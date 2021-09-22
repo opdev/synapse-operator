@@ -1,0 +1,20 @@
+# permissions for end users to view synapses.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: synapse-viewer-role
+rules:
+- apiGroups:
+  - synapse.opdev.io
+  resources:
+  - synapses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - synapse.opdev.io
+  resources:
+  - synapses/status
+  verbs:
+  - get

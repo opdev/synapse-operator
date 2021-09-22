@@ -1,0 +1,24 @@
+# permissions for end users to edit synapses.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: synapse-editor-role
+rules:
+- apiGroups:
+  - synapse.opdev.io
+  resources:
+  - synapses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - synapse.opdev.io
+  resources:
+  - synapses/status
+  verbs:
+  - get

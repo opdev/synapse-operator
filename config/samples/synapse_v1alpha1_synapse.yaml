@@ -1,0 +1,7 @@
+apiVersion: synapse.opdev.io/v1alpha1
+kind: Synapse
+metadata:
+  name: synapse-sample
+spec:
+  # Add fields here
+  foo: bar
