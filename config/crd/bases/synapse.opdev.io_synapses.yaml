@@ -1,0 +1,82 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.1
+  creationTimestamp: null
+  name: synapses.synapse.opdev.io
+spec:
+  group: synapse.opdev.io
+  names:
+    kind: Synapse
+    listKind: SynapseList
+    plural: synapses
+    singular: synapse
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Synapse is the Schema for the synapses API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SynapseSpec defines the desired state of Synapse
+            properties:
+              createNewPostgreSQL:
+                default: false
+                description: Set to true to create a new PostreSQL instance. Currently
+                  not implemented
+                type: boolean
+              homeserverConfigMapName:
+                description: Name of the ConfigMap holding the homeserver.yaml config
+                  file. It is used as an input for the configuration of the Synapse
+                  Server. It can be modified by the Synapse Operator (e.g. the DB
+                  section)
+                type: string
+            required:
+            - homeserverConfigMapName
+            type: object
+          status:
+            description: SynapseStatus defines the observed state of Synapse
+            properties:
+              databaseConnectionInfo:
+                properties:
+                  State:
+                    description: State of the PostgreSQL database
+                    type: string
+                  connectionURL:
+                    description: Endpoint to connect to the PostgreSQL database
+                    type: string
+                  instanceName:
+                    description: Name of the PostgreSQL instance
+                    type: string
+                type: object
+              state:
+                description: State of the Synapse instance
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

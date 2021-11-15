@@ -28,14 +28,42 @@ type SynapseSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Synapse. Edit synapse_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// +kubebuilder:validation:Required
+
+	// Name of the ConfigMap holding the homeserver.yaml config file. It is
+	// used as an input for the configuration of the Synapse Server. It can be
+	// modified by the Synapse Operator (e.g. the DB section)
+	HomeserverConfigMapName string `json:"homeserverConfigMapName"`
+
+	// +kubebuilder:default:=false
+
+	// Set to true to create a new PostreSQL instance. Currently not implemented
+	CreateNewPostgreSQL bool `json:"createNewPostgreSQL,omitempty"`
 }
 
 // SynapseStatus defines the observed state of Synapse
 type SynapseStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Connection information to the extrnal PostgreSQL Database
+
+	DatabaseConnectionInfo SynapseSpecDatabaseConnectionInfo `json:"databaseConnectionInfo,omitempty"`
+
+	// State of the Synapse instance
+	State string `json:"state,omitempty"`
+}
+
+type SynapseSpecDatabaseConnectionInfo struct {
+
+	// Endpoint to connect to the PostgreSQL database
+	ConnectionURL string `json:"connectionURL,omitempty"`
+
+	// Name of the PostgreSQL instance
+	InstanceName string `json:"instanceName,omitempty"`
+
+	// State of the PostgreSQL database
+	State string `json:"State,omitempty"`
 }
 
 //+kubebuilder:object:root=true
