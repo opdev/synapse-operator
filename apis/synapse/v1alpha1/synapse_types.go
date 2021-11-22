@@ -47,15 +47,16 @@ type SynapseStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Connection information to the extrnal PostgreSQL Database
+	DatabaseConnectionInfo SynapseStatusDatabaseConnectionInfo `json:"databaseConnectionInfo,omitempty"`
 
-	DatabaseConnectionInfo SynapseSpecDatabaseConnectionInfo `json:"databaseConnectionInfo,omitempty"`
+	// Holds configuration information for Synapse
+	HomeserverConfiguration SynapseStatusHomeserverConfiguration `json:"homeserverConfiguration,omitempty"`
 
 	// State of the Synapse instance
 	State string `json:"state,omitempty"`
 }
 
-type SynapseSpecDatabaseConnectionInfo struct {
-
+type SynapseStatusDatabaseConnectionInfo struct {
 	// Endpoint to connect to the PostgreSQL database
 	ConnectionURL string `json:"connectionURL,omitempty"`
 
@@ -64,6 +65,14 @@ type SynapseSpecDatabaseConnectionInfo struct {
 
 	// State of the PostgreSQL database
 	State string `json:"State,omitempty"`
+}
+
+type SynapseStatusHomeserverConfiguration struct {
+	// The public-facing domain of the server
+	ServerName string `json:"serverName,omitempty"`
+
+	// Whether or not to report anonymized homeserver usage statistics
+	ReportStats bool `json:"reportStats,omitempty"`
 }
 
 //+kubebuilder:object:root=true

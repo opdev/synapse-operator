@@ -54,6 +54,7 @@ spec:
             description: SynapseStatus defines the observed state of Synapse
             properties:
               databaseConnectionInfo:
+                description: Connection information to the extrnal PostgreSQL Database
                 properties:
                   State:
                     description: State of the PostgreSQL database
@@ -63,6 +64,17 @@ spec:
                     type: string
                   instanceName:
                     description: Name of the PostgreSQL instance
+                    type: string
+                type: object
+              homeserverConfiguration:
+                description: Holds configuration information for Synapse
+                properties:
+                  reportStats:
+                    description: Whether or not to report anonymized homeserver usage
+                      statistics
+                    type: boolean
+                  serverName:
+                    description: The public-facing domain of the server
                     type: string
                 type: object
               state:
