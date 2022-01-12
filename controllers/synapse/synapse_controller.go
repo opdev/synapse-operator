@@ -62,7 +62,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if err := r.ParseHomeserverConfigMap(synapse, ctx); err != nil {
+	if err := r.ParseHomeserverConfigMap(&synapse, ctx); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -99,7 +99,7 @@ func labelsForSynapse(name string) map[string]string {
 // ParseHomeserverConfigMap loads the ConfigMap, which name is determined by
 // Spec.HomeserverConfigMapName, run validation checks and fetch necesarry
 // value needed to configure the Synapse Deployment.
-func (r *SynapseReconciler) ParseHomeserverConfigMap(synapse synapsev1alpha1.Synapse, ctx context.Context) error {
+func (r *SynapseReconciler) ParseHomeserverConfigMap(synapse *synapsev1alpha1.Synapse, ctx context.Context) error {
 	log := ctrllog.FromContext(ctx)
 
 	// Get and validate homeserver ConfigMap
