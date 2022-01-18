@@ -1,6 +1,8 @@
 package synapse
 
 import (
+	"context"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -10,6 +12,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 )
@@ -20,7 +28,60 @@ func BoolAddr(b bool) *bool {
 	return &boolVar
 }
 
-var _ = Describe("Synapse controller", func() {
+var _ = Describe("Integration tests for the Synapse controller", Ordered, Label("integration"), func() {
+	var k8sClient client.Client
+	var testEnv *envtest.Environment
+	var ctx context.Context
+	var cancel context.CancelFunc
+
+	var _ = BeforeAll(func() {
+		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+
+		ctx, cancel = context.WithCancel(context.TODO())
+
+		By("bootstrapping test environment")
+		testEnv = &envtest.Environment{
+			CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+			ErrorIfCRDPathMissing: true,
+		}
+
+		cfg, err := testEnv.Start()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(cfg).NotTo(BeNil())
+
+		err = synapsev1alpha1.AddToScheme(scheme.Scheme)
+		Expect(err).NotTo(HaveOccurred())
+
+		//+kubebuilder:scaffold:scheme
+
+		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(k8sClient).NotTo(BeNil())
+
+		k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
+			Scheme: scheme.Scheme,
+		})
+		Expect(err).ToNot(HaveOccurred())
+
+		err = (&SynapseReconciler{
+			Client: k8sManager.GetClient(),
+			Scheme: k8sManager.GetScheme(),
+		}).SetupWithManager(k8sManager)
+		Expect(err).ToNot(HaveOccurred())
+
+		go func() {
+			defer GinkgoRecover()
+			err = k8sManager.Start(ctx)
+			Expect(err).ToNot(HaveOccurred(), "failed to run manager")
+		}()
+	})
+
+	var _ = AfterAll(func() {
+		cancel()
+		By("tearing down the test environment")
+		err := testEnv.Stop()
+		Expect(err).NotTo(HaveOccurred())
+	})
 
 	// Define utility constants for object names and testing timeouts/durations and intervals.
 	const (
