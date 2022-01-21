@@ -62,7 +62,14 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if err := r.ParseHomeserverConfigMap(synapse, ctx); err != nil {
+	// Get and validate homeserver ConfigMap
+	var cm corev1.ConfigMap
+	if err := r.Get(context.TODO(), types.NamespacedName{Name: synapse.Spec.HomeserverConfigMapName, Namespace: synapse.Namespace}, &cm); err != nil {
+		log.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", synapse.Spec.HomeserverConfigMapName)
+		return ctrl.Result{}, err
+	}
+
+	if err := r.ParseHomeserverConfigMap(ctx, &synapse, cm); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -99,66 +106,59 @@ func labelsForSynapse(name string) map[string]string {
 // ParseHomeserverConfigMap loads the ConfigMap, which name is determined by
 // Spec.HomeserverConfigMapName, run validation checks and fetch necesarry
 // value needed to configure the Synapse Deployment.
-func (r *SynapseReconciler) ParseHomeserverConfigMap(synapse synapsev1alpha1.Synapse, ctx context.Context) error {
+func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synapse *synapsev1alpha1.Synapse, cm corev1.ConfigMap) error {
 	log := ctrllog.FromContext(ctx)
 
-	// Get and validate homeserver ConfigMap
-	var cm corev1.ConfigMap
-	if err := r.Get(context.TODO(), types.NamespacedName{Name: synapse.Spec.HomeserverConfigMapName, Namespace: synapse.Namespace}, &cm); err != nil {
-		log.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", synapse.Spec.HomeserverConfigMapName)
+	// TODO:
+	// - Ensure that key path is and log config file path are in /data
+	// - Otherwise, edit homeserver.yaml with new paths
+
+	// Load and validate homeserver.yaml
+	homeserver := make(map[interface{}]interface{})
+	if cm_data, ok := cm.Data["homeserver.yaml"]; !ok {
+		err := errors.New("missing homeserver.yaml in ConfigMap")
+		log.Error(err, "Missing homeserver.yaml in ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", synapse.Spec.HomeserverConfigMapName)
 		return err
 	} else {
-		// TODO:
-		// - Ensure that key path is and log config file path are in /data
-		// - Otherwise, edit homeserver.yaml with new paths
-
-		// Load and validate homeserver.yaml
-		homeserver := make(map[interface{}]interface{})
-		if cm_data, ok := cm.Data["homeserver.yaml"]; !ok {
-			err := errors.New("missing homeserver.yaml in ConfigMap")
-			log.Error(err, "Missing homeserver.yaml in ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", synapse.Spec.HomeserverConfigMapName)
-			return err
-		} else {
-			// YAML Validation
-			if err := yaml.Unmarshal([]byte(cm_data), homeserver); err != nil {
-				log.Error(err, "Malformed homeserver.yaml")
-				return err
-			}
-		}
-
-		// Fetch server_name and report_stats
-		if _, ok := homeserver["server_name"]; !ok {
-			err := errors.New("missing server_name key in homeserver.yaml")
-			log.Error(err, "Missing server_name key in homeserver.yaml")
+		// YAML Validation
+		if err := yaml.Unmarshal([]byte(cm_data), homeserver); err != nil {
+			log.Error(err, "Malformed homeserver.yaml")
 			return err
 		}
-		if _, ok := homeserver["report_stats"]; !ok {
-			err := errors.New("missing report_stats key in homeserver.yaml")
-			log.Error(err, "Missing report_stats key in homeserver.yaml")
-			return err
-		}
-
-		if server_name, ok := homeserver["server_name"].(string); !ok {
-			err := errors.New("error converting server_name to string")
-			log.Error(err, "Error converting server_name to string")
-			return err
-		} else {
-			synapse.Status.HomeserverConfiguration.ServerName = server_name
-		}
-		if report_stats, ok := homeserver["report_stats"].(bool); !ok {
-			err := errors.New("error converting report_stats to bool")
-			log.Error(err, "Error converting report_stats to bool")
-			return err
-		} else {
-			synapse.Status.HomeserverConfiguration.ReportStats = report_stats
-		}
-
-		log.Info(
-			"Loaded homeserver.yaml from ConfigMap successfully",
-			"server_name:", synapse.Status.HomeserverConfiguration.ServerName,
-			"report_stats:", synapse.Status.HomeserverConfiguration.ReportStats,
-		)
 	}
+
+	// Fetch server_name and report_stats
+	if _, ok := homeserver["server_name"]; !ok {
+		err := errors.New("missing server_name key in homeserver.yaml")
+		log.Error(err, "Missing server_name key in homeserver.yaml")
+		return err
+	}
+	if _, ok := homeserver["report_stats"]; !ok {
+		err := errors.New("missing report_stats key in homeserver.yaml")
+		log.Error(err, "Missing report_stats key in homeserver.yaml")
+		return err
+	}
+
+	if server_name, ok := homeserver["server_name"].(string); !ok {
+		err := errors.New("error converting server_name to string")
+		log.Error(err, "Error converting server_name to string")
+		return err
+	} else {
+		synapse.Status.HomeserverConfiguration.ServerName = server_name
+	}
+	if report_stats, ok := homeserver["report_stats"].(bool); !ok {
+		err := errors.New("error converting report_stats to bool")
+		log.Error(err, "Error converting report_stats to bool")
+		return err
+	} else {
+		synapse.Status.HomeserverConfiguration.ReportStats = report_stats
+	}
+
+	log.Info(
+		"Loaded homeserver.yaml from ConfigMap successfully",
+		"server_name:", synapse.Status.HomeserverConfiguration.ServerName,
+		"report_stats:", synapse.Status.HomeserverConfiguration.ReportStats,
+	)
 
 	return nil
 }
