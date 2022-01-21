@@ -83,7 +83,8 @@ type Synapse struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SynapseSpec   `json:"spec,omitempty"`
+	// +kubebuilder:validation:Required
+	Spec   SynapseSpec   `json:"spec"`
 	Status SynapseStatus `json:"status,omitempty"`
 }
 

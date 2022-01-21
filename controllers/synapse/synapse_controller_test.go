@@ -11,6 +11,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -95,6 +96,71 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 		duration = time.Second * 10
 		interval = time.Millisecond * 250
 	)
+
+	Context("Validating Synapse CRD Schema", func() {
+		var obj map[string]interface{}
+
+		BeforeEach(func() {
+			obj = map[string]interface{}{
+				"apiVersion": "synapse.opdev.io/v1alpha1",
+				"kind":       "Synapse",
+				"metadata": map[string]interface{}{
+					"name":      SynapseName,
+					"namespace": SynapseNamespace,
+				},
+			}
+		})
+
+		DescribeTable("Creating a misconfigured Synapse instance",
+			func(synapse_data map[string]interface{}) {
+				// Augment base synapse obj with additional fields
+				for key, value := range synapse_data {
+					obj[key] = value
+				}
+				// Create Unstructured object from synapse obj
+				u := unstructured.Unstructured{Object: obj}
+				Expect(k8sClient.Create(ctx, &u)).ShouldNot(Succeed())
+			},
+			Entry("when Synapse spec is missing", map[string]interface{}{}),
+			Entry("when Synapse spec is empty", map[string]interface{}{
+				"spec": map[string]interface{}{},
+			}),
+			Entry("when Synapse spec is missing HomeserverConfigMapName", map[string]interface{}{
+				"spec": map[string]interface{}{"createNewPostgreSQL": true},
+			}),
+			Entry("when Synapse spec possesses an invalid field", map[string]interface{}{
+				"spec": map[string]interface{}{
+					"HomeserverConfigMapName": ConfigMapName,
+					"InvalidSpecFiels":        "random",
+				},
+			}),
+		)
+
+		DescribeTable("Creating a correct Synapse instance",
+			func(synapse_data map[string]interface{}) {
+				// Augment base synapse obj with additional fields
+				for key, value := range synapse_data {
+					obj[key] = value
+				}
+				// Create Unstructured object from synapse obj
+				u := unstructured.Unstructured{Object: obj}
+				// Use DryRun option to avoid cleaning up resources
+				opt := client.CreateOptions{DryRun: []string{"All"}}
+				Expect(k8sClient.Create(ctx, &u, &opt)).Should(Succeed())
+			},
+			Entry("when all spec fields are specified", map[string]interface{}{
+				"spec": map[string]interface{}{
+					"homeserverConfigMapName": ConfigMapName,
+					"createNewPostreSQL":      true,
+				},
+			}),
+			Entry("when optional CreateNewPostgreSQL is missing", map[string]interface{}{
+				"spec": map[string]interface{}{
+					"homeserverConfigMapName": ConfigMapName,
+				},
+			}),
+		)
+	})
 
 	Context("When creating a Synapse instance", func() {
 		var synapse *synapsev1alpha1.Synapse

@@ -81,6 +81,8 @@ spec:
                 description: State of the Synapse instance
                 type: string
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true
