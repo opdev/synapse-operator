@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	pgov1beta1 "github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	synapsecontrollers "github.com/opdev/synapse-operator/controllers/synapse"
 	//+kubebuilder:scaffold:imports
@@ -45,6 +46,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(synapsev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(pgov1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

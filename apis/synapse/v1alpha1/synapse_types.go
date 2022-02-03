@@ -37,7 +37,7 @@ type SynapseSpec struct {
 
 	// +kubebuilder:default:=false
 
-	// Set to true to create a new PostreSQL instance. Currently not implemented
+	// Set to true to create a new PostreSQL instance.
 	CreateNewPostgreSQL bool `json:"createNewPostgreSQL,omitempty"`
 }
 
@@ -46,7 +46,7 @@ type SynapseStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Connection information to the extrnal PostgreSQL Database
+	// Connection information to the external PostgreSQL Database
 	DatabaseConnectionInfo SynapseStatusDatabaseConnectionInfo `json:"databaseConnectionInfo,omitempty"`
 
 	// Holds configuration information for Synapse
@@ -60,8 +60,14 @@ type SynapseStatusDatabaseConnectionInfo struct {
 	// Endpoint to connect to the PostgreSQL database
 	ConnectionURL string `json:"connectionURL,omitempty"`
 
-	// Name of the PostgreSQL instance
-	InstanceName string `json:"instanceName,omitempty"`
+	// Name of the database to connect to
+	DatabaseName string `json:"databaseName,omitempty"`
+
+	// User allowed to query the given database
+	User string `json:"user,omitempty"`
+
+	// Base64 encoded password
+	Password string `json:"password,omitempty"`
 
 	// State of the PostgreSQL database
 	State string `json:"State,omitempty"`

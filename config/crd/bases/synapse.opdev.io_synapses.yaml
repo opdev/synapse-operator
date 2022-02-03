@@ -38,8 +38,7 @@ spec:
             properties:
               createNewPostgreSQL:
                 default: false
-                description: Set to true to create a new PostreSQL instance. Currently
-                  not implemented
+                description: Set to true to create a new PostreSQL instance.
                 type: boolean
               homeserverConfigMapName:
                 description: Name of the ConfigMap holding the homeserver.yaml config
@@ -54,7 +53,7 @@ spec:
             description: SynapseStatus defines the observed state of Synapse
             properties:
               databaseConnectionInfo:
-                description: Connection information to the extrnal PostgreSQL Database
+                description: Connection information to the external PostgreSQL Database
                 properties:
                   State:
                     description: State of the PostgreSQL database
@@ -62,8 +61,14 @@ spec:
                   connectionURL:
                     description: Endpoint to connect to the PostgreSQL database
                     type: string
-                  instanceName:
-                    description: Name of the PostgreSQL instance
+                  databaseName:
+                    description: Name of the database to connect to
+                    type: string
+                  password:
+                    description: Base64 encoded password
+                    type: string
+                  user:
+                    description: User allowed to query the given database
                     type: string
                 type: object
               homeserverConfiguration:

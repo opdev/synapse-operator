@@ -3,4 +3,5 @@ kind: Synapse
 metadata:
   name: synapse-sample
 spec:
-  homeserverConfigMapName: synapse-homeserver-with-initcontainer
+  homeserverConfigMapName: synapse-homeserver-postgres
+  createNewPostgreSQL: true
