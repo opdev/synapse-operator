@@ -66,11 +66,11 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	var cm corev1.ConfigMap
 	if err := r.Get(context.TODO(), types.NamespacedName{Name: synapse.Spec.HomeserverConfigMapName, Namespace: synapse.Namespace}, &cm); err != nil {
 		log.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", synapse.Spec.HomeserverConfigMapName)
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: time.Duration(30)}, err
 	}
 
 	if err := r.ParseHomeserverConfigMap(ctx, &synapse, cm); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: time.Duration(30)}, err
 	}
 
 	// Reconcile Synapse resources: PVC, Deployment and Service
