@@ -99,7 +99,7 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, obj
 						Name: "data-pv",
 						VolumeSource: corev1.VolumeSource{
 							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-								ClaimName: "synapse-test-pv-with-initcontainer",
+								ClaimName: s.Name,
 							},
 						},
 					}},
