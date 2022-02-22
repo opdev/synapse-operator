@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -176,6 +177,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 		var createdPVC *corev1.PersistentVolumeClaim
 		var createdDeployment *appsv1.Deployment
 		var createdService *corev1.Service
+		var createdServiceAccount *corev1.ServiceAccount
+		var createdRoleBinding *rbacv1.RoleBinding
 		var synapseLookupKey types.NamespacedName
 		var expectedOwnerReference metav1.OwnerReference
 
@@ -188,6 +191,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			createdPVC = &corev1.PersistentVolumeClaim{}
 			createdDeployment = &appsv1.Deployment{}
 			createdService = &corev1.Service{}
+			createdServiceAccount = &corev1.ServiceAccount{}
+			createdRoleBinding = &rbacv1.RoleBinding{}
 			// The OwnerReference UID must be set after the Synapse instance has been
 			// created. See the JustBeforeEach node.
 			expectedOwnerReference = metav1.OwnerReference{
@@ -276,6 +281,28 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				err := k8sClient.Get(ctx, synapseLookupKey, &corev1.Service{})
 				return err == nil
 			}, timeout, interval).Should(BeFalse())
+
+			By("Cleaning up Synapse RoleBinding")
+			// Delete RoleBinding
+			k8sClient.Get(ctx, synapseLookupKey, createdRoleBinding)
+			Expect(k8sClient.Delete(ctx, createdRoleBinding)).Should(Succeed())
+
+			// Check RoleBinding was successfully removed
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, synapseLookupKey, &rbacv1.RoleBinding{})
+				return err == nil
+			}, timeout, interval).Should(BeFalse())
+
+			By("Cleaning up Synapse ServiceAccount")
+			// Delete ServiceAccount
+			k8sClient.Get(ctx, synapseLookupKey, createdServiceAccount)
+			Expect(k8sClient.Delete(ctx, createdServiceAccount)).Should(Succeed())
+
+			// Check RoleBinding was successfully removed
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, synapseLookupKey, &corev1.ServiceAccount{})
+				return err == nil
+			}, timeout, interval).Should(BeFalse())
 		})
 
 		When("Creating a simple Synapse instance", Ordered, func() {
@@ -348,6 +375,28 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 				By("Checking that the Service's OwnerReference contains the Synapse instance")
 				Expect(createdService.ObjectMeta.OwnerReferences).To(ContainElement(expectedOwnerReference))
+			})
+
+			It("Should create a Synapse ServiceAccount", func() {
+				By("Checking that a Synapse ServiceAccount exists")
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, synapseLookupKey, createdServiceAccount)
+					return err == nil
+				}, timeout, interval).Should(BeTrue())
+
+				By("Checking that the ServiceAccount's OwnerReference contains the Synapse instance")
+				Expect(createdServiceAccount.ObjectMeta.OwnerReferences).To(ContainElement(expectedOwnerReference))
+			})
+
+			It("Should create a Synapse RoleBinding", func() {
+				By("Checking that a Synapse RoleBinding exists")
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, synapseLookupKey, createdRoleBinding)
+					return err == nil
+				}, timeout, interval).Should(BeTrue())
+
+				By("Checking that the RoleBinding's OwnerReference contains the Synapse instance")
+				Expect(createdRoleBinding.ObjectMeta.OwnerReferences).To(ContainElement(expectedOwnerReference))
 			})
 		})
 

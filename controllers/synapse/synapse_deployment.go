@@ -86,7 +86,7 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, obj
 							ContainerPort: 8080,
 						}},
 					}},
-					ServiceAccountName: "synapse-sa",
+					ServiceAccountName: s.Name,
 					Volumes: []corev1.Volume{{
 						Name: "homeserver",
 						VolumeSource: corev1.VolumeSource{

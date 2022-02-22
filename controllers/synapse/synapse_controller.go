@@ -27,6 +27,7 @@ import (
 	"gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -99,16 +100,16 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Reconcile Synapse resources: PVC, Deployment and Service
-	var objectMeta metav1.ObjectMeta
+	objectMeta := setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
+	r.reconcileResource(r.serviceAccountForSynapse, &synapse, &corev1.ServiceAccount{}, objectMeta)
 
-	objectMeta = setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
+	r.reconcileResource(r.roleBindingForSynapse, &synapse, &rbacv1.RoleBinding{}, objectMeta)
+
 	r.reconcileResource(r.persistentVolumeClaimForSynapse, &synapse, &corev1.PersistentVolumeClaim{}, objectMeta)
 
-	objectMeta = setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
 	r.reconcileResource(r.deploymentForSynapse, &synapse, &appsv1.Deployment{}, objectMeta)
 	// TODO: If a deployment is found, check that its Spec are correct.
 
-	objectMeta = setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
 	r.reconcileResource(r.serviceForSynapse, &synapse, &corev1.Service{}, objectMeta)
 
 	// Update the Synapse status if needed
