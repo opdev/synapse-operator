@@ -54,6 +54,9 @@ type SynapseStatus struct {
 
 	// State of the Synapse instance
 	State string `json:"state,omitempty"`
+
+	// Reason for the current Synapse State
+	Reason string `json:"reason,omitempty"`
 }
 
 type SynapseStatusDatabaseConnectionInfo struct {

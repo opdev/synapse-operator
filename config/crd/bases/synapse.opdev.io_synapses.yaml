@@ -82,6 +82,9 @@ spec:
                     description: The public-facing domain of the server
                     type: string
                 type: object
+              reason:
+                description: Reason for the current Synapse State
+                type: string
               state:
                 description: State of the Synapse instance
                 type: string
