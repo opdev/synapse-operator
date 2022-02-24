@@ -2,6 +2,9 @@ package synapse
 
 import (
 	"context"
+	"encoding/json"
+	"io"
+	"net/http"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -12,6 +15,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,6 +34,22 @@ import (
 func BoolAddr(b bool) *bool {
 	boolVar := b
 	return &boolVar
+}
+
+func convert(i interface{}) interface{} {
+	switch x := i.(type) {
+	case map[interface{}]interface{}:
+		m2 := map[string]interface{}{}
+		for k, v := range x {
+			m2[k.(string)] = convert(v)
+		}
+		return m2
+	case []interface{}:
+		for i, v := range x {
+			x[i] = convert(v)
+		}
+	}
+	return i
 }
 
 var _ = Describe("Integration tests for the Synapse controller", Ordered, Label("integration"), func() {
@@ -57,11 +77,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cfg).NotTo(BeNil())
 
-		err = synapsev1alpha1.AddToScheme(scheme.Scheme)
-		Expect(err).NotTo(HaveOccurred())
-
-		err = pgov1beta1.AddToScheme(scheme.Scheme)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(synapsev1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+		Expect(pgov1beta1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
 		//+kubebuilder:scaffold:scheme
 
@@ -82,8 +99,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 		go func() {
 			defer GinkgoRecover()
-			err = k8sManager.Start(ctx)
-			Expect(err).ToNot(HaveOccurred(), "failed to run manager")
+			Expect(k8sManager.Start(ctx)).ToNot(HaveOccurred(), "failed to run manager")
 		}()
 	}
 
@@ -120,16 +136,50 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 	Context("When a corectly configured Kubernetes cluster is present", func() {
 		var _ = BeforeAll(func() {
+
 			logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 			ctx, cancel = context.WithCancel(context.TODO())
+
+			By("Getting latest version of the PostgresCluster CRD")
+			postgresOperatorVersion := "5.0.4"
+			postgresClusterURL := "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-prod/main/operators/postgresql/" +
+				postgresOperatorVersion +
+				"/manifests/postgresclusters.postgres-operator.crunchydata.com.crd.yaml"
+
+			resp, err := http.Get(postgresClusterURL)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			// The CRD is downloaded as a YAML document. The CustomResourceDefinition
+			// struct defined in the v1 package only possess json tags. In order to
+			// successfully Unmarshal the CRD Document into a
+			// CustomResourceDefinition object, it is necessary to first transform the
+			// YAML document into a intermediate JSON document.
+			defer resp.Body.Close()
+			yamlBody, err := io.ReadAll(resp.Body)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			// Unmarshal the YAML document into an intermediate map
+			var mapBody interface{}
+			Expect(yaml.Unmarshal(yamlBody, &mapBody)).ShouldNot(HaveOccurred())
+
+			// The map has to be converted. See https://stackoverflow.com/a/40737676/6133648
+			mapBody = convert(mapBody)
+
+			// Marshal the map into an intermediate JSON document
+			jsonBody, err := json.Marshal(mapBody)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			// Unmarshall the JSON document into the final CustomResourceDefinition object.
+			var PostgresClusterCRD v1.CustomResourceDefinition
+			Expect(json.Unmarshal(jsonBody, &PostgresClusterCRD)).ShouldNot(HaveOccurred())
 
 			By("bootstrapping test environment")
 			testEnv = &envtest.Environment{
 				CRDDirectoryPaths: []string{
 					filepath.Join("..", "..", "config", "crd", "bases"),
-					filepath.Join("..", "..", "postgres-operator-crds"),
 				},
+				CRDs:                  []*v1.CustomResourceDefinition{&PostgresClusterCRD},
 				ErrorIfCRDPathMissing: true,
 			}
 
@@ -139,8 +189,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 		var _ = AfterAll(func() {
 			cancel()
 			By("tearing down the test environment")
-			err := testEnv.Stop()
-			Expect(err).NotTo(HaveOccurred())
+			Expect(testEnv.Stop()).NotTo(HaveOccurred())
 		})
 
 		Context("Validating Synapse CRD Schema", func() {
