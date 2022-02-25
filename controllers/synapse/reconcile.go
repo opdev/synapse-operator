@@ -2,13 +2,12 @@ package synapse
 
 import (
 	"context"
-	"fmt"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
@@ -26,31 +25,61 @@ func setObjectMeta(name string, namespace string, labels map[string]string) meta
 }
 
 func (r *SynapseReconciler) reconcileResource(
+	ctx context.Context,
 	createResource createResourceFunc,
 	s *synapsev1alpha1.Synapse,
 	resource client.Object,
 	objectMeta metav1.ObjectMeta) error {
 
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: objectMeta.Name, Namespace: objectMeta.Namespace}, resource)
-	fmt.Printf("%v - Getting sample resource error boolean: %v", time.Now(), errors.IsNotFound(err))
-	if err != nil {
-		if errors.IsNotFound(err) {
-			fmt.Printf("%v - reconcileResource: creating a new resource for Synapse", time.Now())
+	log := ctrllog.FromContext(ctx)
+	log.Info(
+		"Reconciling resource",
+		"Kind", resource.GetObjectKind(),
+		"Name", objectMeta.Name,
+		"Namespace", objectMeta.Namespace,
+	)
+
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: objectMeta.Name, Namespace: objectMeta.Namespace}, resource); err != nil {
+		if k8serrors.IsNotFound(err) {
+			log.Info(
+				"Creating a new resource for Synapse",
+				"Kind", resource.GetObjectKind(),
+				"Name", objectMeta.Name,
+				"Namespace", objectMeta.Namespace,
+			)
 
 			resource := createResource(s, objectMeta)
-			err = r.Client.Create(context.TODO(), resource)
+			err = r.Client.Create(ctx, resource)
 
 			if err != nil {
-				fmt.Printf("%v - reconcileResource: failed to create new resource, err: %v", time.Now(), err)
+				log.Error(
+					err,
+					"Failed to create a new resource for Synapse",
+					"Kind", resource.GetObjectKind(),
+					"Name", objectMeta.Name,
+					"Namespace", objectMeta.Namespace,
+				)
 				return err
 			}
 
 			return nil
 		}
 
-		fmt.Printf("%v - reconcileResource: error reading resource, err: %v", time.Now(), err)
+		log.Error(
+			err,
+			"Error reading resource",
+			"Kind", resource.GetObjectKind(),
+			"Name", objectMeta.Name,
+			"Namespace", objectMeta.Namespace,
+		)
 		return err
 	}
 
+	log.Info(
+		"Reconciling resource",
+		"Kind", resource.GetObjectKind(),
+		"Name", objectMeta.Name,
+		"Namespace", objectMeta.Namespace,
+	)
 	return nil
 }

@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -75,10 +76,24 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Load the Synapse by name
 	var synapse synapsev1alpha1.Synapse
 	if err := r.Get(ctx, req.NamespacedName, &synapse); err != nil {
-		log.Error(err, "unable to fetch synapse")
-		// we'll ignore not-found errors, since they can't be fixed by an immediate
-		// requeue (we'll need to wait for a new notification), and we can get them
-		// on deleted requests.
+		if k8serrors.IsNotFound(err) {
+			// we'll ignore not-found errors, since they can't be fixed by an immediate
+			// requeue (we'll need to wait for a new notification), and we can get them
+			// on deleted requests.
+			log.Error(
+				err,
+				"Cannot find Synapse - has it been deleted ?",
+				"Synapse Name", synapse.Name,
+				"Synapse Namespace", synapse.Namespace,
+			)
+			return ctrl.Result{}, nil
+		}
+		log.Error(
+			err,
+			"Error fetching Synapse",
+			"Synapse Name", synapse.Name,
+			"Synapse Namespace", synapse.Namespace,
+		)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -116,16 +131,26 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Reconcile Synapse resources: PVC, Deployment and Service
 	objectMeta := setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
-	r.reconcileResource(r.serviceAccountForSynapse, &synapse, &corev1.ServiceAccount{}, objectMeta)
+	if err := r.reconcileResource(ctx, r.serviceAccountForSynapse, &synapse, &corev1.ServiceAccount{}, objectMeta); err != nil {
+		return ctrl.Result{}, err
+	}
 
-	r.reconcileResource(r.roleBindingForSynapse, &synapse, &rbacv1.RoleBinding{}, objectMeta)
+	if err := r.reconcileResource(ctx, r.roleBindingForSynapse, &synapse, &rbacv1.RoleBinding{}, objectMeta); err != nil {
+		return ctrl.Result{}, err
+	}
 
-	r.reconcileResource(r.persistentVolumeClaimForSynapse, &synapse, &corev1.PersistentVolumeClaim{}, objectMeta)
+	if err := r.reconcileResource(ctx, r.persistentVolumeClaimForSynapse, &synapse, &corev1.PersistentVolumeClaim{}, objectMeta); err != nil {
+		return ctrl.Result{}, err
+	}
 
-	r.reconcileResource(r.deploymentForSynapse, &synapse, &appsv1.Deployment{}, objectMeta)
+	if err := r.reconcileResource(ctx, r.deploymentForSynapse, &synapse, &appsv1.Deployment{}, objectMeta); err != nil {
+		return ctrl.Result{}, err
+	}
 	// TODO: If a deployment is found, check that its Spec are correct.
 
-	r.reconcileResource(r.serviceForSynapse, &synapse, &corev1.Service{}, objectMeta)
+	if err := r.reconcileResource(ctx, r.serviceForSynapse, &synapse, &corev1.Service{}, objectMeta); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// Update the Synapse status if needed
 	if synapse.Status.State != "RUNNING" {
@@ -241,11 +266,15 @@ func (r *SynapseReconciler) createPostgresClusterForSynapse(
 
 	// Create ConfigMap for PostgresCluster
 	objectMeta = setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
-	r.reconcileResource(r.configMapForPostgresCluster, &synapse, &corev1.ConfigMap{}, objectMeta)
+	if err := r.reconcileResource(ctx, r.configMapForPostgresCluster, &synapse, &corev1.ConfigMap{}, objectMeta); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// Create PostgresCluster for Synapse
 	objectMeta = setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
-	r.reconcileResource(r.postgresClusterForSynapse, &synapse, &createdPostgresCluster, objectMeta)
+	if err := r.reconcileResource(ctx, r.postgresClusterForSynapse, &synapse, &createdPostgresCluster, objectMeta); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// Wait for PostgresCluster to be up
 	if err := r.Get(ctx, types.NamespacedName{Name: createdPostgresCluster.Name, Namespace: createdPostgresCluster.Namespace}, &createdPostgresCluster); err != nil {
