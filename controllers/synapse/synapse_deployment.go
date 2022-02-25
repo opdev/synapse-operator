@@ -83,7 +83,7 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, obj
 							MountPath: "/data",
 						}},
 						Ports: []corev1.ContainerPort{{
-							ContainerPort: 8080,
+							ContainerPort: 8008,
 						}},
 					}},
 					ServiceAccountName: s.Name,

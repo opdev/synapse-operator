@@ -34,8 +34,8 @@ func (r *SynapseReconciler) serviceForSynapse(s *synapsev1alpha1.Synapse, object
 			Ports: []corev1.ServicePort{{
 				Name:       "http",
 				Protocol:   corev1.ProtocolTCP,
-				Port:       8080,
-				TargetPort: intstr.FromInt(8080),
+				Port:       8008,
+				TargetPort: intstr.FromInt(8008),
 			}},
 			Selector: labelsForSynapse(s.Name),
 			Type:     corev1.ServiceTypeClusterIP,
