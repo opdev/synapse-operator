@@ -220,13 +220,61 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				Entry("when Synapse spec is empty", map[string]interface{}{
 					"spec": map[string]interface{}{},
 				}),
-				Entry("when Synapse spec is missing HomeserverConfigMapName", map[string]interface{}{
+				Entry("when Synapse spec is missing Homeserver", map[string]interface{}{
 					"spec": map[string]interface{}{"createNewPostgreSQL": true},
+				}),
+				// See https://github.com/opdev/synapse-operator/issues/15
+				// Entry("when Synapse spec Homeserver is empty", map[string]interface{}{
+				// 	"spec": map[string]interface{}{
+				// 		"homeserver": map[string]interface{}{},
+				// 	},
+				// }),
+				// Entry("when Synapse spec Homeserver possess both Values and ConfigMap", map[string]interface{}{
+				// 	"spec": map[string]interface{}{
+				// 		"homeserver": map[string]interface{}{
+				// 			"configMap": map[string]interface{}{
+				// 				"name":      ConfigMapName,
+				// 				"namespace": SynapseNamespace,
+				// 			},
+				// 			"values": map[string]interface{}{
+				// 				"serverName":  ServerName,
+				// 				"reportStats": ReportStats,
+				// 			},
+				// 		}},
+				// }),
+				Entry("when Synapse spec Homeserver ConfigMap doesn't specify a Name", map[string]interface{}{
+					"spec": map[string]interface{}{
+						"homeserver": map[string]interface{}{
+							"configMap": map[string]interface{}{
+								"namespace": SynapseNamespace,
+							},
+						}},
+				}),
+				Entry("when Synapse spec Homeserver Values is missing ServerName", map[string]interface{}{
+					"spec": map[string]interface{}{
+						"homeserver": map[string]interface{}{
+							"values": map[string]interface{}{
+								"reportStats": ReportStats,
+							},
+						}},
+				}),
+				Entry("when Synapse spec Homeserver Values is missing ReportStats", map[string]interface{}{
+					"spec": map[string]interface{}{
+						"homeserver": map[string]interface{}{
+							"values": map[string]interface{}{
+								"serverName": ServerName,
+							},
+						}},
 				}),
 				Entry("when Synapse spec possesses an invalid field", map[string]interface{}{
 					"spec": map[string]interface{}{
-						"HomeserverConfigMapName": ConfigMapName,
-						"InvalidSpecFiels":        "random",
+						"Homeserver": map[string]interface{}{
+							"configMap": map[string]interface{}{
+								"name":      ConfigMapName,
+								"namespace": SynapseNamespace,
+							},
+						},
+						"InvalidSpecFiels": "random",
 					},
 				}),
 			)
@@ -243,17 +291,46 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					opt := client.CreateOptions{DryRun: []string{"All"}}
 					Expect(k8sClient.Create(ctx, &u, &opt)).Should(Succeed())
 				},
-				Entry("when all spec fields are specified", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"homeserverConfigMapName": ConfigMapName,
-						"createNewPostreSQL":      true,
+				Entry(
+					"when the Homeserver Configuration file is provided via a ConfigMap",
+					map[string]interface{}{
+						"spec": map[string]interface{}{
+							"homeserver": map[string]interface{}{
+								"configMap": map[string]interface{}{
+									"name":      ConfigMapName,
+									"namespace": SynapseNamespace,
+								},
+							},
+							"createNewPostreSQL": true,
+						},
 					},
-				}),
-				Entry("when optional CreateNewPostgreSQL is missing", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"homeserverConfigMapName": ConfigMapName,
+				),
+				Entry(
+					"when the Homeserver Configuration values are provided",
+					map[string]interface{}{
+						"spec": map[string]interface{}{
+							"homeserver": map[string]interface{}{
+								"values": map[string]interface{}{
+									"serverName":  ServerName,
+									"reportStats": ReportStats,
+								},
+							},
+							"createNewPostreSQL": true,
+						},
 					},
-				}),
+				),
+				Entry(
+					"when optional CreateNewPostgreSQL and ConfigMap Namespace are missing",
+					map[string]interface{}{
+						"spec": map[string]interface{}{
+							"homeserver": map[string]interface{}{
+								"configMap": map[string]interface{}{
+									"name": ConfigMapName,
+								},
+							},
+						},
+					},
+				),
 			)
 		})
 
@@ -400,7 +477,11 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					}
 
 					synapseSpec = synapsev1alpha1.SynapseSpec{
-						HomeserverConfigMapName: ConfigMapName,
+						Homeserver: synapsev1alpha1.SynapseHomeserver{
+							ConfigMap: synapsev1alpha1.SynapseHomeserverConfigMap{
+								Name: ConfigMapName,
+							},
+						},
 					}
 				})
 
@@ -501,8 +582,12 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					}
 
 					synapseSpec = synapsev1alpha1.SynapseSpec{
-						HomeserverConfigMapName: ConfigMapName,
-						CreateNewPostgreSQL:     true,
+						Homeserver: synapsev1alpha1.SynapseHomeserver{
+							ConfigMap: synapsev1alpha1.SynapseHomeserverConfigMap{
+								Name: ConfigMapName,
+							},
+						},
+						CreateNewPostgreSQL: true,
 					}
 				})
 
@@ -589,7 +674,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					Eventually(func(g Gomega) {
 						// Fetching database section of the homeserver.yaml configuration file
 						g.Expect(k8sClient.Get(ctx,
-							types.NamespacedName{Name: synapse.Spec.HomeserverConfigMapName, Namespace: SynapseNamespace},
+							types.NamespacedName{Name: ConfigMapName, Namespace: SynapseNamespace},
 							configMap,
 						)).Should(Succeed())
 
@@ -639,7 +724,11 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						Namespace: SynapseNamespace,
 					},
 					Spec: synapsev1alpha1.SynapseSpec{
-						HomeserverConfigMapName: ConfigMapName,
+						Homeserver: synapsev1alpha1.SynapseHomeserver{
+							ConfigMap: synapsev1alpha1.SynapseHomeserverConfigMap{
+								Name: ConfigMapName,
+							},
+						},
 					},
 				}
 				Expect(k8sClient.Create(ctx, synapse)).Should(Succeed())
@@ -705,8 +794,12 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						Namespace: SynapseNamespace,
 					},
 					Spec: synapsev1alpha1.SynapseSpec{
-						HomeserverConfigMapName: ConfigMapName,
-						CreateNewPostgreSQL:     true,
+						Homeserver: synapsev1alpha1.SynapseHomeserver{
+							ConfigMap: synapsev1alpha1.SynapseHomeserverConfigMap{
+								Name: ConfigMapName,
+							},
+						},
+						CreateNewPostgreSQL: true,
 					},
 				}
 				Expect(k8sClient.Create(ctx, synapse)).Should(Succeed())

@@ -99,13 +99,14 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Get and validate homeserver ConfigMap
 	var cm corev1.ConfigMap
-	if err := r.Get(ctx, types.NamespacedName{Name: synapse.Spec.HomeserverConfigMapName, Namespace: synapse.Namespace}, &cm); err != nil {
-		reason := "ConfigMap " + synapse.Spec.HomeserverConfigMapName + " does not exist in namespace " + synapse.Namespace
+	ConfigMapName := synapse.Spec.Homeserver.ConfigMap.Name
+	if err := r.Get(ctx, types.NamespacedName{Name: ConfigMapName, Namespace: synapse.Namespace}, &cm); err != nil {
+		reason := "ConfigMap " + ConfigMapName + " does not exist in namespace " + synapse.Namespace
 		if err := r.setFailedState(ctx, synapse, reason); err != nil {
 			log.Error(err, "Error updating Synapse State")
 		}
 
-		log.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", synapse.Spec.HomeserverConfigMapName)
+		log.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", ConfigMapName)
 		return ctrl.Result{RequeueAfter: time.Duration(30)}, err
 	}
 
@@ -190,7 +191,7 @@ func (r *SynapseReconciler) setFailedState(ctx context.Context, synapse synapsev
 }
 
 // ParseHomeserverConfigMap loads the ConfigMap, which name is determined by
-// Spec.HomeserverConfigMapName, run validation checks and fetch necesarry
+// Spec.Homeserver.ConfigMap.Name, run validation checks and fetch necesarry
 // value needed to configure the Synapse Deployment.
 func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synapse *synapsev1alpha1.Synapse, cm corev1.ConfigMap) error {
 	log := ctrllog.FromContext(ctx)
@@ -204,7 +205,7 @@ func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synaps
 	cm_data, ok := cm.Data["homeserver.yaml"]
 	if !ok {
 		err := errors.New("missing homeserver.yaml in ConfigMap")
-		log.Error(err, "Missing homeserver.yaml in ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", synapse.Spec.HomeserverConfigMapName)
+		log.Error(err, "Missing homeserver.yaml in ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", synapse.Spec.Homeserver.ConfigMap.Name)
 		return err
 	}
 

@@ -38,16 +38,51 @@ spec:
             properties:
               createNewPostgreSQL:
                 default: false
-                description: Set to true to create a new PostreSQL instance.
+                description: Set to true to create a new PostreSQL instance. The homeserver.yaml
+                  'database' section will be overwritten.
                 type: boolean
-              homeserverConfigMapName:
-                description: Name of the ConfigMap holding the homeserver.yaml config
-                  file. It is used as an input for the configuration of the Synapse
-                  Server. It can be modified by the Synapse Operator (e.g. the DB
-                  section)
-                type: string
+              homeserver:
+                description: Holds information related to the homeserver.yaml configuration
+                  file. The user can either specify an existing ConfigMap by its Name
+                  and Namespace containing a homeserver.yaml, or provide a set of
+                  values for the creation of a configuration file from scratch.
+                properties:
+                  configMap:
+                    description: Holds information about the ConfigMap containing
+                      the homeserver.yaml configuration file to be used as input for
+                      the configuration of the Synapse server.
+                    properties:
+                      name:
+                        description: Name of the ConfigMap in the given Namespace.
+                        type: string
+                      namespace:
+                        description: Namespace in which the ConfigMap is living. If
+                          left empty, the Synapse namespace is used. Currently the
+                          ConfigMap must live in the same namespace as the Synapse
+                          instance referencing it, therefore this attribute is not
+                          used. See https://github.com/opdev/synapse-operator/issues/17
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  values:
+                    description: Holds the required values for the creation of a homeserver.yaml
+                      configuration file by the Synapse Operator
+                    properties:
+                      reportStats:
+                        description: Whether or not to report anonymized homeserver
+                          usage statistics
+                        type: boolean
+                      serverName:
+                        description: The public-facing domain of the server
+                        type: string
+                    required:
+                    - reportStats
+                    - serverName
+                    type: object
+                type: object
             required:
-            - homeserverConfigMapName
+            - homeserver
             type: object
           status:
             description: SynapseStatus defines the observed state of Synapse

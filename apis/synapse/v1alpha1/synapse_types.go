@@ -30,15 +30,56 @@ type SynapseSpec struct {
 
 	// +kubebuilder:validation:Required
 
-	// Name of the ConfigMap holding the homeserver.yaml config file. It is
-	// used as an input for the configuration of the Synapse Server. It can be
-	// modified by the Synapse Operator (e.g. the DB section)
-	HomeserverConfigMapName string `json:"homeserverConfigMapName"`
+	// Holds information related to the homeserver.yaml configuration file.
+	// The user can either specify an existing ConfigMap by its Name and
+	// Namespace containing a homeserver.yaml, or provide a set of values for
+	// the creation of a configuration file from scratch.
+	Homeserver SynapseHomeserver `json:"homeserver"`
 
 	// +kubebuilder:default:=false
 
-	// Set to true to create a new PostreSQL instance.
+	// Set to true to create a new PostreSQL instance. The homeserver.yaml
+	// 'database' section will be overwritten.
 	CreateNewPostgreSQL bool `json:"createNewPostgreSQL,omitempty"`
+}
+
+type SynapseHomeserver struct {
+	// TODO: https://github.com/opdev/synapse-operator/issues/15
+
+	// Holds information about the ConfigMap containing the homeserver.yaml
+	// configuration file to be used as input for the configuration of the
+	// Synapse server.
+	ConfigMap SynapseHomeserverConfigMap `json:"configMap,omitempty"`
+
+	// Holds the required values for the creation of a homeserver.yaml
+	// configuration file by the Synapse Operator
+	Values SynapseHomeserverValues `json:"values,omitempty"`
+}
+
+type SynapseHomeserverConfigMap struct {
+	// +kubebuilder:validation:Required
+
+	// Name of the ConfigMap in the given Namespace.
+	Name string `json:"name"`
+
+	// Namespace in which the ConfigMap is living. If left empty, the Synapse
+	// namespace is used. Currently the ConfigMap must live in the same
+	// namespace as the Synapse instance referencing it, therefore this
+	// attribute is not used.
+	// See https://github.com/opdev/synapse-operator/issues/17
+	Namespace string `json:"namespace,omitempty"`
+}
+
+type SynapseHomeserverValues struct {
+	// +kubebuilder:validation:Required
+
+	// The public-facing domain of the server
+	ServerName string `json:"serverName"`
+
+	// +kubebuilder:validation:Required
+
+	// Whether or not to report anonymized homeserver usage statistics
+	ReportStats bool `json:"reportStats"`
 }
 
 // SynapseStatus defines the observed state of Synapse
