@@ -92,7 +92,7 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, obj
 						VolumeSource: corev1.VolumeSource{
 							ConfigMap: &corev1.ConfigMapVolumeSource{
 								LocalObjectReference: corev1.LocalObjectReference{
-									Name: s.Spec.Homeserver.ConfigMap.Name,
+									Name: s.Status.HomeserverConfigMapName,
 								},
 							},
 						},

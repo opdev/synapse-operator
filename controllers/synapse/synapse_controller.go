@@ -97,27 +97,46 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Get and validate homeserver ConfigMap
-	var cm corev1.ConfigMap
-	ConfigMapName := synapse.Spec.Homeserver.ConfigMap.Name
-	if err := r.Get(ctx, types.NamespacedName{Name: ConfigMapName, Namespace: synapse.Namespace}, &cm); err != nil {
-		reason := "ConfigMap " + ConfigMapName + " does not exist in namespace " + synapse.Namespace
-		if err := r.setFailedState(ctx, synapse, reason); err != nil {
-			log.Error(err, "Error updating Synapse State")
+	var outputConfigMap corev1.ConfigMap
+
+	if synapse.Spec.Homeserver.ConfigMap.Name != "" {
+		var inputConfigMap corev1.ConfigMap
+		// Get and validate homeserver ConfigMap
+		ConfigMapName := synapse.Spec.Homeserver.ConfigMap.Name
+		if err := r.Get(ctx, types.NamespacedName{Name: ConfigMapName, Namespace: synapse.Namespace}, &inputConfigMap); err != nil {
+			reason := "ConfigMap " + ConfigMapName + " does not exist in namespace " + synapse.Namespace
+			if err := r.setFailedState(ctx, &synapse, reason); err != nil {
+				log.Error(err, "Error updating Synapse State")
+			}
+
+			log.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", ConfigMapName)
+			return ctrl.Result{RequeueAfter: time.Duration(30)}, err
 		}
 
-		log.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", ConfigMapName)
-		return ctrl.Result{RequeueAfter: time.Duration(30)}, err
+		if err := r.ParseHomeserverConfigMap(ctx, &synapse, inputConfigMap); err != nil {
+			return ctrl.Result{RequeueAfter: time.Duration(30)}, err
+		}
+
+		synapse.Status.HomeserverConfigMapName = ConfigMapName
+		outputConfigMap = inputConfigMap
+	} else {
+		synapse.Status.HomeserverConfigMapName = synapse.Name
+		synapse.Status.HomeserverConfiguration.ServerName = synapse.Spec.Homeserver.Values.ServerName
+		synapse.Status.HomeserverConfiguration.ReportStats = synapse.Spec.Homeserver.Values.ReportStats
+
+		objectMeta := setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
+		r.reconcileResource(ctx, r.configMapForSynapse, &synapse, &outputConfigMap, objectMeta)
 	}
 
-	if err := r.ParseHomeserverConfigMap(ctx, &synapse, cm); err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(30)}, err
+	if err := r.updateSynapseStatus(ctx, &synapse); err != nil {
+		log.Error(err, "Error updating Synapse Status")
+		return ctrl.Result{}, err
 	}
 
 	if synapse.Spec.CreateNewPostgreSQL {
 		if !r.isPostgresOperatorInstalled(ctx) {
 			reason := "Cannot create PostgreSQL instance for synapse. Postgres-operator is not installed."
-			if err := r.setFailedState(ctx, synapse, reason); err != nil {
+			if err := r.setFailedState(ctx, &synapse, reason); err != nil {
 				log.Error(err, "Error updating Synapse State")
 			}
 
@@ -125,7 +144,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			log.Error(err, "Cannot create PostgreSQL instance for synapse. Potsres-operator is not installed.")
 			return ctrl.Result{}, nil
 		}
-		if result, err := r.createPostgresClusterForSynapse(ctx, synapse, cm); err != nil {
+		if result, err := r.createPostgresClusterForSynapse(ctx, synapse, outputConfigMap); err != nil {
 			return result, err
 		}
 	}
@@ -171,23 +190,12 @@ func labelsForSynapse(name string) map[string]string {
 	return map[string]string{"app": "synapse", "synapse_cr": name}
 }
 
-func (r *SynapseReconciler) setFailedState(ctx context.Context, synapse synapsev1alpha1.Synapse, reason string) error {
-	current := &synapsev1alpha1.Synapse{}
-
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: synapse.Name, Namespace: synapse.Namespace}, current); err != nil {
-		return nil
-	}
+func (r *SynapseReconciler) setFailedState(ctx context.Context, synapse *synapsev1alpha1.Synapse, reason string) error {
 
 	synapse.Status.State = "FAILED"
 	synapse.Status.Reason = reason
 
-	if !reflect.DeepEqual(synapse.Status, current.Status) {
-		if err := r.Status().Patch(ctx, &synapse, client.MergeFrom(current)); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return r.updateSynapseStatus(ctx, synapse)
 }
 
 // ParseHomeserverConfigMap loads the ConfigMap, which name is determined by
@@ -252,6 +260,25 @@ func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synaps
 	return nil
 }
 
+func (r *SynapseReconciler) updateSynapseStatus(ctx context.Context, synapse *synapsev1alpha1.Synapse) error {
+	current := &synapsev1alpha1.Synapse{}
+	if err := r.Get(
+		ctx,
+		types.NamespacedName{Name: synapse.Name, Namespace: synapse.Namespace},
+		current,
+	); err != nil {
+		return err
+	}
+
+	if !reflect.DeepEqual(synapse.Status, current.Status) {
+		if err := r.Status().Patch(ctx, synapse, client.MergeFrom(current)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (r *SynapseReconciler) isPostgresOperatorInstalled(ctx context.Context) bool {
 	err := r.Client.List(ctx, &pgov1beta1.PostgresClusterList{})
 	return err == nil
@@ -282,7 +309,7 @@ func (r *SynapseReconciler) createPostgresClusterForSynapse(
 		return ctrl.Result{}, err
 	}
 	if !r.isPostgresClusterReady(createdPostgresCluster) {
-		r.updateSynapseStatusDatabaseState(ctx, synapse, "NOT READY")
+		r.updateSynapseStatusDatabaseState(ctx, &synapse, "NOT READY")
 		err := errors.New("postgreSQL Database not ready yet")
 		return ctrl.Result{RequeueAfter: time.Duration(5)}, err
 	}
@@ -330,26 +357,9 @@ func (r *SynapseReconciler) isPostgresClusterReady(p pgov1beta1.PostgresCluster)
 	return true
 }
 
-func (r *SynapseReconciler) updateSynapseStatusDatabaseState(ctx context.Context, synapse synapsev1alpha1.Synapse, state string) error {
-	current := &synapsev1alpha1.Synapse{}
-
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{Name: synapse.Name, Namespace: synapse.Namespace},
-		current,
-	); err != nil {
-		return err
-	}
-
+func (r *SynapseReconciler) updateSynapseStatusDatabaseState(ctx context.Context, synapse *synapsev1alpha1.Synapse, state string) error {
 	synapse.Status.DatabaseConnectionInfo.State = state
-
-	if !reflect.DeepEqual(synapse.Status, current.Status) {
-		if err := r.Status().Patch(ctx, &synapse, client.MergeFrom(current)); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return r.updateSynapseStatus(ctx, synapse)
 }
 
 func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(
@@ -358,16 +368,6 @@ func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(
 	createdPostgresCluster pgov1beta1.PostgresCluster,
 ) error {
 	var postgresSecret corev1.Secret
-
-	// Get latest Synapse version
-	current := &synapsev1alpha1.Synapse{}
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{Name: s.Name, Namespace: s.Namespace},
-		current,
-	); err != nil {
-		return err
-	}
 
 	// Get PostgreSQL secret related, containing information for the synapse user
 	if err := r.Get(
@@ -385,13 +385,7 @@ func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(
 		return err
 	}
 
-	if !reflect.DeepEqual(s.Status, current.Status) {
-		if err := r.Status().Patch(ctx, s, client.MergeFrom(current)); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return r.updateSynapseStatus(ctx, s)
 }
 
 func (r *SynapseReconciler) updateSynapseStatusDatabase(

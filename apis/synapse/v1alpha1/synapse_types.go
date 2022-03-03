@@ -93,6 +93,10 @@ type SynapseStatus struct {
 	// Holds configuration information for Synapse
 	HomeserverConfiguration SynapseStatusHomeserverConfiguration `json:"homeserverConfiguration,omitempty"`
 
+	// The name of the ConfigMap, in the synapse Namespace, which contains the
+	// homeserver.yaml configuration file
+	HomeserverConfigMapName string `json:"homeserverConfigMapName,omitempty"`
+
 	// State of the Synapse instance
 	State string `json:"state,omitempty"`
 

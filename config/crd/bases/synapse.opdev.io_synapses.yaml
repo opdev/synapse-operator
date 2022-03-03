@@ -106,6 +106,10 @@ spec:
                     description: User allowed to query the given database
                     type: string
                 type: object
+              homeserverConfigMapName:
+                description: The name of the ConfigMap, in the synapse Namespace,
+                  which contains the homeserver.yaml configuration file
+                type: string
               homeserverConfiguration:
                 description: Holds configuration information for Synapse
                 properties:
