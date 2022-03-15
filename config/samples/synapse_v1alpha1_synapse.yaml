@@ -3,7 +3,8 @@ kind: Synapse
 metadata:
   name: synapse-sample
 spec:
-  createNewPostgreSQL: true
+  createNewPostgreSQL: false
   homeserver:
-    configMap:
-      name: synapse-homeserver-simple
+    values:
+      serverName: example.com
+      reportStats: true
