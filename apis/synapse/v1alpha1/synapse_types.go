@@ -49,11 +49,11 @@ type SynapseHomeserver struct {
 	// Holds information about the ConfigMap containing the homeserver.yaml
 	// configuration file to be used as input for the configuration of the
 	// Synapse server.
-	ConfigMap SynapseHomeserverConfigMap `json:"configMap,omitempty"`
+	ConfigMap *SynapseHomeserverConfigMap `json:"configMap,omitempty"`
 
 	// Holds the required values for the creation of a homeserver.yaml
 	// configuration file by the Synapse Operator
-	Values SynapseHomeserverValues `json:"values,omitempty"`
+	Values *SynapseHomeserverValues `json:"values,omitempty"`
 }
 
 type SynapseHomeserverConfigMap struct {

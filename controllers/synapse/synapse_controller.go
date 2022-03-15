@@ -99,7 +99,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	var outputConfigMap corev1.ConfigMap
 
-	if synapse.Spec.Homeserver.ConfigMap.Name != "" {
+	if synapse.Spec.Homeserver.ConfigMap != nil {
 		var inputConfigMap corev1.ConfigMap
 		// Get and validate homeserver ConfigMap
 		ConfigMapName := synapse.Spec.Homeserver.ConfigMap.Name
@@ -213,7 +213,7 @@ func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synaps
 	cm_data, ok := cm.Data["homeserver.yaml"]
 	if !ok {
 		err := errors.New("missing homeserver.yaml in ConfigMap")
-		log.Error(err, "Missing homeserver.yaml in ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", synapse.Spec.Homeserver.ConfigMap.Name)
+		log.Error(err, "Missing homeserver.yaml in ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
 		return err
 	}
 

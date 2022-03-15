@@ -210,7 +210,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			By("bootstrapping test environment")
 			testEnv = &envtest.Environment{
 				CRDDirectoryPaths: []string{
-					filepath.Join("..", "..", "config", "crd", "bases"),
+					filepath.Join("..", "..", "bundle", "manifests", "synapse.opdev.io_synapses.yaml"),
 				},
 				CRDs:                  []*v1.CustomResourceDefinition{&PostgresClusterCRD},
 				ErrorIfCRDPathMissing: true,
@@ -256,25 +256,24 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				Entry("when Synapse spec is missing Homeserver", map[string]interface{}{
 					"spec": map[string]interface{}{"createNewPostgreSQL": true},
 				}),
-				// See https://github.com/opdev/synapse-operator/issues/15
-				// Entry("when Synapse spec Homeserver is empty", map[string]interface{}{
-				// 	"spec": map[string]interface{}{
-				// 		"homeserver": map[string]interface{}{},
-				// 	},
-				// }),
-				// Entry("when Synapse spec Homeserver possess both Values and ConfigMap", map[string]interface{}{
-				// 	"spec": map[string]interface{}{
-				// 		"homeserver": map[string]interface{}{
-				// 			"configMap": map[string]interface{}{
-				// 				"name":      ConfigMapName,
-				// 				"namespace": SynapseNamespace,
-				// 			},
-				// 			"values": map[string]interface{}{
-				// 				"serverName":  ServerName,
-				// 				"reportStats": ReportStats,
-				// 			},
-				// 		}},
-				// }),
+				Entry("when Synapse spec Homeserver is empty", map[string]interface{}{
+					"spec": map[string]interface{}{
+						"homeserver": map[string]interface{}{},
+					},
+				}),
+				Entry("when Synapse spec Homeserver possess both Values and ConfigMap", map[string]interface{}{
+					"spec": map[string]interface{}{
+						"homeserver": map[string]interface{}{
+							"configMap": map[string]interface{}{
+								"name":      ConfigMapName,
+								"namespace": SynapseNamespace,
+							},
+							"values": map[string]interface{}{
+								"serverName":  ServerName,
+								"reportStats": ReportStats,
+							},
+						}},
+				}),
 				Entry("when Synapse spec Homeserver ConfigMap doesn't specify a Name", map[string]interface{}{
 					"spec": map[string]interface{}{
 						"homeserver": map[string]interface{}{
@@ -461,7 +460,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					createdConfigMap = &corev1.ConfigMap{}
 					synapseSpec = synapsev1alpha1.SynapseSpec{
 						Homeserver: synapsev1alpha1.SynapseHomeserver{
-							Values: synapsev1alpha1.SynapseHomeserverValues{
+							Values: &synapsev1alpha1.SynapseHomeserverValues{
 								ServerName:  ServerName,
 								ReportStats: ReportStats,
 							},
@@ -571,7 +570,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 						synapseSpec = synapsev1alpha1.SynapseSpec{
 							Homeserver: synapsev1alpha1.SynapseHomeserver{
-								ConfigMap: synapsev1alpha1.SynapseHomeserverConfigMap{
+								ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
 									Name: ConfigMapName,
 								},
 							},
@@ -642,7 +641,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 						synapseSpec = synapsev1alpha1.SynapseSpec{
 							Homeserver: synapsev1alpha1.SynapseHomeserver{
-								ConfigMap: synapsev1alpha1.SynapseHomeserverConfigMap{
+								ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
 									Name: ConfigMapName,
 								},
 							},
@@ -770,7 +769,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					},
 					Spec: synapsev1alpha1.SynapseSpec{
 						Homeserver: synapsev1alpha1.SynapseHomeserver{
-							ConfigMap: synapsev1alpha1.SynapseHomeserverConfigMap{
+							ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
 								Name: ConfigMapName,
 							},
 						},
@@ -800,7 +799,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			By("bootstrapping test environment")
 			testEnv = &envtest.Environment{
 				CRDDirectoryPaths: []string{
-					filepath.Join("..", "..", "config", "crd", "bases"),
+					filepath.Join("..", "..", "bundle", "manifests", "synapse.opdev.io_synapses.yaml"),
 				},
 				ErrorIfCRDPathMissing: true,
 			}
@@ -840,7 +839,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					},
 					Spec: synapsev1alpha1.SynapseSpec{
 						Homeserver: synapsev1alpha1.SynapseHomeserver{
-							ConfigMap: synapsev1alpha1.SynapseHomeserverConfigMap{
+							ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
 								Name: ConfigMapName,
 							},
 						},
