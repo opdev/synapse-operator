@@ -6,6 +6,7 @@ require (
 	github.com/crunchydata/postgres-operator v1.3.3-0.20220202164906-1c3cc3597c95
 	github.com/onsi/ginkgo/v2 v2.0.0
 	github.com/onsi/gomega v1.17.0
+	github.com/openshift/api v3.9.0+incompatible
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.23.3
 	k8s.io/apiextensions-apiserver v0.23.0
