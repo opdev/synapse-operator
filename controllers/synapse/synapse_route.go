@@ -32,12 +32,12 @@ func (r *SynapseReconciler) routeForSynapse(s *synapsev1alpha1.Synapse, objectMe
 	route := &routev1.Route{
 		ObjectMeta: objectMeta,
 		Spec: routev1.RouteSpec{
-			Host: "synapse.apps.alex-test-ocp4.9.23.coreostrain.me",
+			Host: objectMeta.Name + "-" + objectMeta.Namespace + "." + s.Spec.Homeserver.Values.ServerName,
 			Port: &routev1.RoutePort{
-				TargetPort: intstr.FromInt(8008),
+				TargetPort: intstr.FromString("unsecure-http"),
 			},
 			To: routev1.RouteTargetReference{
-				Kind:   "service",
+				Kind:   "Service",
 				Name:   "synapse-sample",
 				Weight: &weight,
 			},

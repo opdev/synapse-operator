@@ -28,6 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	routev1 "github.com/openshift/api/route/v1"
+
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -282,6 +284,14 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	// TODO: If a deployment is found, check that its Spec are correct.
 
+	if err := r.reconcileResource(ctx, r.serviceForSynapse, &synapse, &corev1.Service{}, objectMeta); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := r.reconcileResource(ctx, r.routeForSynapse, &synapse, &routev1.Route{}, objectMeta); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Update the Synapse status if needed
 	if synapse.Status.State != "RUNNING" {
 		synapse.Status.State = "RUNNING"
@@ -520,5 +530,6 @@ func (r *SynapseReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&routev1.Route{}).
 		Complete(r)
 }
