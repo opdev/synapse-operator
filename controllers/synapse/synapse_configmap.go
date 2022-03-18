@@ -273,7 +273,6 @@ listeners:
     tls: false
     type: http
     x_forwarded: true
-    bind_addresses: ['::1', '127.0.0.1']
 
     resources:
       - names: [client, federation]
