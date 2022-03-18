@@ -29,10 +29,10 @@ import (
 // serviceForSynapse returns a synapse Service object
 func (r *SynapseReconciler) routeForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) client.Object {
 	weight := int32(100)
-	service := &routev1.Route{
+	route := &routev1.Route{
 		ObjectMeta: objectMeta,
 		Spec: routev1.RouteSpec{
-			Host: "test-host",
+			Host: "synapse.apps.alex-test-ocp4.9.23.coreostrain.me",
 			Port: &routev1.RoutePort{
 				TargetPort: intstr.FromInt(8008),
 			},
@@ -44,6 +44,6 @@ func (r *SynapseReconciler) routeForSynapse(s *synapsev1alpha1.Synapse, objectMe
 		},
 	}
 	// Set Synapse instance as the owner and controller
-	ctrl.SetControllerReference(s, service, r.Scheme)
-	return service
+	ctrl.SetControllerReference(s, route, r.Scheme)
+	return route
 }
