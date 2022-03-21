@@ -140,6 +140,9 @@ spec:
                   heisenbridge:
                     description: Status of the Heisenbridge
                     properties:
+                      configMapName:
+                        description: Name of the ConfigMap used for Heisenbridge configuration
+                        type: string
                       ip:
                         description: IP at which the Heisenbridge is available
                         type: string

@@ -188,14 +188,54 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 
-		// Get Service IP and update the Synapse status
+		// Get Service IP and update the Synapse status with Service IP and
+		// ConfigMap name
 		heisenbridgeIP, err := r.getServiceIP(ctx, heisenbergKey, createdHeisenbridgeService)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		synapse.Status.BridgesConfiguration.Heisenbridge.IP = heisenbridgeIP
+
+		inputConfigMapName := synapse.Spec.Bridges.Heisenbridge.ConfigMap.Name
+		if inputConfigMapName != "" {
+			synapse.Status.BridgesConfiguration.Heisenbridge.ConfigMapName = inputConfigMapName
+		} else {
+			synapse.Status.BridgesConfiguration.Heisenbridge.ConfigMapName = objectMetaHeisenbridge.Name
+		}
+
 		if err := r.updateSynapseStatus(ctx, &synapse); err != nil {
 			return ctrl.Result{}, err
+		}
+
+		if inputConfigMapName != "" {
+			var inputHeisenbridgeConfigMap = &corev1.ConfigMap{}
+			keyForConfigMap := types.NamespacedName{Name: inputConfigMapName, Namespace: synapse.Namespace}
+
+			if err := r.Get(ctx, keyForConfigMap, inputHeisenbridgeConfigMap); err != nil {
+				reason := "ConfigMap " + inputConfigMapName + " does not exist in namespace " + synapse.Namespace
+				if err := r.setFailedState(ctx, &synapse, reason); err != nil {
+					log.Error(err, "Error updating Synapse State")
+				}
+
+				log.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", inputConfigMapName)
+				return ctrl.Result{RequeueAfter: time.Duration(30)}, err
+			}
+
+			// Configure correct URL in Heisenbridge ConfigMap
+			if err := r.updateHeisenbridgeConfigMapURL(ctx, inputHeisenbridgeConfigMap, synapse); err != nil {
+				return ctrl.Result{}, err
+			}
+		} else {
+			// Create ConfigMap for Heisenbridge
+			if err := r.reconcileResource(
+				ctx,
+				r.configMapForHeisenbridge,
+				&synapse,
+				&corev1.ConfigMap{},
+				objectMetaHeisenbridge,
+			); err != nil {
+				return ctrl.Result{}, err
+			}
 		}
 
 		// Create Deployment for Heisenbridge
@@ -204,17 +244,6 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.deploymentForHeisenbridge,
 			&synapse,
 			&appsv1.Deployment{},
-			objectMetaHeisenbridge,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Create ConfigMap for Heisenbridge
-		if err := r.reconcileResource(
-			ctx,
-			r.configMapForHeisenbridge,
-			&synapse,
-			&corev1.ConfigMap{},
 			objectMetaHeisenbridge,
 		); err != nil {
 			return ctrl.Result{}, err
@@ -651,6 +680,60 @@ func (r *SynapseReconciler) convertStructToMap(in interface{}) (map[string]inter
 	}
 
 	return out, nil
+}
+
+func (r *SynapseReconciler) updateHeisenbridgeConfigMapURL(
+	ctx context.Context,
+	cm *corev1.ConfigMap,
+	s synapsev1alpha1.Synapse) error {
+
+	if err := r.Get(
+		ctx,
+		types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace},
+		cm,
+	); err != nil {
+		return err
+	}
+
+	if err := r.updateHeisenbridgeConfigMapDataWithURL(cm, s); err != nil {
+		return err
+	}
+
+	// Update ConfigMap
+	if err := r.Client.Update(ctx, cm); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *SynapseReconciler) updateHeisenbridgeConfigMapDataWithURL(
+	cm *corev1.ConfigMap,
+	s synapsev1alpha1.Synapse,
+) error {
+	heisenbridge := make(map[string]interface{})
+
+	// Load heisenbridge.yaml from ConfigMap
+	cm_data, ok := cm.Data["heisenbridge.yaml"]
+	if !ok {
+		err := errors.New("missing heisenbridge.yaml in ConfigMap")
+		return err
+	}
+	if err := yaml.Unmarshal([]byte(cm_data), heisenbridge); err != nil {
+		return err
+	}
+
+	// Configure Heisenbridge URL
+	heisenbridge["url"] = "http://" + s.Status.BridgesConfiguration.Heisenbridge.IP + ":9898"
+
+	// Write heisenbridge.yaml into ConfigMap data
+	if configMapData, err := yaml.Marshal(heisenbridge); err != nil {
+		return err
+	} else {
+		cm.Data = map[string]string{"heisenbridge.yaml": string(configMapData)}
+	}
+
+	return nil
 }
 
 func (r *SynapseReconciler) updateSynapseConfigMapWithHeisenbridgeInfos(

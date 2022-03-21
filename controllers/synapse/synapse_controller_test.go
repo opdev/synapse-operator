@@ -832,88 +832,234 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				})
 
 				When("Enabling the Heisenbridge", func() {
-					var createdHeisenbridgeConfigMap *corev1.ConfigMap
 					var createdHeisenbridgeDeployment *appsv1.Deployment
 					var createdHeisenbridgeService *corev1.Service
 					var heisenbridgeLookupKey types.NamespacedName
 
-					BeforeAll(func() {
-						initSynapseVariables()
-
+					var initHeisenbridgeVariables = func() {
 						// Init vars
-						createdHeisenbridgeConfigMap = &corev1.ConfigMap{}
 						createdHeisenbridgeDeployment = &appsv1.Deployment{}
 						createdHeisenbridgeService = &corev1.Service{}
 
-						configmapData = map[string]string{
-							"homeserver.yaml": "server_name: " + ServerName + "\n" +
-								"report_stats: " + strconv.FormatBool(ReportStats),
-						}
-
-						synapseSpec = synapsev1alpha1.SynapseSpec{
-							Homeserver: synapsev1alpha1.SynapseHomeserver{
-								ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
-									Name: ConfigMapName,
-								},
-							},
-							Bridges: synapsev1alpha1.SynapseBridges{
-								Heisenbridge: synapsev1alpha1.SynapseHeisenbridge{
-									Enabled: true,
-								},
-							},
-						}
-
 						heisenbridgeLookupKey = types.NamespacedName{Name: SynapseName + "-heisenbridge", Namespace: SynapseNamespace}
+					}
 
-						createSynapseConfigMap()
-						createSynapseInstance()
-					})
-
-					AfterAll(func() {
-						// Cleanup Heisenbridge resources
-						By("Cleaning up the Heisenbridge ConfigMap")
-						deleteResource(createdHeisenbridgeConfigMap, heisenbridgeLookupKey, false)
-
+					var cleanupHeisenbridgeResources = func() {
 						By("Cleaning up the Heisenbridge Deployment")
 						deleteResource(createdHeisenbridgeDeployment, heisenbridgeLookupKey, false)
 
 						By("Cleaning up the Heisenbridge Service")
 						deleteResource(createdHeisenbridgeService, heisenbridgeLookupKey, false)
+					}
 
-						cleanupSynapseResources()
-						cleanupSynapseConfigMap()
-					})
+					When("Using the default configuration", func() {
+						var createdHeisenbridgeConfigMap *corev1.ConfigMap
 
-					It("Should create a ConfigMap for Heisenbridge", func() {
-						checkResourcePresence(createdHeisenbridgeConfigMap, heisenbridgeLookupKey, expectedOwnerReference)
-					})
+						BeforeAll(func() {
+							initSynapseVariables()
+							initHeisenbridgeVariables()
 
-					It("Should create a Deployment for Heisenbridge", func() {
-						By("Checking that a Synapse Deployment exists and is correctly configured")
-						checkResourcePresence(createdHeisenbridgeDeployment, heisenbridgeLookupKey, expectedOwnerReference)
-					})
+							createdHeisenbridgeConfigMap = &corev1.ConfigMap{}
 
-					It("Should create a Service for Heisenbridge", func() {
-						checkResourcePresence(createdHeisenbridgeService, heisenbridgeLookupKey, expectedOwnerReference)
-					})
-
-					It("Should add the Heisenbridge IP to the Synapse Status", func() {
-						// Get Heisenbridge IP
-						var heisenbridgeIP string
-						Eventually(func() bool {
-							err := k8sClient.Get(ctx, heisenbridgeLookupKey, createdHeisenbridgeService)
-							if err != nil {
-								return false
+							configmapData = map[string]string{
+								"homeserver.yaml": "server_name: " + ServerName + "\n" +
+									"report_stats: " + strconv.FormatBool(ReportStats),
 							}
-							heisenbridgeIP = createdHeisenbridgeService.Spec.ClusterIP
-							return heisenbridgeIP != ""
-						}, timeout, interval).Should(BeTrue())
 
-						Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).To(Succeed())
-						Expect(synapse.Status.BridgesConfiguration.Heisenbridge.IP).To(Equal(heisenbridgeIP))
+							synapseSpec = synapsev1alpha1.SynapseSpec{
+								Homeserver: synapsev1alpha1.SynapseHomeserver{
+									ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
+										Name: ConfigMapName,
+									},
+								},
+								Bridges: synapsev1alpha1.SynapseBridges{
+									Heisenbridge: synapsev1alpha1.SynapseHeisenbridge{
+										Enabled: true,
+									},
+								},
+							}
+
+							createSynapseConfigMap()
+							createSynapseInstance()
+						})
+
+						AfterAll(func() {
+							// Cleanup Heisenbridge resources
+							By("Cleaning up the Heisenbridge ConfigMap")
+							deleteResource(createdHeisenbridgeConfigMap, heisenbridgeLookupKey, false)
+
+							cleanupSynapseResources()
+							cleanupSynapseConfigMap()
+							cleanupHeisenbridgeResources()
+						})
+
+						It("Should create a ConfigMap for Heisenbridge", func() {
+							checkResourcePresence(createdHeisenbridgeConfigMap, heisenbridgeLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a Deployment for Heisenbridge", func() {
+							By("Checking that a Synapse Deployment exists and is correctly configured")
+							checkResourcePresence(createdHeisenbridgeDeployment, heisenbridgeLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a Service for Heisenbridge", func() {
+							checkResourcePresence(createdHeisenbridgeService, heisenbridgeLookupKey, expectedOwnerReference)
+						})
+
+						It("Should add the Heisenbridge IP to the Synapse Status", func() {
+							// Get Heisenbridge IP
+							var heisenbridgeIP string
+							Eventually(func() bool {
+								err := k8sClient.Get(ctx, heisenbridgeLookupKey, createdHeisenbridgeService)
+								if err != nil {
+									return false
+								}
+								heisenbridgeIP = createdHeisenbridgeService.Spec.ClusterIP
+								return heisenbridgeIP != ""
+							}, timeout, interval).Should(BeTrue())
+
+							Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).To(Succeed())
+							Expect(synapse.Status.BridgesConfiguration.Heisenbridge.IP).To(Equal(heisenbridgeIP))
+							Expect(synapse.Status.BridgesConfiguration.Heisenbridge.ConfigMapName).To(Equal(heisenbridgeLookupKey.Name))
+						})
+
+						It("Should update the Synapse homeserver.yaml", func() {
+							Eventually(func(g Gomega) {
+								g.Expect(k8sClient.Get(ctx,
+									types.NamespacedName{Name: ConfigMapName, Namespace: SynapseNamespace},
+									configMap,
+								)).Should(Succeed())
+
+								cm_data, ok := configMap.Data["homeserver.yaml"]
+								g.Expect(ok).Should(BeTrue())
+
+								homeserver := make(map[string]interface{})
+								g.Expect(yaml.Unmarshal([]byte(cm_data), homeserver)).Should(Succeed())
+
+								_, ok = homeserver["app_service_config_files"]
+								g.Expect(ok).Should(BeTrue())
+
+								g.Expect(homeserver["app_service_config_files"]).Should(ContainElement("/data-heisenbridge/heisenbridge.yaml"))
+							}, timeout, interval).Should(Succeed())
+						})
+					})
+
+					When("The user provides an input ConfigMap", func() {
+						var inputHeisenbridgeConfigMap *corev1.ConfigMap
+						var heisenbridgeConfigMapData map[string]string
+						var heisenbridgeIP string
+
+						const HeisenbridgeConfigMapName = "heisenbridge-input"
+
+						BeforeAll(func() {
+							initSynapseVariables()
+							initHeisenbridgeVariables()
+
+							heisenbridgeIP = ""
+
+							configmapData = map[string]string{
+								"homeserver.yaml": "server_name: " + ServerName + "\n" +
+									"report_stats: " + strconv.FormatBool(ReportStats),
+							}
+
+							synapseSpec = synapsev1alpha1.SynapseSpec{
+								Homeserver: synapsev1alpha1.SynapseHomeserver{
+									ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
+										Name: ConfigMapName,
+									},
+								},
+								Bridges: synapsev1alpha1.SynapseBridges{
+									Heisenbridge: synapsev1alpha1.SynapseHeisenbridge{
+										Enabled: true,
+										ConfigMap: synapsev1alpha1.SynapseHeisenbridgeConfigMap{
+											Name: HeisenbridgeConfigMapName,
+										},
+									},
+								},
+							}
+
+							By("Creating a ConfigMap containing a basic heisenbridge.yaml")
+							// Incomplete heisenbridge.yaml, containing only the
+							// required data for our tests. In particular, we
+							// will test if the URL has been correctly updated
+							heisenbridgeConfigMapData = map[string]string{
+								"heisenbridge.yaml": "url: http://10.217.5.134:9898",
+							}
+
+							inputHeisenbridgeConfigMap = &corev1.ConfigMap{
+								ObjectMeta: metav1.ObjectMeta{
+									Name:      HeisenbridgeConfigMapName,
+									Namespace: SynapseNamespace,
+								},
+								Data: heisenbridgeConfigMapData,
+							}
+							Expect(k8sClient.Create(ctx, inputHeisenbridgeConfigMap)).Should(Succeed())
+
+							createSynapseConfigMap()
+							createSynapseInstance()
+						})
+
+						AfterAll(func() {
+							// Cleanup Heisenbridge resources
+							By("Cleaning up the Heisenbridge ConfigMap")
+							heisenbridgeConfigMapLookupKey := types.NamespacedName{
+								Name:      HeisenbridgeConfigMapName,
+								Namespace: SynapseNamespace,
+							}
+
+							deleteResource(inputHeisenbridgeConfigMap, heisenbridgeConfigMapLookupKey, false)
+
+							cleanupSynapseResources()
+							cleanupSynapseConfigMap()
+							cleanupHeisenbridgeResources()
+						})
+
+						It("Should create a Deployment for Heisenbridge", func() {
+							By("Checking that a Synapse Deployment exists and is correctly configured")
+							checkResourcePresence(createdHeisenbridgeDeployment, heisenbridgeLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a Service for Heisenbridge", func() {
+							checkResourcePresence(createdHeisenbridgeService, heisenbridgeLookupKey, expectedOwnerReference)
+						})
+
+						It("Should update the Synapse Status with Heisenbridge configuration information", func() {
+							// Get Heisenbridge IP
+							Eventually(func() bool {
+								err := k8sClient.Get(ctx, heisenbridgeLookupKey, createdHeisenbridgeService)
+								if err != nil {
+									return false
+								}
+								heisenbridgeIP = createdHeisenbridgeService.Spec.ClusterIP
+								return heisenbridgeIP != ""
+							}, timeout, interval).Should(BeTrue())
+
+							Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).To(Succeed())
+							Expect(synapse.Status.BridgesConfiguration.Heisenbridge.IP).To(Equal(heisenbridgeIP))
+							Expect(synapse.Status.BridgesConfiguration.Heisenbridge.ConfigMapName).To(Equal(HeisenbridgeConfigMapName))
+						})
+
+						It("Should update the Heisenbridge input ConfigMap", func() {
+							Eventually(func(g Gomega) {
+								g.Expect(k8sClient.Get(ctx,
+									types.NamespacedName{Name: HeisenbridgeConfigMapName, Namespace: SynapseNamespace},
+									inputHeisenbridgeConfigMap,
+								)).Should(Succeed())
+
+								cm_data, ok := inputHeisenbridgeConfigMap.Data["heisenbridge.yaml"]
+								g.Expect(ok).Should(BeTrue())
+
+								heisenbridge := make(map[string]interface{})
+								g.Expect(yaml.Unmarshal([]byte(cm_data), heisenbridge)).Should(Succeed())
+
+								_, ok = heisenbridge["url"]
+								g.Expect(ok).Should(BeTrue())
+
+								g.Expect(heisenbridge["url"]).To(Equal("http://" + heisenbridgeIP + ":9898"))
+							}, timeout, interval).Should(Succeed())
+						})
 					})
 				})
-
 			})
 		})
 

@@ -167,6 +167,9 @@ type SynapseStatusBridgesConfiguration struct {
 type SynapseStatusHeisenbridge struct {
 	// IP at which the Heisenbridge is available
 	IP string `json:"ip,omitempty"`
+
+	// Name of the ConfigMap used for Heisenbridge configuration
+	ConfigMapName string `json:"configMapName,omitempty"`
 }
 
 type SynapseStatusDatabaseConnectionInfo struct {
