@@ -108,6 +108,31 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, obj
 			},
 		},
 	}
+
+	if s.Spec.Bridges.Heisenbridge.Enabled {
+		dep.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			dep.Spec.Template.Spec.Containers[0].VolumeMounts,
+			corev1.VolumeMount{
+				Name:      "data-heisenbridge",
+				MountPath: "/data-heisenbridge",
+			},
+		)
+
+		dep.Spec.Template.Spec.Volumes = append(
+			dep.Spec.Template.Spec.Volumes,
+			corev1.Volume{
+				Name: "data-heisenbridge",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: s.Name + "-heisenbridge",
+						},
+					},
+				},
+			},
+		)
+	}
+
 	// Set Synapse instance as the owner and controller
 	ctrl.SetControllerReference(s, dep, r.Scheme)
 	return dep

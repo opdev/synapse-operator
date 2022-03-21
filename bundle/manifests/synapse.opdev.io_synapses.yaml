@@ -34,6 +34,50 @@ spec:
           spec:
             description: SynapseSpec defines the desired state of Synapse
             properties:
+              bridges:
+                description: Configuration options for optional matrix bridges
+                properties:
+                  heisenbridge:
+                    description: 'Configuration options for the IRC bridge Heisenbridge.
+                      The user can either: * disable the deployment of the bridge.
+                      * enable the bridge, without specifying additional configuration   options.
+                      The bridge will be deployed with a default configuration. *
+                      enable the bridge and specify an existing ConfigMap by its Name
+                      and   Namespace containing a heisenbridge.yaml. This ConfigMap
+                      will be   modified in place to configure the correct homeserver
+                      connection URL.'
+                    properties:
+                      configMap:
+                        description: Holds information about the ConfigMap containing
+                          the heisenbridge.yaml configuration file to be used as input
+                          for the configuration of the Heisenbridge IRC Bridge. Note
+                          that this ConfigMap will be modified by the Synapse controller.
+                        properties:
+                          name:
+                            description: Name of the ConfigMap in the given Namespace.
+                            type: string
+                          namespace:
+                            description: Namespace in which the ConfigMap is living.
+                              If left empty, the Synapse namespace is used. Currently
+                              the ConfigMap must live in the same namespace as the
+                              Synapse instance referencing it, therefore this attribute
+                              is not used. See https://github.com/opdev/synapse-operator/issues/17
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      enabled:
+                        default: false
+                        description: Whether to deploy Heisenbridge or not
+                        type: boolean
+                      verboseLevel:
+                        default: 0
+                        description: 'Controls the verbosity of the Heisenbrige: *
+                          0 corresponds to normal level of logs * 1 corresponds to
+                          "-v" * 2 corresponds to "-vv" * 3 corresponds to "-vvv"'
+                        type: integer
+                    type: object
+                type: object
               createNewPostgreSQL:
                 default: false
                 description: Set to true to create a new PostreSQL instance. The homeserver.yaml
@@ -90,6 +134,17 @@ spec:
           status:
             description: SynapseStatus defines the observed state of Synapse
             properties:
+              bridgesConfiguration:
+                description: Configuration of deployed bridges
+                properties:
+                  heisenbridge:
+                    description: Status of the Heisenbridge
+                    properties:
+                      ip:
+                        description: IP at which the Heisenbridge is available
+                        type: string
+                    type: object
+                type: object
               databaseConnectionInfo:
                 description: Connection information to the external PostgreSQL Database
                 properties:
@@ -124,6 +179,10 @@ spec:
                     description: The public-facing domain of the server
                     type: string
                 type: object
+              ip:
+                description: Synapse IP address (corresponding to the Synapse Service
+                  IP address)
+                type: string
               reason:
                 description: Reason for the current Synapse State
                 type: string

@@ -36,6 +36,9 @@ type SynapseSpec struct {
 	// the creation of a configuration file from scratch.
 	Homeserver SynapseHomeserver `json:"homeserver"`
 
+	// Configuration options for optional matrix bridges
+	Bridges SynapseBridges `json:"bridges,omitempty"`
+
 	// +kubebuilder:default:=false
 
 	// Set to true to create a new PostreSQL instance. The homeserver.yaml
@@ -44,8 +47,6 @@ type SynapseSpec struct {
 }
 
 type SynapseHomeserver struct {
-	// TODO: https://github.com/opdev/synapse-operator/issues/15
-
 	// Holds information about the ConfigMap containing the homeserver.yaml
 	// configuration file to be used as input for the configuration of the
 	// Synapse server.
@@ -82,10 +83,61 @@ type SynapseHomeserverValues struct {
 	ReportStats bool `json:"reportStats"`
 }
 
+type SynapseBridges struct {
+	// Configuration options for the IRC bridge Heisenbridge. The user can
+	// either:
+	// * disable the deployment of the bridge.
+	// * enable the bridge, without specifying additional configuration
+	//   options. The bridge will be deployed with a default configuration.
+	// * enable the bridge and specify an existing ConfigMap by its Name and
+	//   Namespace containing a heisenbridge.yaml. This ConfigMap will be
+	//   modified in place to configure the correct homeserver connection URL.
+	Heisenbridge SynapseHeisenbridge `json:"heisenbridge,omitempty"`
+}
+
+type SynapseHeisenbridge struct {
+	// +kubebuilder:default:=false
+
+	// Whether to deploy Heisenbridge or not
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Holds information about the ConfigMap containing the heisenbridge.yaml
+	// configuration file to be used as input for the configuration of the
+	// Heisenbridge IRC Bridge. Note that this ConfigMap will be modified by
+	// the Synapse controller.
+	ConfigMap SynapseHeisenbridgeConfigMap `json:"configMap,omitempty"`
+
+	// +kubebuilder:default:=0
+
+	// Controls the verbosity of the Heisenbrige:
+	// * 0 corresponds to normal level of logs
+	// * 1 corresponds to "-v"
+	// * 2 corresponds to "-vv"
+	// * 3 corresponds to "-vvv"
+	VerboseLevel int `json:"verboseLevel,omitempty"`
+}
+
+type SynapseHeisenbridgeConfigMap struct {
+	// +kubebuilder:validation:Required
+
+	// Name of the ConfigMap in the given Namespace.
+	Name string `json:"name"`
+
+	// Namespace in which the ConfigMap is living. If left empty, the Synapse
+	// namespace is used. Currently the ConfigMap must live in the same
+	// namespace as the Synapse instance referencing it, therefore this
+	// attribute is not used.
+	// See https://github.com/opdev/synapse-operator/issues/17
+	Namespace string `json:"namespace,omitempty"`
+}
+
 // SynapseStatus defines the observed state of Synapse
 type SynapseStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Configuration of deployed bridges
+	BridgesConfiguration SynapseStatusBridgesConfiguration `json:"bridgesConfiguration,omitempty"`
 
 	// Connection information to the external PostgreSQL Database
 	DatabaseConnectionInfo SynapseStatusDatabaseConnectionInfo `json:"databaseConnectionInfo,omitempty"`
@@ -97,11 +149,24 @@ type SynapseStatus struct {
 	// homeserver.yaml configuration file
 	HomeserverConfigMapName string `json:"homeserverConfigMapName,omitempty"`
 
+	// Synapse IP address (corresponding to the Synapse Service IP address)
+	IP string `json:"ip,omitempty"`
+
 	// State of the Synapse instance
 	State string `json:"state,omitempty"`
 
 	// Reason for the current Synapse State
 	Reason string `json:"reason,omitempty"`
+}
+
+type SynapseStatusBridgesConfiguration struct {
+	// Status of the Heisenbridge
+	Heisenbridge SynapseStatusHeisenbridge `json:"heisenbridge,omitempty"`
+}
+
+type SynapseStatusHeisenbridge struct {
+	// IP at which the Heisenbridge is available
+	IP string `json:"ip,omitempty"`
 }
 
 type SynapseStatusDatabaseConnectionInfo struct {
