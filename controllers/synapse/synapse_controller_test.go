@@ -298,15 +298,34 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							},
 						}},
 				}),
-				Entry("when Synapse spec possesses an invalid field", map[string]interface{}{
+				Entry("when Heisenbridge ConfigMap doesn't possess a name", map[string]interface{}{
 					"spec": map[string]interface{}{
-						"Homeserver": map[string]interface{}{
+						"homeserver": map[string]interface{}{
 							"configMap": map[string]interface{}{
 								"name":      ConfigMapName,
 								"namespace": SynapseNamespace,
 							},
 						},
-						"InvalidSpecFiels": "random",
+						"bridges": map[string]interface{}{
+							"heisenbridge": map[string]interface{}{
+								"enabled": false,
+								"configMap": map[string]interface{}{
+									"namespace": "random-namespace",
+								},
+							},
+						},
+					},
+				}),
+				// This should not work but passes
+				PEntry("when Synapse spec possesses an invalid field", map[string]interface{}{
+					"spec": map[string]interface{}{
+						"homeserver": map[string]interface{}{
+							"configMap": map[string]interface{}{
+								"name":      ConfigMapName,
+								"namespace": SynapseNamespace,
+							},
+						},
+						"invalidSpecFiels": "random",
 					},
 				}),
 			)
@@ -358,6 +377,43 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							"homeserver": map[string]interface{}{
 								"configMap": map[string]interface{}{
 									"name": ConfigMapName,
+								},
+							},
+						},
+					},
+				),
+				Entry(
+					"when optional Heisenbridge is enabled",
+					map[string]interface{}{
+						"spec": map[string]interface{}{
+							"homeserver": map[string]interface{}{
+								"configMap": map[string]interface{}{
+									"name": ConfigMapName,
+								},
+							},
+							"bridges": map[string]interface{}{
+								"heisenbridge": map[string]interface{}{
+									"enabled": true,
+								},
+							},
+						},
+					},
+				),
+				Entry(
+					"when optional Heisenbridge is enabled and an input ConfigMap name is given",
+					map[string]interface{}{
+						"spec": map[string]interface{}{
+							"homeserver": map[string]interface{}{
+								"configMap": map[string]interface{}{
+									"name": ConfigMapName,
+								},
+							},
+							"bridges": map[string]interface{}{
+								"heisenbridge": map[string]interface{}{
+									"enabled": true,
+									"configMap": map[string]interface{}{
+										"name": "random-name",
+									},
 								},
 							},
 						},
@@ -478,6 +534,17 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				})
 
 				It("Should should update the Synapse Status", func() {
+					// Get ServiceIP
+					var synapseIP string
+					Eventually(func() bool {
+						err := k8sClient.Get(ctx, synapseLookupKey, createdService)
+						if err != nil {
+							return false
+						}
+						synapseIP = createdService.Spec.ClusterIP
+						return synapseIP != ""
+					}, timeout, interval).Should(BeTrue())
+
 					expectedStatus := synapsev1alpha1.SynapseStatus{
 						State:                   "RUNNING",
 						Reason:                  "",
@@ -486,6 +553,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							ServerName:  ServerName,
 							ReportStats: ReportStats,
 						},
+						IP: synapseIP,
 					}
 					// Status may need some time to be updated
 					Eventually(func() synapsev1alpha1.SynapseStatus {
@@ -528,7 +596,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				It("Should create a Synapse RoleBinding", func() {
 					checkResourcePresence(createdRoleBinding, synapseLookupKey, expectedOwnerReference)
 				})
-
 			})
 
 			When("Specifying the Synapse configuration via a ConfigMap", func() {
@@ -578,6 +645,17 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					})
 
 					It("Should should update the Synapse Status", func() {
+						// Get ServiceIP
+						var synapseIP string
+						Eventually(func() bool {
+							err := k8sClient.Get(ctx, synapseLookupKey, createdService)
+							if err != nil {
+								return false
+							}
+							synapseIP = createdService.Spec.ClusterIP
+							return synapseIP != ""
+						}, timeout, interval).Should(BeTrue())
+
 						expectedStatus := synapsev1alpha1.SynapseStatus{
 							State:                   "RUNNING",
 							Reason:                  "",
@@ -586,6 +664,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 								ServerName:  ServerName,
 								ReportStats: ReportStats,
 							},
+							IP: synapseIP,
 						}
 						// Status may need some time to be updated
 						Eventually(func() synapsev1alpha1.SynapseStatus {
@@ -754,6 +833,82 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						}, timeout, interval).Should(Succeed())
 					})
 				})
+
+				When("Enabling the Heisenbridge", func() {
+					var createdHeisenbridgeConfigMap *corev1.ConfigMap
+					var createdHeisenbridgeDeployment *appsv1.Deployment
+					var createdHeisenbridgeService *corev1.Service
+					var heisenbridgeLookupKey types.NamespacedName
+
+					BeforeAll(func() {
+						createdHeisenbridgeConfigMap = &corev1.ConfigMap{}
+						createdHeisenbridgeDeployment = &appsv1.Deployment{}
+						createdHeisenbridgeService = &corev1.Service{}
+
+						configmapData = map[string]string{
+							"homeserver.yaml": "server_name: " + ServerName + "\n" +
+								"report_stats: " + strconv.FormatBool(ReportStats),
+						}
+
+						synapseSpec = synapsev1alpha1.SynapseSpec{
+							Homeserver: synapsev1alpha1.SynapseHomeserver{
+								ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
+									Name: ConfigMapName,
+								},
+							},
+							Bridges: synapsev1alpha1.SynapseBridges{
+								Heisenbridge: synapsev1alpha1.SynapseHeisenbridge{
+									Enabled: true,
+								},
+							},
+						}
+
+						heisenbridgeLookupKey = types.NamespacedName{Name: SynapseName + "-heisenbridge", Namespace: SynapseNamespace}
+
+					})
+
+					AfterAll(func() {
+						// Cleanup Heisenbridge resources
+						By("Cleaning up the Heisenbridge ConfigMap")
+						deleteResource(createdHeisenbridgeConfigMap, heisenbridgeLookupKey, false)
+
+						By("Cleaning up the Heisenbridge Deployment")
+						deleteResource(createdHeisenbridgeDeployment, heisenbridgeLookupKey, false)
+
+						By("Cleaning up the Heisenbridge Service")
+						deleteResource(createdHeisenbridgeService, heisenbridgeLookupKey, false)
+					})
+
+					It("Should create a ConfigMap for Heisenbridge", func() {
+						checkResourcePresence(createdHeisenbridgeConfigMap, heisenbridgeLookupKey, expectedOwnerReference)
+					})
+
+					It("Should create a Deployment for Heisenbridge", func() {
+						By("Checking that a Synapse Deployment exists and is correctly configured")
+						checkResourcePresence(createdHeisenbridgeDeployment, heisenbridgeLookupKey, expectedOwnerReference)
+					})
+
+					It("Should create a Service for Heisenbridge", func() {
+						checkResourcePresence(createdHeisenbridgeService, heisenbridgeLookupKey, expectedOwnerReference)
+					})
+
+					It("Should add the Heisenbridge IP to the Synapse Status", func() {
+						// Get Heisenbridge IP
+						var heisenbridgeIP string
+						Eventually(func() bool {
+							err := k8sClient.Get(ctx, heisenbridgeLookupKey, createdHeisenbridgeService)
+							if err != nil {
+								return false
+							}
+							heisenbridgeIP = createdHeisenbridgeService.Spec.ClusterIP
+							return heisenbridgeIP != ""
+						}, timeout, interval).Should(BeTrue())
+
+						Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).To(Succeed())
+						Expect(synapse.Status.BridgesConfiguration.Heisenbridge.IP).To(Equal(heisenbridgeIP))
+					})
+				})
+
 			})
 		})
 

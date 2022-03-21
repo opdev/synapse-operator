@@ -149,8 +149,84 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	// Reconcile Synapse resources: PVC, Deployment and Service
+	// We first need to create the Synapse Service as its IP address is potentially
+	// needed by the Bridges
 	objectMeta := setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
+	synapseKey := types.NamespacedName{Name: synapse.Name, Namespace: synapse.Namespace}
+	createdService := &corev1.Service{}
+	if err := r.reconcileResource(ctx, r.serviceForSynapse, &synapse, createdService, objectMeta); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Fetch Synapse IP and update the resource status
+	synapseIP, err := r.getServiceIP(ctx, synapseKey, createdService)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	synapse.Status.IP = synapseIP
+	if err := r.updateSynapseStatus(ctx, &synapse); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if synapse.Spec.Bridges.Heisenbridge.Enabled {
+		log.Info("Heisenbridge is enabled - deploying Heisenbridge")
+		// Heisenbridge is composed of a ConfigMap, a Service and a Deployment.
+		// Resources associated to the Heisenbridge are append with "-heisenbridge"
+		createdHeisenbridgeService := &corev1.Service{}
+		objectMetaHeisenbridge := setObjectMeta(synapse.Name+"-heisenbridge", synapse.Namespace, map[string]string{})
+		heisenbergKey := types.NamespacedName{Name: synapse.Name + "-heisenbridge", Namespace: synapse.Namespace}
+
+		// First create the service as we need its IP address for the
+		// heisenbridge.yaml configuration file
+		if err := r.reconcileResource(
+			ctx,
+			r.serviceForHeisenbridge,
+			&synapse,
+			createdHeisenbridgeService,
+			objectMetaHeisenbridge,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Get Service IP and update the Synapse status
+		heisenbridgeIP, err := r.getServiceIP(ctx, heisenbergKey, createdHeisenbridgeService)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		synapse.Status.BridgesConfiguration.Heisenbridge.IP = heisenbridgeIP
+		if err := r.updateSynapseStatus(ctx, &synapse); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Create Deployment for Heisenbridge
+		if err := r.reconcileResource(
+			ctx,
+			r.deploymentForHeisenbridge,
+			&synapse,
+			&appsv1.Deployment{},
+			objectMetaHeisenbridge,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Create ConfigMap for Heisenbridge
+		if err := r.reconcileResource(
+			ctx,
+			r.configMapForHeisenbridge,
+			&synapse,
+			&corev1.ConfigMap{},
+			objectMetaHeisenbridge,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Update the Synapse ConfigMap to enable Heisenbridge
+		if err := r.updateSynapseConfigMapWithHeisenbridgeInfos(ctx, &outputConfigMap, synapse); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Reconcile Synapse resources: PVC, Deployment and Service
 	if err := r.reconcileResource(ctx, r.serviceAccountForSynapse, &synapse, &corev1.ServiceAccount{}, objectMeta); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -167,10 +243,6 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 	// TODO: If a deployment is found, check that its Spec are correct.
-
-	if err := r.reconcileResource(ctx, r.serviceForSynapse, &synapse, &corev1.Service{}, objectMeta); err != nil {
-		return ctrl.Result{}, err
-	}
 
 	// Update the Synapse status if needed
 	if synapse.Status.State != "RUNNING" {
@@ -320,7 +392,7 @@ func (r *SynapseReconciler) createPostgresClusterForSynapse(
 	}
 
 	// Update configMap data with PostgreSQL DB information
-	if err := r.updateSynapseConfigMap(ctx, &cm, synapse); err != nil {
+	if err := r.updateSynapseConfigMapWithPostgreSQLInfos(ctx, &cm, synapse); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -441,7 +513,7 @@ func (r *SynapseReconciler) updateSynapseStatusDatabase(
 	return nil
 }
 
-func (r *SynapseReconciler) updateSynapseConfigMap(
+func (r *SynapseReconciler) updateSynapseConfigMapWithPostgreSQLInfos(
 	ctx context.Context,
 	cm *corev1.ConfigMap,
 	s synapsev1alpha1.Synapse,
@@ -455,7 +527,7 @@ func (r *SynapseReconciler) updateSynapseConfigMap(
 		return err
 	}
 
-	if err := r.updateSynapseConfigMapData(cm, s); err != nil {
+	if err := r.updateSynapseConfigMapDataWithPostgreSQLInfos(cm, s); err != nil {
 		return err
 	}
 
@@ -467,7 +539,7 @@ func (r *SynapseReconciler) updateSynapseConfigMap(
 	return nil
 }
 
-func (r *SynapseReconciler) updateSynapseConfigMapData(
+func (r *SynapseReconciler) updateSynapseConfigMapDataWithPostgreSQLInfos(
 	cm *corev1.ConfigMap,
 	s synapsev1alpha1.Synapse,
 ) error {
@@ -549,6 +621,24 @@ func (r *SynapseReconciler) updateSynapseConfigMapData(
 	return nil
 }
 
+func (r *SynapseReconciler) getServiceIP(
+	ctx context.Context,
+	synapseKey types.NamespacedName,
+	service *corev1.Service,
+) (string, error) {
+	if err := r.Get(ctx, synapseKey, service); err != nil {
+		return "", err
+	}
+
+	serviceIP := service.Spec.ClusterIP
+	if serviceIP == "" {
+		err := errors.New("service IP not set")
+		return "", err
+	}
+
+	return serviceIP, nil
+}
+
 func (r *SynapseReconciler) convertStructToMap(in interface{}) (map[string]interface{}, error) {
 	var intermediate []byte
 	var out map[string]interface{}
@@ -561,6 +651,58 @@ func (r *SynapseReconciler) convertStructToMap(in interface{}) (map[string]inter
 	}
 
 	return out, nil
+}
+
+func (r *SynapseReconciler) updateSynapseConfigMapWithHeisenbridgeInfos(
+	ctx context.Context,
+	cm *corev1.ConfigMap,
+	s synapsev1alpha1.Synapse,
+) error {
+	// Get latest ConfigMap version
+	if err := r.Get(
+		ctx,
+		types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace},
+		cm,
+	); err != nil {
+		return err
+	}
+
+	if err := r.updateSynapseConfigMapDataWithHeisenbridgeInfos(cm, s); err != nil {
+		return err
+	}
+
+	// Update ConfigMap
+	if err := r.Client.Update(ctx, cm); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *SynapseReconciler) updateSynapseConfigMapDataWithHeisenbridgeInfos(cm *corev1.ConfigMap, s synapsev1alpha1.Synapse) error {
+	homeserver := make(map[string]interface{})
+
+	// Load homeserver.yaml from ConfigMap
+	cm_data, ok := cm.Data["homeserver.yaml"]
+	if !ok {
+		err := errors.New("missing homeserver.yaml in ConfigMap")
+		return err
+	}
+	if err := yaml.Unmarshal([]byte(cm_data), homeserver); err != nil {
+		return err
+	}
+
+	// Add heisenbridge configuration file to the list of application services
+	homeserver["app_service_config_files"] = []string{"/data-heisenbridge/heisenbridge.yaml"}
+
+	// Write homeserver.yaml into ConfigMap data
+	if configMapData, err := yaml.Marshal(homeserver); err != nil {
+		return err
+	} else {
+		cm.Data = map[string]string{"homeserver.yaml": string(configMapData)}
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
