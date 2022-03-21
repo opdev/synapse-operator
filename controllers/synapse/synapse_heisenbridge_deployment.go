@@ -68,7 +68,7 @@ func (r *SynapseReconciler) deploymentForHeisenbridge(s *synapsev1alpha1.Synapse
 						VolumeSource: corev1.VolumeSource{
 							ConfigMap: &corev1.ConfigMapVolumeSource{
 								LocalObjectReference: corev1.LocalObjectReference{
-									Name: objectMeta.Name,
+									Name: s.Status.BridgesConfiguration.Heisenbridge.ConfigMapName,
 								},
 							},
 						},
