@@ -433,15 +433,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			var expectedOwnerReference metav1.OwnerReference
 			var synapseSpec synapsev1alpha1.SynapseSpec
 
-			// This node could be a `BeforeEach` with a `OncePerOrdered`
-			// decorator, if the last container nodes of each branch would be
-			// decorated with `Ordered`, and the root container node wouldn't
-			// be `Ordered`. But we need the root container node to have the
-			// `Ordered` decorator so we can use `BeforeAll` and `AfterAll`
-			// setup nodes within it to start envTest only once. Therefore we
-			// are using functions instead, that are called in other setup nodes
-			// down the tree.
-			var beforeEachCreateSynapseInstance = func() {
+			var initSynapseVariables = func() {
 				// Init variables
 				synapseLookupKey = types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace}
 				createdPVC = &corev1.PersistentVolumeClaim{}
@@ -460,9 +452,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				}
 			}
 
-			// This node could be a `JustBeforeEach` with a `OncePerOrdered`
-			// decorator, see comment above.
-			var justBeforeEachCreateSynapseInstance = func() {
+			var createSynapseInstance = func() {
 				By("Creating the Synapse instance")
 				synapse = &synapsev1alpha1.Synapse{
 					ObjectMeta: metav1.ObjectMeta{
@@ -480,12 +470,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				}, timeout, interval).Should(BeTrue())
 
 				expectedOwnerReference.UID = synapse.GetUID()
-
 			}
 
-			// This node could be a `AfterEach` with a `OncePerOrdered`
-			// decorator, see comment above.
-			var afterEachCreateSynapseInstance = func() {
+			var cleanupSynapseResources = func() {
 				By("Cleaning up Synapse CR")
 				Expect(k8sClient.Delete(ctx, synapse)).Should(Succeed())
 
@@ -511,7 +498,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				var createdConfigMap *corev1.ConfigMap
 
 				BeforeAll(func() {
-					beforeEachCreateSynapseInstance()
+					initSynapseVariables()
 
 					createdConfigMap = &corev1.ConfigMap{}
 					synapseSpec = synapsev1alpha1.SynapseSpec{
@@ -523,14 +510,14 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						},
 					}
 
-					justBeforeEachCreateSynapseInstance()
+					createSynapseInstance()
 				})
 
 				AfterAll(func() {
 					// Delete new ConfigMap
 					deleteResource(createdConfigMap, synapseLookupKey, false)
 
-					afterEachCreateSynapseInstance()
+					cleanupSynapseResources()
 				})
 
 				It("Should should update the Synapse Status", func() {
@@ -602,13 +589,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				var configMap *corev1.ConfigMap
 				var configmapData map[string]string
 
-				BeforeEach(OncePerOrdered, func() {
-					beforeEachCreateSynapseInstance()
-				})
-
-				JustBeforeEach(OncePerOrdered, func() {
-					justBeforeEachCreateSynapseInstance()
-
+				var createSynapseConfigMap = func() {
 					By("Creating a ConfigMap containing a basic homeserver.yaml")
 					// Populate the ConfigMap with the minimum data needed
 					configMap = &corev1.ConfigMap{
@@ -619,17 +600,17 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						Data: configmapData,
 					}
 					Expect(k8sClient.Create(ctx, configMap)).Should(Succeed())
-				})
+				}
 
-				AfterEach(OncePerOrdered, func() {
+				var cleanupSynapseConfigMap = func() {
 					By("Cleaning up ConfigMap")
 					Expect(k8sClient.Delete(ctx, configMap)).Should(Succeed())
-
-					afterEachCreateSynapseInstance()
-				})
+				}
 
 				When("Creating a simple Synapse instance", func() {
 					BeforeAll(func() {
+						initSynapseVariables()
+
 						configmapData = map[string]string{
 							"homeserver.yaml": "server_name: " + ServerName + "\n" +
 								"report_stats: " + strconv.FormatBool(ReportStats),
@@ -642,6 +623,14 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 								},
 							},
 						}
+
+						createSynapseConfigMap()
+						createSynapseInstance()
+					})
+
+					AfterAll(func() {
+						cleanupSynapseResources()
+						cleanupSynapseConfigMap()
 					})
 
 					It("Should should update the Synapse Status", func() {
@@ -710,6 +699,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					var postgresSecret corev1.Secret
 
 					BeforeAll(func() {
+						initSynapseVariables()
+
 						// Init variable
 						createdPostgresCluster = &pgov1beta1.PostgresCluster{}
 
@@ -726,6 +717,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							},
 							CreateNewPostgreSQL: true,
 						}
+
+						createSynapseConfigMap()
+						createSynapseInstance()
 					})
 
 					doPostgresControllerJob := func() {
@@ -763,6 +757,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					AfterAll(func() {
 						By("Cleaning up the Synapse PostgresCluster")
 						deleteResource(createdPostgresCluster, synapseLookupKey, false)
+
+						cleanupSynapseResources()
+						cleanupSynapseConfigMap()
 					})
 
 					It("Should create a PostgresCluster for Synapse", func() {
@@ -841,6 +838,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					var heisenbridgeLookupKey types.NamespacedName
 
 					BeforeAll(func() {
+						initSynapseVariables()
+
+						// Init vars
 						createdHeisenbridgeConfigMap = &corev1.ConfigMap{}
 						createdHeisenbridgeDeployment = &appsv1.Deployment{}
 						createdHeisenbridgeService = &corev1.Service{}
@@ -865,6 +865,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 						heisenbridgeLookupKey = types.NamespacedName{Name: SynapseName + "-heisenbridge", Namespace: SynapseNamespace}
 
+						createSynapseConfigMap()
+						createSynapseInstance()
 					})
 
 					AfterAll(func() {
@@ -877,6 +879,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 						By("Cleaning up the Heisenbridge Service")
 						deleteResource(createdHeisenbridgeService, heisenbridgeLookupKey, false)
+
+						cleanupSynapseResources()
+						cleanupSynapseConfigMap()
 					})
 
 					It("Should create a ConfigMap for Heisenbridge", func() {
