@@ -222,7 +222,13 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 
 			// Configure correct URL in Heisenbridge ConfigMap
-			if err := r.updateHeisenbridgeConfigMapURL(ctx, inputHeisenbridgeConfigMap, synapse); err != nil {
+			if err := r.updateConfigMap(
+				ctx,
+				inputHeisenbridgeConfigMap,
+				synapse,
+				r.updateHeisenbridgeWithURL,
+				"heisenbridge.yaml",
+			); err != nil {
 				return ctrl.Result{}, err
 			}
 		} else {
@@ -250,7 +256,13 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 		// Update the Synapse ConfigMap to enable Heisenbridge
-		if err := r.updateSynapseConfigMapWithHeisenbridgeInfos(ctx, &outputConfigMap, synapse); err != nil {
+		if err := r.updateConfigMap(
+			ctx,
+			&outputConfigMap,
+			synapse,
+			r.updateHomeserverWithHeisenbridgeInfos,
+			"homeserver.yaml",
+		); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -310,17 +322,8 @@ func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synaps
 	// - Otherwise, edit homeserver.yaml with new paths
 
 	// Load and validate homeserver.yaml
-	homeserver := make(map[string]interface{})
-	cm_data, ok := cm.Data["homeserver.yaml"]
-	if !ok {
-		err := errors.New("missing homeserver.yaml in ConfigMap")
-		log.Error(err, "Missing homeserver.yaml in ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
-		return err
-	}
-
-	// YAML Validation
-	if err := yaml.Unmarshal([]byte(cm_data), homeserver); err != nil {
-		log.Error(err, "Malformed homeserver.yaml")
+	homeserver, err := r.loadYAMLFileFromConfigMapData(cm, "homeserver.yaml")
+	if err != nil {
 		return err
 	}
 
@@ -421,7 +424,13 @@ func (r *SynapseReconciler) createPostgresClusterForSynapse(
 	}
 
 	// Update configMap data with PostgreSQL DB information
-	if err := r.updateSynapseConfigMapWithPostgreSQLInfos(ctx, &cm, synapse); err != nil {
+	if err := r.updateConfigMap(
+		ctx,
+		&cm,
+		synapse,
+		r.updateHomeserverWithPostgreSQLInfos,
+		"homeserver.yaml",
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -542,73 +551,57 @@ func (r *SynapseReconciler) updateSynapseStatusDatabase(
 	return nil
 }
 
-func (r *SynapseReconciler) updateSynapseConfigMapWithPostgreSQLInfos(
-	ctx context.Context,
-	cm *corev1.ConfigMap,
+func (r *SynapseReconciler) updateHomeserverWithPostgreSQLInfos(
 	s synapsev1alpha1.Synapse,
+	homeserver map[string]interface{},
 ) error {
-	// Get latest ConfigMap version
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace},
-		cm,
-	); err != nil {
+	databaseData, err := r.fetchDatabaseDataFromSynapseStatus(s)
+	if err != nil {
 		return err
 	}
 
-	if err := r.updateSynapseConfigMapDataWithPostgreSQLInfos(cm, s); err != nil {
-		return err
-	}
-
-	// Update ConfigMap
-	if err := r.Client.Update(ctx, cm); err != nil {
-		return err
-	}
-
+	// Save new database section of homeserver.yaml
+	homeserver["database"] = databaseData
 	return nil
 }
 
-func (r *SynapseReconciler) updateSynapseConfigMapDataWithPostgreSQLInfos(
-	cm *corev1.ConfigMap,
-	s synapsev1alpha1.Synapse,
-) error {
-	homeserver := make(map[string]interface{})
+func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1.Synapse) (map[string]interface{}, error) {
 	databaseData := HomeserverPgsqlDatabase{}
 
 	// Check if s.Status.DatabaseConnectionInfo contains necessary information
 	if s.Status.DatabaseConnectionInfo == (synapsev1alpha1.SynapseStatusDatabaseConnectionInfo{}) {
 		err := errors.New("missing DatabaseConnectionInfo in Synapse status")
-		return err
+		return map[string]interface{}{}, err
 	}
 
 	if s.Status.DatabaseConnectionInfo.User == "" {
 		err := errors.New("missing User in DatabaseConnectionInfo")
-		return err
+		return map[string]interface{}{}, err
 	}
 
 	if s.Status.DatabaseConnectionInfo.Password == "" {
 		err := errors.New("missing Password in DatabaseConnectionInfo")
-		return err
+		return map[string]interface{}{}, err
 	}
 	decodedPassword := base64decode([]byte(s.Status.DatabaseConnectionInfo.Password))
 
 	if s.Status.DatabaseConnectionInfo.DatabaseName == "" {
 		err := errors.New("missing DatabaseName in DatabaseConnectionInfo")
-		return err
+		return map[string]interface{}{}, err
 	}
 
 	if s.Status.DatabaseConnectionInfo.ConnectionURL == "" {
 		err := errors.New("missing ConnectionURL in DatabaseConnectionInfo")
-		return err
+		return map[string]interface{}{}, err
 	}
 	connectionURL := strings.Split(s.Status.DatabaseConnectionInfo.ConnectionURL, ":")
 	if len(connectionURL) < 2 {
 		err := errors.New("error parsing the Connection URL with value: " + s.Status.DatabaseConnectionInfo.ConnectionURL)
-		return err
+		return map[string]interface{}{}, err
 	}
 	port, err := strconv.ParseInt(connectionURL[1], 10, 64)
 	if err != nil {
-		return err
+		return map[string]interface{}{}, err
 	}
 
 	// Populate databaseData
@@ -624,30 +617,10 @@ func (r *SynapseReconciler) updateSynapseConfigMapDataWithPostgreSQLInfos(
 	// Convert databaseData into a map[string]interface{}
 	databaseDataMap, err := r.convertStructToMap(databaseData)
 	if err != nil {
-		return err
+		return map[string]interface{}{}, err
 	}
 
-	// Load homeserver.yaml from ConfigMap
-	cm_data, ok := cm.Data["homeserver.yaml"]
-	if !ok {
-		err := errors.New("missing homeserver.yaml in ConfigMap")
-		return err
-	}
-	if err := yaml.Unmarshal([]byte(cm_data), homeserver); err != nil {
-		return err
-	}
-
-	// Save new database section of homeserver.yaml
-	homeserver["database"] = databaseDataMap
-
-	// Write homeserver.yaml into ConfigMap data
-	if configMapData, err := yaml.Marshal(homeserver); err != nil {
-		return err
-	} else {
-		cm.Data = map[string]string{"homeserver.yaml": string(configMapData)}
-	}
-
-	return nil
+	return databaseDataMap, nil
 }
 
 func (r *SynapseReconciler) getServiceIP(
@@ -682,109 +655,20 @@ func (r *SynapseReconciler) convertStructToMap(in interface{}) (map[string]inter
 	return out, nil
 }
 
-func (r *SynapseReconciler) updateHeisenbridgeConfigMapURL(
-	ctx context.Context,
-	cm *corev1.ConfigMap,
-	s synapsev1alpha1.Synapse) error {
-
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace},
-		cm,
-	); err != nil {
-		return err
-	}
-
-	if err := r.updateHeisenbridgeConfigMapDataWithURL(cm, s); err != nil {
-		return err
-	}
-
-	// Update ConfigMap
-	if err := r.Client.Update(ctx, cm); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *SynapseReconciler) updateHeisenbridgeConfigMapDataWithURL(
-	cm *corev1.ConfigMap,
+func (r *SynapseReconciler) updateHeisenbridgeWithURL(
 	s synapsev1alpha1.Synapse,
+	heisenbridge map[string]interface{},
 ) error {
-	heisenbridge := make(map[string]interface{})
-
-	// Load heisenbridge.yaml from ConfigMap
-	cm_data, ok := cm.Data["heisenbridge.yaml"]
-	if !ok {
-		err := errors.New("missing heisenbridge.yaml in ConfigMap")
-		return err
-	}
-	if err := yaml.Unmarshal([]byte(cm_data), heisenbridge); err != nil {
-		return err
-	}
-
-	// Configure Heisenbridge URL
 	heisenbridge["url"] = "http://" + s.Status.BridgesConfiguration.Heisenbridge.IP + ":9898"
-
-	// Write heisenbridge.yaml into ConfigMap data
-	if configMapData, err := yaml.Marshal(heisenbridge); err != nil {
-		return err
-	} else {
-		cm.Data = map[string]string{"heisenbridge.yaml": string(configMapData)}
-	}
-
 	return nil
 }
 
-func (r *SynapseReconciler) updateSynapseConfigMapWithHeisenbridgeInfos(
-	ctx context.Context,
-	cm *corev1.ConfigMap,
+func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
 	s synapsev1alpha1.Synapse,
+	homeserver map[string]interface{},
 ) error {
-	// Get latest ConfigMap version
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace},
-		cm,
-	); err != nil {
-		return err
-	}
-
-	if err := r.updateSynapseConfigMapDataWithHeisenbridgeInfos(cm, s); err != nil {
-		return err
-	}
-
-	// Update ConfigMap
-	if err := r.Client.Update(ctx, cm); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *SynapseReconciler) updateSynapseConfigMapDataWithHeisenbridgeInfos(cm *corev1.ConfigMap, s synapsev1alpha1.Synapse) error {
-	homeserver := make(map[string]interface{})
-
-	// Load homeserver.yaml from ConfigMap
-	cm_data, ok := cm.Data["homeserver.yaml"]
-	if !ok {
-		err := errors.New("missing homeserver.yaml in ConfigMap")
-		return err
-	}
-	if err := yaml.Unmarshal([]byte(cm_data), homeserver); err != nil {
-		return err
-	}
-
 	// Add heisenbridge configuration file to the list of application services
 	homeserver["app_service_config_files"] = []string{"/data-heisenbridge/heisenbridge.yaml"}
-
-	// Write homeserver.yaml into ConfigMap data
-	if configMapData, err := yaml.Marshal(homeserver); err != nil {
-		return err
-	} else {
-		cm.Data = map[string]string{"homeserver.yaml": string(configMapData)}
-	}
-
 	return nil
 }
 

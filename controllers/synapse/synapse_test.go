@@ -347,7 +347,7 @@ var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 		// Re-usable test for checking different happy paths
 		check_happy_path := func() {
 			By("Updating the ConfigMap Data")
-			Expect(r.updateSynapseConfigMapDataWithPostgreSQLInfos(&cm, s)).Should(Succeed())
+			Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).Should(Succeed())
 
 			By("Parsing the ConfigMap Data and checking Database information are correct")
 			configMapData, ok := cm.Data["homeserver.yaml"]
@@ -489,7 +489,7 @@ var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 			})
 
 			It("Should fail to update the ConfigMap data", func() {
-				Expect(r.updateSynapseConfigMapDataWithPostgreSQLInfos(&cm, s)).ShouldNot(Succeed())
+				Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
 			})
 		})
 
@@ -499,7 +499,7 @@ var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 			})
 
 			It("Should fail to update the ConfigMap data", func() {
-				Expect(r.updateSynapseConfigMapDataWithPostgreSQLInfos(&cm, s)).ShouldNot(Succeed())
+				Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
 			})
 		})
 
@@ -509,7 +509,7 @@ var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 			})
 
 			It("Should fail to update the ConfigMap data", func() {
-				Expect(r.updateSynapseConfigMapDataWithPostgreSQLInfos(&cm, s)).ShouldNot(Succeed())
+				Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
 			})
 		})
 
@@ -519,7 +519,7 @@ var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 			})
 
 			It("Should fail to update the ConfigMap data", func() {
-				Expect(r.updateSynapseConfigMapDataWithPostgreSQLInfos(&cm, s)).ShouldNot(Succeed())
+				Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
 			})
 		})
 
@@ -529,7 +529,7 @@ var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 			})
 
 			It("Should fail to update the ConfigMap data", func() {
-				Expect(r.updateSynapseConfigMapDataWithPostgreSQLInfos(&cm, s)).ShouldNot(Succeed())
+				Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
 			})
 		})
 
@@ -539,7 +539,7 @@ var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 			})
 
 			It("Should fail to update the ConfigMap data", func() {
-				Expect(r.updateSynapseConfigMapDataWithPostgreSQLInfos(&cm, s)).ShouldNot(Succeed())
+				Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
 			})
 		})
 	})
