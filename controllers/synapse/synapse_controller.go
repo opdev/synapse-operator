@@ -20,8 +20,6 @@ import (
 	"context"
 	"errors"
 	"reflect"
-	"strconv"
-	"strings"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -311,59 +309,6 @@ func (r *SynapseReconciler) setFailedState(ctx context.Context, synapse *synapse
 	return r.updateSynapseStatus(ctx, synapse)
 }
 
-// ParseHomeserverConfigMap loads the ConfigMap, which name is determined by
-// Spec.Homeserver.ConfigMap.Name, run validation checks and fetch necesarry
-// value needed to configure the Synapse Deployment.
-func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synapse *synapsev1alpha1.Synapse, cm corev1.ConfigMap) error {
-	log := ctrllog.FromContext(ctx)
-
-	// TODO:
-	// - Ensure that key path is and log config file path are in /data
-	// - Otherwise, edit homeserver.yaml with new paths
-
-	// Load and validate homeserver.yaml
-	homeserver, err := r.loadYAMLFileFromConfigMapData(cm, "homeserver.yaml")
-	if err != nil {
-		return err
-	}
-
-	// Fetch server_name and report_stats
-	if _, ok := homeserver["server_name"]; !ok {
-		err := errors.New("missing server_name key in homeserver.yaml")
-		log.Error(err, "Missing server_name key in homeserver.yaml")
-		return err
-	}
-	server_name, ok := homeserver["server_name"].(string)
-	if !ok {
-		err := errors.New("error converting server_name to string")
-		log.Error(err, "Error converting server_name to string")
-		return err
-	}
-
-	if _, ok := homeserver["report_stats"]; !ok {
-		err := errors.New("missing report_stats key in homeserver.yaml")
-		log.Error(err, "Missing report_stats key in homeserver.yaml")
-		return err
-	}
-	report_stats, ok := homeserver["report_stats"].(bool)
-	if !ok {
-		err := errors.New("error converting report_stats to bool")
-		log.Error(err, "Error converting report_stats to bool")
-		return err
-	}
-
-	synapse.Status.HomeserverConfiguration.ServerName = server_name
-	synapse.Status.HomeserverConfiguration.ReportStats = report_stats
-
-	log.Info(
-		"Loaded homeserver.yaml from ConfigMap successfully",
-		"server_name:", synapse.Status.HomeserverConfiguration.ServerName,
-		"report_stats:", synapse.Status.HomeserverConfiguration.ReportStats,
-	)
-
-	return nil
-}
-
 func (r *SynapseReconciler) updateSynapseStatus(ctx context.Context, synapse *synapsev1alpha1.Synapse) error {
 	current := &synapsev1alpha1.Synapse{}
 	if err := r.Get(
@@ -551,78 +496,6 @@ func (r *SynapseReconciler) updateSynapseStatusDatabase(
 	return nil
 }
 
-func (r *SynapseReconciler) updateHomeserverWithPostgreSQLInfos(
-	s synapsev1alpha1.Synapse,
-	homeserver map[string]interface{},
-) error {
-	databaseData, err := r.fetchDatabaseDataFromSynapseStatus(s)
-	if err != nil {
-		return err
-	}
-
-	// Save new database section of homeserver.yaml
-	homeserver["database"] = databaseData
-	return nil
-}
-
-func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1.Synapse) (map[string]interface{}, error) {
-	databaseData := HomeserverPgsqlDatabase{}
-
-	// Check if s.Status.DatabaseConnectionInfo contains necessary information
-	if s.Status.DatabaseConnectionInfo == (synapsev1alpha1.SynapseStatusDatabaseConnectionInfo{}) {
-		err := errors.New("missing DatabaseConnectionInfo in Synapse status")
-		return map[string]interface{}{}, err
-	}
-
-	if s.Status.DatabaseConnectionInfo.User == "" {
-		err := errors.New("missing User in DatabaseConnectionInfo")
-		return map[string]interface{}{}, err
-	}
-
-	if s.Status.DatabaseConnectionInfo.Password == "" {
-		err := errors.New("missing Password in DatabaseConnectionInfo")
-		return map[string]interface{}{}, err
-	}
-	decodedPassword := base64decode([]byte(s.Status.DatabaseConnectionInfo.Password))
-
-	if s.Status.DatabaseConnectionInfo.DatabaseName == "" {
-		err := errors.New("missing DatabaseName in DatabaseConnectionInfo")
-		return map[string]interface{}{}, err
-	}
-
-	if s.Status.DatabaseConnectionInfo.ConnectionURL == "" {
-		err := errors.New("missing ConnectionURL in DatabaseConnectionInfo")
-		return map[string]interface{}{}, err
-	}
-	connectionURL := strings.Split(s.Status.DatabaseConnectionInfo.ConnectionURL, ":")
-	if len(connectionURL) < 2 {
-		err := errors.New("error parsing the Connection URL with value: " + s.Status.DatabaseConnectionInfo.ConnectionURL)
-		return map[string]interface{}{}, err
-	}
-	port, err := strconv.ParseInt(connectionURL[1], 10, 64)
-	if err != nil {
-		return map[string]interface{}{}, err
-	}
-
-	// Populate databaseData
-	databaseData.Name = "psycopg2"
-	databaseData.Args.User = s.Status.DatabaseConnectionInfo.User
-	databaseData.Args.Password = decodedPassword
-	databaseData.Args.Database = s.Status.DatabaseConnectionInfo.DatabaseName
-	databaseData.Args.Host = connectionURL[0]
-	databaseData.Args.Port = port
-	databaseData.Args.CpMin = 5
-	databaseData.Args.CpMax = 10
-
-	// Convert databaseData into a map[string]interface{}
-	databaseDataMap, err := r.convertStructToMap(databaseData)
-	if err != nil {
-		return map[string]interface{}{}, err
-	}
-
-	return databaseDataMap, nil
-}
-
 func (r *SynapseReconciler) getServiceIP(
 	ctx context.Context,
 	synapseKey types.NamespacedName,
@@ -653,23 +526,6 @@ func (r *SynapseReconciler) convertStructToMap(in interface{}) (map[string]inter
 	}
 
 	return out, nil
-}
-
-func (r *SynapseReconciler) updateHeisenbridgeWithURL(
-	s synapsev1alpha1.Synapse,
-	heisenbridge map[string]interface{},
-) error {
-	heisenbridge["url"] = "http://" + s.Status.BridgesConfiguration.Heisenbridge.IP + ":9898"
-	return nil
-}
-
-func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
-	s synapsev1alpha1.Synapse,
-	homeserver map[string]interface{},
-) error {
-	// Add heisenbridge configuration file to the list of application services
-	homeserver["app_service_config_files"] = []string{"/data-heisenbridge/heisenbridge.yaml"}
-	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
