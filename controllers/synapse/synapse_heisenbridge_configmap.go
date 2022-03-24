@@ -52,3 +52,11 @@ namespaces:
 
 	return cm
 }
+
+func (r *SynapseReconciler) updateHeisenbridgeWithURL(
+	s synapsev1alpha1.Synapse,
+	heisenbridge map[string]interface{},
+) error {
+	heisenbridge["url"] = "http://" + s.Status.BridgesConfiguration.Heisenbridge.IP + ":9898"
+	return nil
+}
