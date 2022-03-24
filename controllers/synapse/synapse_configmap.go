@@ -2682,13 +2682,6 @@ redis:
 	return cm
 }
 
-func (r *SynapseReconciler) boolToString(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
-}
-
 // ParseHomeserverConfigMap loads the ConfigMap, which name is determined by
 // Spec.Homeserver.ConfigMap.Name, run validation checks and fetch necesarry
 // value needed to configure the Synapse Deployment.

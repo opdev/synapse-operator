@@ -58,7 +58,7 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, obj
 							Value: server_name,
 						}, {
 							Name:  "SYNAPSE_REPORT_STATS",
-							Value: convert_to_yes_no(report_stats),
+							Value: boolToYesNo(report_stats),
 						}},
 						VolumeMounts: []corev1.VolumeMount{{
 							Name:      "homeserver",
@@ -136,11 +136,4 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, obj
 	// Set Synapse instance as the owner and controller
 	ctrl.SetControllerReference(s, dep, r.Scheme)
 	return dep
-}
-
-func convert_to_yes_no(report_stats bool) string {
-	if report_stats {
-		return "yes"
-	}
-	return "no"
 }
