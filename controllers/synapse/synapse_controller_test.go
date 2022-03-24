@@ -567,7 +567,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						Value: ServerName,
 					}, {
 						Name:  "SYNAPSE_REPORT_STATS",
-						Value: convert_to_yes_no(ReportStats),
+						Value: boolToYesNo(ReportStats),
 					}}
 					Expect(createdDeployment.Spec.Template.Spec.InitContainers[0].Env).Should(ContainElements(envVars))
 				})
@@ -676,7 +676,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							Value: ServerName,
 						}, {
 							Name:  "SYNAPSE_REPORT_STATS",
-							Value: convert_to_yes_no(ReportStats),
+							Value: boolToYesNo(ReportStats),
 						}}
 						Expect(createdDeployment.Spec.Template.Spec.InitContainers[0].Env).Should(ContainElements(envVars))
 					})

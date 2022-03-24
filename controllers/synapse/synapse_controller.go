@@ -22,7 +22,6 @@ import (
 	"reflect"
 	"time"
 
-	"gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -512,20 +511,6 @@ func (r *SynapseReconciler) getServiceIP(
 	}
 
 	return serviceIP, nil
-}
-
-func (r *SynapseReconciler) convertStructToMap(in interface{}) (map[string]interface{}, error) {
-	var intermediate []byte
-	var out map[string]interface{}
-	intermediate, err := yaml.Marshal(in)
-	if err != nil {
-		return nil, err
-	}
-	if err := yaml.Unmarshal(intermediate, &out); err != nil {
-		return nil, err
-	}
-
-	return out, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
