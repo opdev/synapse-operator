@@ -697,9 +697,15 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				When("Requesting a new PostgreSQL instance to be created for Synapse", func() {
 					var createdPostgresCluster *pgov1beta1.PostgresCluster
 					var postgresSecret corev1.Secret
+					var postgresLookupKeys types.NamespacedName
 
 					BeforeAll(func() {
 						initSynapseVariables()
+
+						postgresLookupKeys = types.NamespacedName{
+							Name:      synapseLookupKey.Name + "-pgsql",
+							Namespace: synapseLookupKey.Namespace,
+						}
 
 						// Init variable
 						createdPostgresCluster = &pgov1beta1.PostgresCluster{}
@@ -729,7 +735,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						// we have to manually create this secret here.
 						postgresSecret = corev1.Secret{
 							ObjectMeta: metav1.ObjectMeta{
-								Name:      SynapseName + "-pguser-synapse",
+								Name:      SynapseName + "-pgsql-pguser-synapse",
 								Namespace: SynapseNamespace,
 							},
 							Data: map[string][]byte{
@@ -756,7 +762,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 					AfterAll(func() {
 						By("Cleaning up the Synapse PostgresCluster")
-						deleteResource(createdPostgresCluster, synapseLookupKey, false)
+						deleteResource(createdPostgresCluster, postgresLookupKeys, false)
 
 						cleanupSynapseResources()
 						cleanupSynapseConfigMap()
@@ -764,7 +770,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 					It("Should create a PostgresCluster for Synapse", func() {
 						By("Checking that a Synapse PostgresCluster exists")
-						checkResourcePresence(createdPostgresCluster, synapseLookupKey, expectedOwnerReference)
+						checkResourcePresence(createdPostgresCluster, postgresLookupKeys, expectedOwnerReference)
 					})
 
 					It("Should update the Synapse status", func() {
