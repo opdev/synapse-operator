@@ -1,0 +1,9 @@
+apiVersion: synapse.opdev.io/v1alpha1
+kind: Synapse
+metadata:
+  name: your-first-synapse-deployment
+spec:
+  homeserver:
+    values:
+      serverName: example.com
+      reportStats: true
