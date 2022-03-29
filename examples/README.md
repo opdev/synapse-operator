@@ -5,7 +5,8 @@ main features of the Synapse operator.
 
 ## Pre-requisites
 
-The Synapse operator should be running in your cluster.
+The Synapse operator should be running in your cluster. See the
+[deployment intructions](https://github.com/opdev/synapse-operator#deploying-the-synapse-operator).
 
 ## Your first Synapse deployment
 
