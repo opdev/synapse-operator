@@ -341,13 +341,12 @@ func (r *SynapseReconciler) createPostgresClusterForSynapse(
 	createdPostgresCluster := pgov1beta1.PostgresCluster{}
 
 	// Create ConfigMap for PostgresCluster
-	objectMeta = setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
+	objectMeta = setObjectMeta(synapse.Name+"-pgsql", synapse.Namespace, map[string]string{})
 	if err := r.reconcileResource(ctx, r.configMapForPostgresCluster, &synapse, &corev1.ConfigMap{}, objectMeta); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Create PostgresCluster for Synapse
-	objectMeta = setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
 	if err := r.reconcileResource(ctx, r.postgresClusterForSynapse, &synapse, &createdPostgresCluster, objectMeta); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -427,8 +426,8 @@ func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(
 	if err := r.Get(
 		ctx,
 		types.NamespacedName{
-			Name:      s.Name + "-pguser-synapse",
-			Namespace: s.Namespace,
+			Name:      createdPostgresCluster.Name + "-pguser-synapse",
+			Namespace: createdPostgresCluster.Namespace,
 		},
 		&postgresSecret,
 	); err != nil {
