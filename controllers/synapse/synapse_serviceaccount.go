@@ -27,18 +27,20 @@ import (
 )
 
 // serviceAccountForSynapse returns a synapse ServiceAccount object
-func (r *SynapseReconciler) serviceAccountForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) client.Object {
+func (r *SynapseReconciler) serviceAccountForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: objectMeta,
 	}
 
 	// Set Synapse instance as the owner and controller
-	ctrl.SetControllerReference(s, sa, r.Scheme)
-	return sa
+	if err := ctrl.SetControllerReference(s, sa, r.Scheme); err != nil {
+		return &corev1.ServiceAccount{}, err
+	}
+	return sa, nil
 }
 
 // roleBindingForSynapse returns a synapse RoleBinding object
-func (r *SynapseReconciler) roleBindingForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) client.Object {
+func (r *SynapseReconciler) roleBindingForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	rb := &rbacv1.RoleBinding{
 		ObjectMeta: objectMeta,
 		RoleRef: rbacv1.RoleRef{
@@ -54,6 +56,8 @@ func (r *SynapseReconciler) roleBindingForSynapse(s *synapsev1alpha1.Synapse, ob
 	}
 
 	// Set Synapse instance as the owner and controller
-	ctrl.SetControllerReference(s, rb, r.Scheme)
-	return rb
+	if err := ctrl.SetControllerReference(s, rb, r.Scheme); err != nil {
+		return &rbacv1.RoleBinding{}, err
+	}
+	return rb, nil
 }

@@ -33,11 +33,14 @@ func labelsForHeisenbridge(name string) map[string]string {
 }
 
 // deploymentForSynapse returns a synapse Deployment object
-func (r *SynapseReconciler) deploymentForHeisenbridge(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) client.Object {
+func (r *SynapseReconciler) deploymentForHeisenbridge(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	ls := labelsForHeisenbridge(s.Name)
 	replicas := int32(1)
 
 	command := r.craftHeisenbridgeCommad(*s)
+	// The created Heisenbridge ConfigMap Name share the same name as the
+	// Heisenbridge Deployment
+	heisenbridgeConfigMapName := objectMeta.Name
 
 	dep := &appsv1.Deployment{
 		ObjectMeta: objectMeta,
@@ -68,7 +71,7 @@ func (r *SynapseReconciler) deploymentForHeisenbridge(s *synapsev1alpha1.Synapse
 						VolumeSource: corev1.VolumeSource{
 							ConfigMap: &corev1.ConfigMapVolumeSource{
 								LocalObjectReference: corev1.LocalObjectReference{
-									Name: s.Status.BridgesConfiguration.Heisenbridge.ConfigMapName,
+									Name: heisenbridgeConfigMapName,
 								},
 							},
 						},
@@ -78,8 +81,10 @@ func (r *SynapseReconciler) deploymentForHeisenbridge(s *synapsev1alpha1.Synapse
 		},
 	}
 	// Set Synapse instance as the owner and controller
-	ctrl.SetControllerReference(s, dep, r.Scheme)
-	return dep
+	if err := ctrl.SetControllerReference(s, dep, r.Scheme); err != nil {
+		return &appsv1.Deployment{}, err
+	}
+	return dep, nil
 }
 
 func (r *SynapseReconciler) craftHeisenbridgeCommad(s synapsev1alpha1.Synapse) []string {

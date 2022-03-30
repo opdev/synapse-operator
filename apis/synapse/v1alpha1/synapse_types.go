@@ -64,10 +64,7 @@ type SynapseHomeserverConfigMap struct {
 	Name string `json:"name"`
 
 	// Namespace in which the ConfigMap is living. If left empty, the Synapse
-	// namespace is used. Currently the ConfigMap must live in the same
-	// namespace as the Synapse instance referencing it, therefore this
-	// attribute is not used.
-	// See https://github.com/opdev/synapse-operator/issues/17
+	// namespace is used.
 	Namespace string `json:"namespace,omitempty"`
 }
 
@@ -90,8 +87,7 @@ type SynapseBridges struct {
 	// * enable the bridge, without specifying additional configuration
 	//   options. The bridge will be deployed with a default configuration.
 	// * enable the bridge and specify an existing ConfigMap by its Name and
-	//   Namespace containing a heisenbridge.yaml. This ConfigMap will be
-	//   modified in place to configure the correct homeserver connection URL.
+	//   Namespace containing a heisenbridge.yaml.
 	Heisenbridge SynapseHeisenbridge `json:"heisenbridge,omitempty"`
 }
 
@@ -103,8 +99,7 @@ type SynapseHeisenbridge struct {
 
 	// Holds information about the ConfigMap containing the heisenbridge.yaml
 	// configuration file to be used as input for the configuration of the
-	// Heisenbridge IRC Bridge. Note that this ConfigMap will be modified by
-	// the Synapse controller.
+	// Heisenbridge IRC Bridge.
 	ConfigMap SynapseHeisenbridgeConfigMap `json:"configMap,omitempty"`
 
 	// +kubebuilder:default:=0
@@ -124,10 +119,7 @@ type SynapseHeisenbridgeConfigMap struct {
 	Name string `json:"name"`
 
 	// Namespace in which the ConfigMap is living. If left empty, the Synapse
-	// namespace is used. Currently the ConfigMap must live in the same
-	// namespace as the Synapse instance referencing it, therefore this
-	// attribute is not used.
-	// See https://github.com/opdev/synapse-operator/issues/17
+	// namespace is used.
 	Namespace string `json:"namespace,omitempty"`
 }
 
@@ -144,10 +136,6 @@ type SynapseStatus struct {
 
 	// Holds configuration information for Synapse
 	HomeserverConfiguration SynapseStatusHomeserverConfiguration `json:"homeserverConfiguration,omitempty"`
-
-	// The name of the ConfigMap, in the synapse Namespace, which contains the
-	// homeserver.yaml configuration file
-	HomeserverConfigMapName string `json:"homeserverConfigMapName,omitempty"`
 
 	// Synapse IP address (corresponding to the Synapse Service IP address)
 	IP string `json:"ip,omitempty"`
@@ -167,9 +155,6 @@ type SynapseStatusBridgesConfiguration struct {
 type SynapseStatusHeisenbridge struct {
 	// IP at which the Heisenbridge is available
 	IP string `json:"ip,omitempty"`
-
-	// Name of the ConfigMap used for Heisenbridge configuration
-	ConfigMapName string `json:"configMapName,omitempty"`
 }
 
 type SynapseStatusDatabaseConnectionInfo struct {

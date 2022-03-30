@@ -13,7 +13,7 @@ import (
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 )
 
-type createResourceFunc func(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) client.Object
+type createResourceFunc func(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error)
 
 func setObjectMeta(name string, namespace string, labels map[string]string) metav1.ObjectMeta {
 	objectMeta := metav1.ObjectMeta{
@@ -48,9 +48,19 @@ func (r *SynapseReconciler) reconcileResource(
 				"Namespace", objectMeta.Namespace,
 			)
 
-			resource := createResource(s, objectMeta)
-			err = r.Client.Create(ctx, resource)
+			resource, err := createResource(s, objectMeta)
+			if err != nil {
+				log.Error(
+					err,
+					"Failed to generate a new resource for Synapse",
+					"Kind", resource.GetObjectKind(),
+					"Name", objectMeta.Name,
+					"Namespace", objectMeta.Namespace,
+				)
+				return err
+			}
 
+			err = r.Client.Create(ctx, resource)
 			if err != nil {
 				log.Error(
 					err,

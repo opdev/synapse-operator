@@ -30,7 +30,7 @@ import (
 )
 
 // postgresClusterForSynapse returns a synapse Deployment object
-func (r *SynapseReconciler) postgresClusterForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) client.Object {
+func (r *SynapseReconciler) postgresClusterForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	postgresCluster := &pgov1beta1.PostgresCluster{
 		ObjectMeta: objectMeta,
 		Spec: pgov1beta1.PostgresClusterSpec{
@@ -78,18 +78,23 @@ func (r *SynapseReconciler) postgresClusterForSynapse(s *synapsev1alpha1.Synapse
 	}
 
 	// Set Synapse instance as the owner and controller
-	ctrl.SetControllerReference(s, postgresCluster, r.Scheme)
-	return postgresCluster
+	if err := ctrl.SetControllerReference(s, postgresCluster, r.Scheme); err != nil {
+		return &pgov1beta1.PostgresCluster{}, err
+	}
+	return postgresCluster, nil
 }
 
-func (r *SynapseReconciler) configMapForPostgresCluster(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) client.Object {
+func (r *SynapseReconciler) configMapForPostgresCluster(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: objectMeta,
 		Data:       map[string]string{"createdb.sql": "CREATE DATABASE synapse LOCALE 'C' ENCODING 'UTF-8' TEMPLATE template0;"},
 	}
-	ctrl.SetControllerReference(s, configMap, r.Scheme)
 
-	return configMap
+	if err := ctrl.SetControllerReference(s, configMap, r.Scheme); err != nil {
+		return &corev1.ConfigMap{}, err
+	}
+
+	return configMap, nil
 }
 
 func base64encode(to_encode string) []byte {

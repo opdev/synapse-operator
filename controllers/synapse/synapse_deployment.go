@@ -27,12 +27,14 @@ import (
 )
 
 // deploymentForSynapse returns a synapse Deployment object
-func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) client.Object {
+func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	ls := labelsForSynapse(s.Name)
 	replicas := int32(1)
 
 	server_name := s.Status.HomeserverConfiguration.ServerName
 	report_stats := s.Status.HomeserverConfiguration.ReportStats
+	// The created Synapse ConfigMap shares the same name as the Synapse deployment
+	synapseConfigMapName := objectMeta.Name
 
 	dep := &appsv1.Deployment{
 		ObjectMeta: objectMeta,
@@ -92,7 +94,7 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, obj
 						VolumeSource: corev1.VolumeSource{
 							ConfigMap: &corev1.ConfigMapVolumeSource{
 								LocalObjectReference: corev1.LocalObjectReference{
-									Name: s.Status.HomeserverConfigMapName,
+									Name: synapseConfigMapName,
 								},
 							},
 						},
@@ -110,6 +112,8 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, obj
 	}
 
 	if s.Spec.Bridges.Heisenbridge.Enabled {
+		heisenbridgeConfigMapName := objectMeta.Name + "-heisenbridge"
+
 		dep.Spec.Template.Spec.Containers[0].VolumeMounts = append(
 			dep.Spec.Template.Spec.Containers[0].VolumeMounts,
 			corev1.VolumeMount{
@@ -125,7 +129,7 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, obj
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: s.Status.BridgesConfiguration.Heisenbridge.ConfigMapName,
+							Name: heisenbridgeConfigMapName,
 						},
 					},
 				},
@@ -134,6 +138,9 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, obj
 	}
 
 	// Set Synapse instance as the owner and controller
-	ctrl.SetControllerReference(s, dep, r.Scheme)
-	return dep
+	if err := ctrl.SetControllerReference(s, dep, r.Scheme); err != nil {
+		return &appsv1.Deployment{}, err
+	}
+
+	return dep, nil
 }

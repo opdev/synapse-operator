@@ -45,25 +45,19 @@ spec:
                       * enable the bridge, without specifying additional configuration   options.
                       The bridge will be deployed with a default configuration. *
                       enable the bridge and specify an existing ConfigMap by its Name
-                      and   Namespace containing a heisenbridge.yaml. This ConfigMap
-                      will be   modified in place to configure the correct homeserver
-                      connection URL.'
+                      and   Namespace containing a heisenbridge.yaml.'
                     properties:
                       configMap:
                         description: Holds information about the ConfigMap containing
                           the heisenbridge.yaml configuration file to be used as input
-                          for the configuration of the Heisenbridge IRC Bridge. Note
-                          that this ConfigMap will be modified by the Synapse controller.
+                          for the configuration of the Heisenbridge IRC Bridge.
                         properties:
                           name:
                             description: Name of the ConfigMap in the given Namespace.
                             type: string
                           namespace:
                             description: Namespace in which the ConfigMap is living.
-                              If left empty, the Synapse namespace is used. Currently
-                              the ConfigMap must live in the same namespace as the
-                              Synapse instance referencing it, therefore this attribute
-                              is not used. See https://github.com/opdev/synapse-operator/issues/17
+                              If left empty, the Synapse namespace is used.
                             type: string
                         required:
                         - name
@@ -101,10 +95,7 @@ spec:
                         type: string
                       namespace:
                         description: Namespace in which the ConfigMap is living. If
-                          left empty, the Synapse namespace is used. Currently the
-                          ConfigMap must live in the same namespace as the Synapse
-                          instance referencing it, therefore this attribute is not
-                          used. See https://github.com/opdev/synapse-operator/issues/17
+                          left empty, the Synapse namespace is used.
                         type: string
                     required:
                     - name
@@ -137,9 +128,6 @@ spec:
                   heisenbridge:
                     description: Status of the Heisenbridge
                     properties:
-                      configMapName:
-                        description: Name of the ConfigMap used for Heisenbridge configuration
-                        type: string
                       ip:
                         description: IP at which the Heisenbridge is available
                         type: string
@@ -164,10 +152,6 @@ spec:
                     description: User allowed to query the given database
                     type: string
                 type: object
-              homeserverConfigMapName:
-                description: The name of the ConfigMap, in the synapse Namespace,
-                  which contains the homeserver.yaml configuration file
-                type: string
               homeserverConfiguration:
                 description: Holds configuration information for Synapse
                 properties:
