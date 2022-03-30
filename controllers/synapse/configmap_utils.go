@@ -23,6 +23,7 @@ import (
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -129,4 +130,34 @@ func (r *SynapseReconciler) writeYAMLFileToConfigMapData(
 
 	r.writeFileToConfigMapData(configMap, filename, string(bytesContent))
 	return nil
+}
+
+// getConfigMapCopy is a generic function which creates a copy of a given
+// source ConfigMap. The resulting copy is a ConfigMap with similar data, and
+// with metadata set by the 'copyConfigMapObjectMeta' argument.
+func (r *SynapseReconciler) getConfigMapCopy(
+	sourceConfigMapName string,
+	sourceConfigMapNamespace string,
+	copyConfigMapObjectMeta metav1.ObjectMeta,
+) (*corev1.ConfigMap, error) {
+	sourceConfigMap := &corev1.ConfigMap{}
+
+	ctx := context.TODO()
+
+	// Get sourceConfigMap
+	if err := r.Get(
+		ctx,
+		types.NamespacedName{Name: sourceConfigMapName, Namespace: sourceConfigMapNamespace},
+		sourceConfigMap,
+	); err != nil {
+		return &corev1.ConfigMap{}, err
+	}
+
+	// Create a copy of the source ConfigMap with the same content.
+	copyConfigMap := &corev1.ConfigMap{
+		ObjectMeta: copyConfigMapObjectMeta,
+		Data:       sourceConfigMap.Data,
+	}
+
+	return copyConfigMap, nil
 }

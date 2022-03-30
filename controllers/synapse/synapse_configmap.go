@@ -32,7 +32,7 @@ import (
 )
 
 // configMapForSynapse returns a synapse ConfigMap object
-func (r *SynapseReconciler) configMapForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) client.Object {
+func (r *SynapseReconciler) configMapForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	homeserverYaml := `
 # Configuration file for Synapse.
 #
@@ -2677,9 +2677,38 @@ redis:
 	}
 
 	// Set Synapse instance as the owner and controller
-	ctrl.SetControllerReference(s, cm, r.Scheme)
+	if err := ctrl.SetControllerReference(s, cm, r.Scheme); err != nil {
+		return &corev1.ConfigMap{}, err
+	}
 
-	return cm
+	return cm, nil
+}
+
+// configMapForSynapseCopy is a function of type createResourceFunc, to be
+// passed as an argument in a call to reconcileResouce.
+//
+// The ConfigMap returned by configMapForSynapseCopy is a copy of the ConfigMap
+// defined in Spec.Homeserver.ConfigMap.
+func (r *SynapseReconciler) configMapForSynapseCopy(
+	s *synapsev1alpha1.Synapse,
+	objectMeta metav1.ObjectMeta,
+) (client.Object, error) {
+	var copyConfigMap *corev1.ConfigMap
+
+	sourceConfigMapName := s.Spec.Homeserver.ConfigMap.Name
+	sourceConfigMapNamespace := r.getConfigMapNamespace(*s, s.Spec.Homeserver.ConfigMap.Namespace)
+
+	copyConfigMap, err := r.getConfigMapCopy(sourceConfigMapName, sourceConfigMapNamespace, objectMeta)
+	if err != nil {
+		return &corev1.ConfigMap{}, err
+	}
+
+	// Set Synapse instance as the owner and controller
+	if err := ctrl.SetControllerReference(s, copyConfigMap, r.Scheme); err != nil {
+		return nil, err
+	}
+
+	return copyConfigMap, nil
 }
 
 // ParseHomeserverConfigMap loads the ConfigMap, which name is determined by

@@ -27,7 +27,7 @@ import (
 )
 
 // serviceForSynapse returns a synapse Service object
-func (r *SynapseReconciler) serviceForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) client.Object {
+func (r *SynapseReconciler) serviceForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	service := &corev1.Service{
 		ObjectMeta: objectMeta,
 		Spec: corev1.ServiceSpec{
@@ -42,6 +42,8 @@ func (r *SynapseReconciler) serviceForSynapse(s *synapsev1alpha1.Synapse, object
 		},
 	}
 	// Set Synapse instance as the owner and controller
-	ctrl.SetControllerReference(s, service, r.Scheme)
-	return service
+	if err := ctrl.SetControllerReference(s, service, r.Scheme); err != nil {
+		return &corev1.Service{}, err
+	}
+	return service, nil
 }

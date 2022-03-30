@@ -27,7 +27,7 @@ import (
 )
 
 // persistentVolumeClaimForSynapse returns a synapse PVC object
-func (r *SynapseReconciler) persistentVolumeClaimForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) client.Object {
+func (r *SynapseReconciler) persistentVolumeClaimForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	pvcmode := corev1.PersistentVolumeFilesystem
 
 	pvc := &corev1.PersistentVolumeClaim{
@@ -44,6 +44,8 @@ func (r *SynapseReconciler) persistentVolumeClaimForSynapse(s *synapsev1alpha1.S
 	}
 
 	// Set Synapse instance as the owner and controller
-	ctrl.SetControllerReference(s, pvc, r.Scheme)
-	return pvc
+	if err := ctrl.SetControllerReference(s, pvc, r.Scheme); err != nil {
+		return &corev1.PersistentVolumeClaim{}, err
+	}
+	return pvc, nil
 }

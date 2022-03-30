@@ -70,8 +70,9 @@ type HomeserverPgsqlDatabase struct {
 func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	// Load the Synapse by name
 	var synapse synapsev1alpha1.Synapse
+
+	// Load the Synapse by name
 	if err := r.Get(ctx, req.NamespacedName, &synapse); err != nil {
 		if k8serrors.IsNotFound(err) {
 			// we'll ignore not-found errors, since they can't be fixed by an immediate
@@ -94,19 +95,37 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	var outputConfigMap corev1.ConfigMap
+	objectMetaForSynapse := setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
+
+	// The ConfigMap for Synapse, containing the homeserver.yaml config file.
+	// It's either a copy of a user-provided ConfigMap, if defined in
+	// Spec.Homeserver.ConfigMap, or a new ConfigMap containing a default
+	// homeserver.yaml.
+	var createdConfigMap corev1.ConfigMap
 
 	if synapse.Spec.Homeserver.ConfigMap != nil {
-		var inputConfigMap corev1.ConfigMap
-		// Get and validate homeserver ConfigMap
+		var inputConfigMap corev1.ConfigMap // the user-provided ConfigMap. It should contain a valid homeserver.yaml
+		// Get and validate the inputConfigMap
 		ConfigMapName := synapse.Spec.Homeserver.ConfigMap.Name
-		if err := r.Get(ctx, types.NamespacedName{Name: ConfigMapName, Namespace: synapse.Namespace}, &inputConfigMap); err != nil {
-			reason := "ConfigMap " + ConfigMapName + " does not exist in namespace " + synapse.Namespace
+		ConfigMapNamespace := r.getConfigMapNamespace(synapse, synapse.Spec.Homeserver.ConfigMap.Namespace)
+		if err := r.Get(
+			ctx,
+			types.NamespacedName{Name: ConfigMapName, Namespace: ConfigMapNamespace},
+			&inputConfigMap,
+		); err != nil {
+			reason := "ConfigMap " + ConfigMapName + " does not exist in namespace " + ConfigMapNamespace
 			if err := r.setFailedState(ctx, &synapse, reason); err != nil {
 				log.Error(err, "Error updating Synapse State")
 			}
 
-			log.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", ConfigMapName)
+			log.Error(
+				err,
+				"Failed to get ConfigMap",
+				"ConfigMap.Namespace",
+				ConfigMapNamespace,
+				"ConfigMap.Name",
+				ConfigMapName,
+			)
 			return ctrl.Result{RequeueAfter: time.Duration(30)}, err
 		}
 
@@ -114,15 +133,30 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{RequeueAfter: time.Duration(30)}, err
 		}
 
-		synapse.Status.HomeserverConfigMapName = ConfigMapName
-		outputConfigMap = inputConfigMap
+		// Create a copy of the inputConfigMap defined in Spec.Homeserver.ConfigMap
+		// Here we use the configMapForSynapseCopy function as createResourceFunc
+		if err := r.reconcileResource(
+			ctx,
+			r.configMapForSynapseCopy,
+			&synapse,
+			&createdConfigMap,
+			objectMetaForSynapse,
+		); err != nil {
+			return ctrl.Result{}, nil
+		}
 	} else {
-		synapse.Status.HomeserverConfigMapName = synapse.Name
 		synapse.Status.HomeserverConfiguration.ServerName = synapse.Spec.Homeserver.Values.ServerName
 		synapse.Status.HomeserverConfiguration.ReportStats = synapse.Spec.Homeserver.Values.ReportStats
 
-		objectMeta := setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
-		r.reconcileResource(ctx, r.configMapForSynapse, &synapse, &outputConfigMap, objectMeta)
+		if err := r.reconcileResource(
+			ctx,
+			r.configMapForSynapse,
+			&synapse,
+			&createdConfigMap,
+			objectMetaForSynapse,
+		); err != nil {
+			return ctrl.Result{}, nil
+		}
 	}
 
 	if err := r.updateSynapseStatus(ctx, &synapse); err != nil {
@@ -141,17 +175,22 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			log.Error(err, "Cannot create PostgreSQL instance for synapse. Potsres-operator is not installed.")
 			return ctrl.Result{}, nil
 		}
-		if result, err := r.createPostgresClusterForSynapse(ctx, synapse, outputConfigMap); err != nil {
+		if result, err := r.createPostgresClusterForSynapse(ctx, synapse, createdConfigMap); err != nil {
 			return result, err
 		}
 	}
 
 	// We first need to create the Synapse Service as its IP address is potentially
 	// needed by the Bridges
-	objectMeta := setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
 	synapseKey := types.NamespacedName{Name: synapse.Name, Namespace: synapse.Namespace}
 	createdService := &corev1.Service{}
-	if err := r.reconcileResource(ctx, r.serviceForSynapse, &synapse, createdService, objectMeta); err != nil {
+	if err := r.reconcileResource(
+		ctx,
+		r.serviceForSynapse,
+		&synapse,
+		createdService,
+		objectMetaForSynapse,
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -185,43 +224,72 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 
-		// Get Service IP and update the Synapse status with Service IP and
-		// ConfigMap name
+		// Get Service IP and update the Synapse status
 		heisenbridgeIP, err := r.getServiceIP(ctx, heisenbergKey, createdHeisenbridgeService)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		synapse.Status.BridgesConfiguration.Heisenbridge.IP = heisenbridgeIP
-
-		inputConfigMapName := synapse.Spec.Bridges.Heisenbridge.ConfigMap.Name
-		if inputConfigMapName != "" {
-			synapse.Status.BridgesConfiguration.Heisenbridge.ConfigMapName = inputConfigMapName
-		} else {
-			synapse.Status.BridgesConfiguration.Heisenbridge.ConfigMapName = objectMetaHeisenbridge.Name
-		}
-
 		if err := r.updateSynapseStatus(ctx, &synapse); err != nil {
 			return ctrl.Result{}, err
 		}
 
+		// The ConfigMap for Heisenbridge, containing the heisenbridge.yaml
+		// config file. It's either a copy of a user-provided ConfigMap, if
+		// defined in Spec.Bridges.Heisenbridge.ConfigMap, or a new ConfigMap
+		// containing a default heisenbridge.yaml.
+		createdHeisenbridgeConfigMap := &corev1.ConfigMap{}
+
+		// The user may specify a ConfigMap, containing the heisenbridge.yaml
+		// config file, under Spec.Bridges.Heisenbridge.ConfigMap
+		inputConfigMapName := synapse.Spec.Bridges.Heisenbridge.ConfigMap.Name
+		setConfigMapNamespace := synapse.Spec.Bridges.Heisenbridge.ConfigMap.Namespace
+		inputConfigMapNamespace := r.getConfigMapNamespace(synapse, setConfigMapNamespace)
 		if inputConfigMapName != "" {
+			// If the user provided a custom Heisenbridge configuration via a
+			// ConfigMap, we need to validate that the ConfigMap exists, and
+			// create a copy in createdHeisenbridgeConfigMap
+
+			// Get and check the input ConfigMap for Heisenbridge
 			var inputHeisenbridgeConfigMap = &corev1.ConfigMap{}
-			keyForConfigMap := types.NamespacedName{Name: inputConfigMapName, Namespace: synapse.Namespace}
+			keyForConfigMap := types.NamespacedName{
+				Name:      inputConfigMapName,
+				Namespace: inputConfigMapNamespace,
+			}
 
 			if err := r.Get(ctx, keyForConfigMap, inputHeisenbridgeConfigMap); err != nil {
-				reason := "ConfigMap " + inputConfigMapName + " does not exist in namespace " + synapse.Namespace
+				reason := "ConfigMap " + inputConfigMapName + " does not exist in namespace " + inputConfigMapNamespace
 				if err := r.setFailedState(ctx, &synapse, reason); err != nil {
 					log.Error(err, "Error updating Synapse State")
 				}
 
-				log.Error(err, "Failed to get ConfigMap", "ConfigMap.Namespace", synapse.Namespace, "ConfigMap.Name", inputConfigMapName)
+				log.Error(
+					err,
+					"Failed to get ConfigMap",
+					"ConfigMap.Namespace",
+					inputConfigMapNamespace,
+					"ConfigMap.Name",
+					inputConfigMapName,
+				)
 				return ctrl.Result{RequeueAfter: time.Duration(30)}, err
+			}
+
+			// Create a copy of the inputHeisenbridgeConfigMap defined in Spec.Bridges.Heisenbridge.ConfigMap
+			// Here we use the configMapForHeisenbridgeCopy function as createResourceFunc
+			if err := r.reconcileResource(
+				ctx,
+				r.configMapForHeisenbridgeCopy,
+				&synapse,
+				createdHeisenbridgeConfigMap,
+				objectMetaHeisenbridge,
+			); err != nil {
+				return ctrl.Result{}, err
 			}
 
 			// Configure correct URL in Heisenbridge ConfigMap
 			if err := r.updateConfigMap(
 				ctx,
-				inputHeisenbridgeConfigMap,
+				createdHeisenbridgeConfigMap,
 				synapse,
 				r.updateHeisenbridgeWithURL,
 				"heisenbridge.yaml",
@@ -255,7 +323,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// Update the Synapse ConfigMap to enable Heisenbridge
 		if err := r.updateConfigMap(
 			ctx,
-			&outputConfigMap,
+			&createdConfigMap,
 			synapse,
 			r.updateHomeserverWithHeisenbridgeInfos,
 			"homeserver.yaml",
@@ -265,19 +333,43 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Reconcile Synapse resources: PVC, Deployment and Service
-	if err := r.reconcileResource(ctx, r.serviceAccountForSynapse, &synapse, &corev1.ServiceAccount{}, objectMeta); err != nil {
+	if err := r.reconcileResource(
+		ctx,
+		r.serviceAccountForSynapse,
+		&synapse,
+		&corev1.ServiceAccount{},
+		objectMetaForSynapse,
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if err := r.reconcileResource(ctx, r.roleBindingForSynapse, &synapse, &rbacv1.RoleBinding{}, objectMeta); err != nil {
+	if err := r.reconcileResource(
+		ctx,
+		r.roleBindingForSynapse,
+		&synapse,
+		&rbacv1.RoleBinding{},
+		objectMetaForSynapse,
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if err := r.reconcileResource(ctx, r.persistentVolumeClaimForSynapse, &synapse, &corev1.PersistentVolumeClaim{}, objectMeta); err != nil {
+	if err := r.reconcileResource(
+		ctx,
+		r.persistentVolumeClaimForSynapse,
+		&synapse,
+		&corev1.PersistentVolumeClaim{},
+		objectMetaForSynapse,
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if err := r.reconcileResource(ctx, r.deploymentForSynapse, &synapse, &appsv1.Deployment{}, objectMeta); err != nil {
+	if err := r.reconcileResource(
+		ctx,
+		r.deploymentForSynapse,
+		&synapse,
+		&appsv1.Deployment{},
+		objectMetaForSynapse,
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 	// TODO: If a deployment is found, check that its Spec are correct.
@@ -298,6 +390,19 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // belonging to the given synapse CR name.
 func labelsForSynapse(name string) map[string]string {
 	return map[string]string{"app": "synapse", "synapse_cr": name}
+}
+
+// ConfigMap that are created by the user could be living in a different
+// namespace as Synapse. getConfigMapNamespace provides a way to default to the
+// Synapse namespace if none is provided.
+func (r *SynapseReconciler) getConfigMapNamespace(
+	synapse synapsev1alpha1.Synapse,
+	setNamespace string,
+) string {
+	if setNamespace != "" {
+		return setNamespace
+	}
+	return synapse.Namespace
 }
 
 func (r *SynapseReconciler) setFailedState(ctx context.Context, synapse *synapsev1alpha1.Synapse, reason string) error {

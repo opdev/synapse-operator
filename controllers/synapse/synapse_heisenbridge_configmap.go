@@ -26,7 +26,7 @@ import (
 )
 
 // configMapForSynapse returns a synapse ConfigMap object
-func (r *SynapseReconciler) configMapForHeisenbridge(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) client.Object {
+func (r *SynapseReconciler) configMapForHeisenbridge(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	heisenbridgeYaml := `
 id: heisenbridge
 url: http://` + s.Status.BridgesConfiguration.Heisenbridge.IP + `:9898
@@ -48,9 +48,38 @@ namespaces:
 	}
 
 	// Set Synapse instance as the owner and controller
-	ctrl.SetControllerReference(s, cm, r.Scheme)
+	if err := ctrl.SetControllerReference(s, cm, r.Scheme); err != nil {
+		return &corev1.ConfigMap{}, err
+	}
 
-	return cm
+	return cm, nil
+}
+
+// configMapForHeisenbridgeCopy is a function of type createResourceFunc, to be
+// passed as an argument in a call to reconcileResouce.
+//
+// The ConfigMap returned by configMapForHeisenbridgeCopy is a copy of the ConfigMap
+// defined in Spec.Bridges.Heisenbridge.ConfigMap.
+func (r *SynapseReconciler) configMapForHeisenbridgeCopy(
+	s *synapsev1alpha1.Synapse,
+	objectMeta metav1.ObjectMeta,
+) (client.Object, error) {
+	var copyConfigMap *corev1.ConfigMap
+
+	sourceConfigMapName := s.Spec.Bridges.Heisenbridge.ConfigMap.Name
+	sourceConfigMapNamespace := r.getConfigMapNamespace(*s, s.Spec.Bridges.Heisenbridge.ConfigMap.Namespace)
+
+	copyConfigMap, err := r.getConfigMapCopy(sourceConfigMapName, sourceConfigMapNamespace, objectMeta)
+	if err != nil {
+		return &corev1.ConfigMap{}, err
+	}
+
+	// Set Synapse instance as the owner and controller
+	if err := ctrl.SetControllerReference(s, copyConfigMap, r.Scheme); err != nil {
+		return &corev1.ConfigMap{}, err
+	}
+
+	return copyConfigMap, nil
 }
 
 func (r *SynapseReconciler) updateHeisenbridgeWithURL(

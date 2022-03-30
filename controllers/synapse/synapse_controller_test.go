@@ -55,11 +55,11 @@ func convert(i interface{}) interface{} {
 var _ = Describe("Integration tests for the Synapse controller", Ordered, Label("integration"), func() {
 	// Define utility constants for object names and testing timeouts/durations and intervals.
 	const (
-		SynapseName      = "test-synapse"
-		SynapseNamespace = "default"
-		ConfigMapName    = "test-configmap"
-		ServerName       = "example.com"
-		ReportStats      = false
+		SynapseName        = "test-synapse"
+		SynapseNamespace   = "default"
+		InputConfigMapName = "test-configmap"
+		ServerName         = "example.com"
+		ReportStats        = false
 
 		timeout  = time.Second * 2
 		duration = time.Second * 2
@@ -265,7 +265,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					"spec": map[string]interface{}{
 						"homeserver": map[string]interface{}{
 							"configMap": map[string]interface{}{
-								"name":      ConfigMapName,
+								"name":      InputConfigMapName,
 								"namespace": SynapseNamespace,
 							},
 							"values": map[string]interface{}{
@@ -302,7 +302,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					"spec": map[string]interface{}{
 						"homeserver": map[string]interface{}{
 							"configMap": map[string]interface{}{
-								"name":      ConfigMapName,
+								"name":      InputConfigMapName,
 								"namespace": SynapseNamespace,
 							},
 						},
@@ -321,7 +321,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					"spec": map[string]interface{}{
 						"homeserver": map[string]interface{}{
 							"configMap": map[string]interface{}{
-								"name":      ConfigMapName,
+								"name":      InputConfigMapName,
 								"namespace": SynapseNamespace,
 							},
 						},
@@ -348,7 +348,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						"spec": map[string]interface{}{
 							"homeserver": map[string]interface{}{
 								"configMap": map[string]interface{}{
-									"name":      ConfigMapName,
+									"name":      InputConfigMapName,
 									"namespace": SynapseNamespace,
 								},
 							},
@@ -376,7 +376,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						"spec": map[string]interface{}{
 							"homeserver": map[string]interface{}{
 								"configMap": map[string]interface{}{
-									"name": ConfigMapName,
+									"name": InputConfigMapName,
 								},
 							},
 						},
@@ -388,7 +388,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						"spec": map[string]interface{}{
 							"homeserver": map[string]interface{}{
 								"configMap": map[string]interface{}{
-									"name": ConfigMapName,
+									"name": InputConfigMapName,
 								},
 							},
 							"bridges": map[string]interface{}{
@@ -405,7 +405,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						"spec": map[string]interface{}{
 							"homeserver": map[string]interface{}{
 								"configMap": map[string]interface{}{
-									"name": ConfigMapName,
+									"name": InputConfigMapName,
 								},
 							},
 							"bridges": map[string]interface{}{
@@ -424,6 +424,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 		Context("When creating a valid Synapse instance", func() {
 			var synapse *synapsev1alpha1.Synapse
+			var createdConfigMap *corev1.ConfigMap
 			var createdPVC *corev1.PersistentVolumeClaim
 			var createdDeployment *appsv1.Deployment
 			var createdService *corev1.Service
@@ -436,6 +437,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			var initSynapseVariables = func() {
 				// Init variables
 				synapseLookupKey = types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace}
+				createdConfigMap = &corev1.ConfigMap{}
 				createdPVC = &corev1.PersistentVolumeClaim{}
 				createdDeployment = &appsv1.Deployment{}
 				createdService = &corev1.Service{}
@@ -478,6 +480,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 				// Child resources must be manually deleted as the controllers responsible of
 				// their lifecycle are not running.
+				By("Cleaning up Synapse ConfigMap")
+				deleteResource(createdConfigMap, synapseLookupKey, false)
+
 				By("Cleaning up Synapse PVC")
 				deleteResource(createdPVC, synapseLookupKey, true)
 
@@ -495,12 +500,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			}
 
 			When("Specifying the Synapse configuration via Values", func() {
-				var createdConfigMap *corev1.ConfigMap
-
 				BeforeAll(func() {
 					initSynapseVariables()
 
-					createdConfigMap = &corev1.ConfigMap{}
 					synapseSpec = synapsev1alpha1.SynapseSpec{
 						Homeserver: synapsev1alpha1.SynapseHomeserver{
 							Values: &synapsev1alpha1.SynapseHomeserverValues{
@@ -514,9 +516,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				})
 
 				AfterAll(func() {
-					// Delete new ConfigMap
-					deleteResource(createdConfigMap, synapseLookupKey, false)
-
 					cleanupSynapseResources()
 				})
 
@@ -533,9 +532,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					}, timeout, interval).Should(BeTrue())
 
 					expectedStatus := synapsev1alpha1.SynapseStatus{
-						State:                   "RUNNING",
-						Reason:                  "",
-						HomeserverConfigMapName: SynapseName,
+						State:  "RUNNING",
+						Reason: "",
 						HomeserverConfiguration: synapsev1alpha1.SynapseStatusHomeserverConfiguration{
 							ServerName:  ServerName,
 							ReportStats: ReportStats,
@@ -586,32 +584,32 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			})
 
 			When("Specifying the Synapse configuration via a ConfigMap", func() {
-				var configMap *corev1.ConfigMap
-				var configmapData map[string]string
+				var inputConfigMap *corev1.ConfigMap
+				var inputConfigmapData map[string]string
 
 				var createSynapseConfigMap = func() {
 					By("Creating a ConfigMap containing a basic homeserver.yaml")
 					// Populate the ConfigMap with the minimum data needed
-					configMap = &corev1.ConfigMap{
+					inputConfigMap = &corev1.ConfigMap{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      ConfigMapName,
+							Name:      InputConfigMapName,
 							Namespace: SynapseNamespace,
 						},
-						Data: configmapData,
+						Data: inputConfigmapData,
 					}
-					Expect(k8sClient.Create(ctx, configMap)).Should(Succeed())
+					Expect(k8sClient.Create(ctx, inputConfigMap)).Should(Succeed())
 				}
 
 				var cleanupSynapseConfigMap = func() {
 					By("Cleaning up ConfigMap")
-					Expect(k8sClient.Delete(ctx, configMap)).Should(Succeed())
+					Expect(k8sClient.Delete(ctx, inputConfigMap)).Should(Succeed())
 				}
 
 				When("Creating a simple Synapse instance", func() {
 					BeforeAll(func() {
 						initSynapseVariables()
 
-						configmapData = map[string]string{
+						inputConfigmapData = map[string]string{
 							"homeserver.yaml": "server_name: " + ServerName + "\n" +
 								"report_stats: " + strconv.FormatBool(ReportStats),
 						}
@@ -619,7 +617,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						synapseSpec = synapsev1alpha1.SynapseSpec{
 							Homeserver: synapsev1alpha1.SynapseHomeserver{
 								ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
-									Name: ConfigMapName,
+									Name: InputConfigMapName,
 								},
 							},
 						}
@@ -646,9 +644,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						}, timeout, interval).Should(BeTrue())
 
 						expectedStatus := synapsev1alpha1.SynapseStatus{
-							State:                   "RUNNING",
-							Reason:                  "",
-							HomeserverConfigMapName: ConfigMapName,
+							State:  "RUNNING",
+							Reason: "",
 							HomeserverConfiguration: synapsev1alpha1.SynapseStatusHomeserverConfiguration{
 								ServerName:  ServerName,
 								ReportStats: ReportStats,
@@ -660,6 +657,10 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
 							return synapse.Status
 						}, timeout, interval).Should(Equal(expectedStatus))
+					})
+
+					It("Should create a Synapse ConfigMap", func() {
+						checkResourcePresence(createdConfigMap, synapseLookupKey, expectedOwnerReference)
 					})
 
 					It("Should create a Synapse PVC", func() {
@@ -710,7 +711,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						// Init variable
 						createdPostgresCluster = &pgov1beta1.PostgresCluster{}
 
-						configmapData = map[string]string{
+						inputConfigmapData = map[string]string{
 							"homeserver.yaml": "server_name: " + ServerName + "\n" +
 								"report_stats: " + strconv.FormatBool(ReportStats),
 						}
@@ -718,7 +719,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						synapseSpec = synapsev1alpha1.SynapseSpec{
 							Homeserver: synapsev1alpha1.SynapseHomeserver{
 								ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
-									Name: ConfigMapName,
+									Name: InputConfigMapName,
 								},
 							},
 							CreateNewPostgreSQL: true,
@@ -799,11 +800,11 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						Eventually(func(g Gomega) {
 							// Fetching database section of the homeserver.yaml configuration file
 							g.Expect(k8sClient.Get(ctx,
-								types.NamespacedName{Name: ConfigMapName, Namespace: SynapseNamespace},
-								configMap,
+								types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace},
+								createdConfigMap,
 							)).Should(Succeed())
 
-							cm_data, ok := configMap.Data["homeserver.yaml"]
+							cm_data, ok := createdConfigMap.Data["homeserver.yaml"]
 							g.Expect(ok).Should(BeTrue())
 
 							homeserver := make(map[string]interface{})
@@ -840,12 +841,14 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				When("Enabling the Heisenbridge", func() {
 					var createdHeisenbridgeDeployment *appsv1.Deployment
 					var createdHeisenbridgeService *corev1.Service
+					var createdHeisenbridgeConfigMap *corev1.ConfigMap
 					var heisenbridgeLookupKey types.NamespacedName
 
 					var initHeisenbridgeVariables = func() {
 						// Init vars
 						createdHeisenbridgeDeployment = &appsv1.Deployment{}
 						createdHeisenbridgeService = &corev1.Service{}
+						createdHeisenbridgeConfigMap = &corev1.ConfigMap{}
 
 						heisenbridgeLookupKey = types.NamespacedName{Name: SynapseName + "-heisenbridge", Namespace: SynapseNamespace}
 					}
@@ -856,18 +859,17 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 						By("Cleaning up the Heisenbridge Service")
 						deleteResource(createdHeisenbridgeService, heisenbridgeLookupKey, false)
+
+						By("Cleaning up the Heisenbridge ConfigMap")
+						deleteResource(createdHeisenbridgeConfigMap, heisenbridgeLookupKey, false)
 					}
 
 					When("Using the default configuration", func() {
-						var createdHeisenbridgeConfigMap *corev1.ConfigMap
-
 						BeforeAll(func() {
 							initSynapseVariables()
 							initHeisenbridgeVariables()
 
-							createdHeisenbridgeConfigMap = &corev1.ConfigMap{}
-
-							configmapData = map[string]string{
+							inputConfigmapData = map[string]string{
 								"homeserver.yaml": "server_name: " + ServerName + "\n" +
 									"report_stats: " + strconv.FormatBool(ReportStats),
 							}
@@ -875,7 +877,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							synapseSpec = synapsev1alpha1.SynapseSpec{
 								Homeserver: synapsev1alpha1.SynapseHomeserver{
 									ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
-										Name: ConfigMapName,
+										Name: InputConfigMapName,
 									},
 								},
 								Bridges: synapsev1alpha1.SynapseBridges{
@@ -891,9 +893,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 						AfterAll(func() {
 							// Cleanup Heisenbridge resources
-							By("Cleaning up the Heisenbridge ConfigMap")
-							deleteResource(createdHeisenbridgeConfigMap, heisenbridgeLookupKey, false)
-
 							cleanupSynapseResources()
 							cleanupSynapseConfigMap()
 							cleanupHeisenbridgeResources()
@@ -926,17 +925,16 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 							Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).To(Succeed())
 							Expect(synapse.Status.BridgesConfiguration.Heisenbridge.IP).To(Equal(heisenbridgeIP))
-							Expect(synapse.Status.BridgesConfiguration.Heisenbridge.ConfigMapName).To(Equal(heisenbridgeLookupKey.Name))
 						})
 
 						It("Should update the Synapse homeserver.yaml", func() {
 							Eventually(func(g Gomega) {
 								g.Expect(k8sClient.Get(ctx,
-									types.NamespacedName{Name: ConfigMapName, Namespace: SynapseNamespace},
-									configMap,
+									types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace},
+									createdConfigMap,
 								)).Should(Succeed())
 
-								cm_data, ok := configMap.Data["homeserver.yaml"]
+								cm_data, ok := createdConfigMap.Data["homeserver.yaml"]
 								g.Expect(ok).Should(BeTrue())
 
 								homeserver := make(map[string]interface{})
@@ -952,10 +950,10 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 					When("The user provides an input ConfigMap", func() {
 						var inputHeisenbridgeConfigMap *corev1.ConfigMap
-						var heisenbridgeConfigMapData map[string]string
+						var inputHeisenbridgeConfigMapData map[string]string
 						var heisenbridgeIP string
 
-						const HeisenbridgeConfigMapName = "heisenbridge-input"
+						const InputHeisenbridgeConfigMapName = "heisenbridge-input"
 
 						BeforeAll(func() {
 							initSynapseVariables()
@@ -963,7 +961,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 							heisenbridgeIP = ""
 
-							configmapData = map[string]string{
+							inputConfigmapData = map[string]string{
 								"homeserver.yaml": "server_name: " + ServerName + "\n" +
 									"report_stats: " + strconv.FormatBool(ReportStats),
 							}
@@ -971,14 +969,14 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							synapseSpec = synapsev1alpha1.SynapseSpec{
 								Homeserver: synapsev1alpha1.SynapseHomeserver{
 									ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
-										Name: ConfigMapName,
+										Name: InputConfigMapName,
 									},
 								},
 								Bridges: synapsev1alpha1.SynapseBridges{
 									Heisenbridge: synapsev1alpha1.SynapseHeisenbridge{
 										Enabled: true,
 										ConfigMap: synapsev1alpha1.SynapseHeisenbridgeConfigMap{
-											Name: HeisenbridgeConfigMapName,
+											Name: InputHeisenbridgeConfigMapName,
 										},
 									},
 								},
@@ -988,16 +986,16 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							// Incomplete heisenbridge.yaml, containing only the
 							// required data for our tests. In particular, we
 							// will test if the URL has been correctly updated
-							heisenbridgeConfigMapData = map[string]string{
+							inputHeisenbridgeConfigMapData = map[string]string{
 								"heisenbridge.yaml": "url: http://10.217.5.134:9898",
 							}
 
 							inputHeisenbridgeConfigMap = &corev1.ConfigMap{
 								ObjectMeta: metav1.ObjectMeta{
-									Name:      HeisenbridgeConfigMapName,
+									Name:      InputHeisenbridgeConfigMapName,
 									Namespace: SynapseNamespace,
 								},
-								Data: heisenbridgeConfigMapData,
+								Data: inputHeisenbridgeConfigMapData,
 							}
 							Expect(k8sClient.Create(ctx, inputHeisenbridgeConfigMap)).Should(Succeed())
 
@@ -1009,7 +1007,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							// Cleanup Heisenbridge resources
 							By("Cleaning up the Heisenbridge ConfigMap")
 							heisenbridgeConfigMapLookupKey := types.NamespacedName{
-								Name:      HeisenbridgeConfigMapName,
+								Name:      InputHeisenbridgeConfigMapName,
 								Namespace: SynapseNamespace,
 							}
 
@@ -1018,6 +1016,10 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							cleanupSynapseResources()
 							cleanupSynapseConfigMap()
 							cleanupHeisenbridgeResources()
+						})
+
+						It("Should create a ConfigMap for Heisenbridge", func() {
+							checkResourcePresence(createdHeisenbridgeConfigMap, heisenbridgeLookupKey, expectedOwnerReference)
 						})
 
 						It("Should create a Deployment for Heisenbridge", func() {
@@ -1042,15 +1044,11 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 							Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).To(Succeed())
 							Expect(synapse.Status.BridgesConfiguration.Heisenbridge.IP).To(Equal(heisenbridgeIP))
-							Expect(synapse.Status.BridgesConfiguration.Heisenbridge.ConfigMapName).To(Equal(HeisenbridgeConfigMapName))
 						})
 
-						It("Should update the Heisenbridge input ConfigMap", func() {
+						It("Should add url value to the created Heisenbridge ConfigMap", func() {
 							Eventually(func(g Gomega) {
-								g.Expect(k8sClient.Get(ctx,
-									types.NamespacedName{Name: HeisenbridgeConfigMapName, Namespace: SynapseNamespace},
-									inputHeisenbridgeConfigMap,
-								)).Should(Succeed())
+								g.Expect(k8sClient.Get(ctx, heisenbridgeLookupKey, inputHeisenbridgeConfigMap)).Should(Succeed())
 
 								cm_data, ok := inputHeisenbridgeConfigMap.Data["heisenbridge.yaml"]
 								g.Expect(ok).Should(BeTrue())
@@ -1082,7 +1080,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					Spec: synapsev1alpha1.SynapseSpec{
 						Homeserver: synapsev1alpha1.SynapseHomeserver{
 							ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
-								Name: ConfigMapName,
+								Name: InputConfigMapName,
 							},
 						},
 					},
@@ -1096,7 +1094,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			})
 
 			It("Should get in a failed state and not create child objects", func() {
-				reason := "ConfigMap " + ConfigMapName + " does not exist in namespace " + SynapseNamespace
+				reason := "ConfigMap " + InputConfigMapName + " does not exist in namespace " + SynapseNamespace
 				checkSubresourceAbsence(reason)
 			})
 		})
@@ -1133,7 +1131,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			BeforeAll(func() {
 				configMap = &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      ConfigMapName,
+						Name:      InputConfigMapName,
 						Namespace: SynapseNamespace,
 					},
 					Data: map[string]string{
@@ -1152,7 +1150,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					Spec: synapsev1alpha1.SynapseSpec{
 						Homeserver: synapsev1alpha1.SynapseHomeserver{
 							ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
-								Name: ConfigMapName,
+								Name: InputConfigMapName,
 							},
 						},
 						CreateNewPostgreSQL: true,
