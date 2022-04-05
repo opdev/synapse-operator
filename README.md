@@ -10,6 +10,28 @@ offers a convenient way to deploy and manage a
 
 Each of the following sections present one way to deploy the Synapse operator.
 
+### Deploy the controller using the existing manifest file
+
+The easiest way to deploy the Synapse operator is to use the manifest file
+present in the `install` directory:
+
+```shell
+$ kubectl apply -f install/synapse-operator.yaml
+namespace/synapse-operator-system created
+customresourcedefinition.apiextensions.k8s.io/synapses.synapse.opdev.io configured
+serviceaccount/synapse-operator-controller-manager created
+role.rbac.authorization.k8s.io/synapse-operator-leader-election-role created
+clusterrole.rbac.authorization.k8s.io/synapse-operator-manager-role created
+clusterrole.rbac.authorization.k8s.io/synapse-operator-metrics-reader created
+clusterrole.rbac.authorization.k8s.io/synapse-operator-proxy-role created
+rolebinding.rbac.authorization.k8s.io/synapse-operator-leader-election-rolebinding created
+clusterrolebinding.rbac.authorization.k8s.io/synapse-operator-manager-rolebinding created
+clusterrolebinding.rbac.authorization.k8s.io/synapse-operator-proxy-rolebinding created
+configmap/synapse-operator-manager-config created
+service/synapse-operator-controller-manager-metrics-service created
+deployment.apps/synapse-operator-controller-manager created
+```
+
 ### Run the controller locally with `make run`
 
 Install the `Synapse` CRD with:
