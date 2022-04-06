@@ -1,0 +1,423 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: synapse-operator-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.1
+  creationTimestamp: null
+  name: synapses.synapse.opdev.io
+spec:
+  group: synapse.opdev.io
+  names:
+    kind: Synapse
+    listKind: SynapseList
+    plural: synapses
+    singular: synapse
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Synapse is the Schema for the synapses API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SynapseSpec defines the desired state of Synapse
+            properties:
+              bridges:
+                description: Configuration options for optional matrix bridges
+                properties:
+                  heisenbridge:
+                    description: 'Configuration options for the IRC bridge Heisenbridge. The user can either: * disable the deployment of the bridge. * enable the bridge, without specifying additional configuration   options. The bridge will be deployed with a default configuration. * enable the bridge and specify an existing ConfigMap by its Name and   Namespace containing a heisenbridge.yaml. This ConfigMap will be   modified in place to configure the correct homeserver connection URL.'
+                    properties:
+                      configMap:
+                        description: Holds information about the ConfigMap containing the heisenbridge.yaml configuration file to be used as input for the configuration of the Heisenbridge IRC Bridge. Note that this ConfigMap will be modified by the Synapse controller.
+                        properties:
+                          name:
+                            description: Name of the ConfigMap in the given Namespace.
+                            type: string
+                          namespace:
+                            description: Namespace in which the ConfigMap is living. If left empty, the Synapse namespace is used. Currently the ConfigMap must live in the same namespace as the Synapse instance referencing it, therefore this attribute is not used. See https://github.com/opdev/synapse-operator/issues/17
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      enabled:
+                        default: false
+                        description: Whether to deploy Heisenbridge or not
+                        type: boolean
+                      verboseLevel:
+                        default: 0
+                        description: 'Controls the verbosity of the Heisenbrige: * 0 corresponds to normal level of logs * 1 corresponds to "-v" * 2 corresponds to "-vv" * 3 corresponds to "-vvv"'
+                        type: integer
+                    type: object
+                type: object
+              createNewPostgreSQL:
+                default: false
+                description: Set to true to create a new PostreSQL instance. The homeserver.yaml 'database' section will be overwritten.
+                type: boolean
+              homeserver:
+                description: Holds information related to the homeserver.yaml configuration file. The user can either specify an existing ConfigMap by its Name and Namespace containing a homeserver.yaml, or provide a set of values for the creation of a configuration file from scratch.
+                oneOf:
+                - required:
+                  - configMap
+                - required:
+                  - values
+                properties:
+                  configMap:
+                    description: Holds information about the ConfigMap containing the homeserver.yaml configuration file to be used as input for the configuration of the Synapse server.
+                    properties:
+                      name:
+                        description: Name of the ConfigMap in the given Namespace.
+                        type: string
+                      namespace:
+                        description: Namespace in which the ConfigMap is living. If left empty, the Synapse namespace is used. Currently the ConfigMap must live in the same namespace as the Synapse instance referencing it, therefore this attribute is not used. See https://github.com/opdev/synapse-operator/issues/17
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  values:
+                    description: Holds the required values for the creation of a homeserver.yaml configuration file by the Synapse Operator
+                    properties:
+                      reportStats:
+                        description: Whether or not to report anonymized homeserver usage statistics
+                        type: boolean
+                      serverName:
+                        description: The public-facing domain of the server
+                        type: string
+                    required:
+                    - reportStats
+                    - serverName
+                    type: object
+                type: object
+            required:
+            - homeserver
+            type: object
+          status:
+            description: SynapseStatus defines the observed state of Synapse
+            properties:
+              bridgesConfiguration:
+                description: Configuration of deployed bridges
+                properties:
+                  heisenbridge:
+                    description: Status of the Heisenbridge
+                    properties:
+                      configMapName:
+                        description: Name of the ConfigMap used for Heisenbridge configuration
+                        type: string
+                      ip:
+                        description: IP at which the Heisenbridge is available
+                        type: string
+                    type: object
+                type: object
+              databaseConnectionInfo:
+                description: Connection information to the external PostgreSQL Database
+                properties:
+                  State:
+                    description: State of the PostgreSQL database
+                    type: string
+                  connectionURL:
+                    description: Endpoint to connect to the PostgreSQL database
+                    type: string
+                  databaseName:
+                    description: Name of the database to connect to
+                    type: string
+                  password:
+                    description: Base64 encoded password
+                    type: string
+                  user:
+                    description: User allowed to query the given database
+                    type: string
+                type: object
+              homeserverConfigMapName:
+                description: The name of the ConfigMap, in the synapse Namespace, which contains the homeserver.yaml configuration file
+                type: string
+              homeserverConfiguration:
+                description: Holds configuration information for Synapse
+                properties:
+                  reportStats:
+                    description: Whether or not to report anonymized homeserver usage statistics
+                    type: boolean
+                  serverName:
+                    description: The public-facing domain of the server
+                    type: string
+                type: object
+              ip:
+                description: Synapse IP address (corresponding to the Synapse Service IP address)
+                type: string
+              reason:
+                description: Reason for the current Synapse State
+                type: string
+              state:
+                description: State of the Synapse instance
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: synapse-operator-controller-manager
+  namespace: synapse-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: synapse-operator-leader-election-role
+  namespace: synapse-operator-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: synapse-operator-manager-role
+rules:
+- apiGroups:
+  - synapse.opdev.io
+  resources:
+  - synapses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - synapse.opdev.io
+  resources:
+  - synapses/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - synapse.opdev.io
+  resources:
+  - synapses/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: synapse-operator-metrics-reader
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: synapse-operator-proxy-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: synapse-operator-leader-election-rolebinding
+  namespace: synapse-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: synapse-operator-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: synapse-operator-controller-manager
+  namespace: synapse-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: synapse-operator-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: synapse-operator-manager-role
+subjects:
+- kind: ServiceAccount
+  name: synapse-operator-controller-manager
+  namespace: synapse-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: synapse-operator-proxy-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: synapse-operator-proxy-role
+subjects:
+- kind: ServiceAccount
+  name: synapse-operator-controller-manager
+  namespace: synapse-operator-system
+---
+apiVersion: v1
+data:
+  controller_manager_config.yaml: |
+    apiVersion: controller-runtime.sigs.k8s.io/v1alpha1
+    kind: ControllerManagerConfig
+    health:
+      healthProbeBindAddress: :8081
+    metrics:
+      bindAddress: 127.0.0.1:8080
+    webhook:
+      port: 9443
+    leaderElection:
+      leaderElect: true
+      resourceName: 8d311e9b.opdev.io
+kind: ConfigMap
+metadata:
+  name: synapse-operator-manager-config
+  namespace: synapse-operator-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: synapse-operator-controller-manager-metrics-service
+  namespace: synapse-operator-system
+spec:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: https
+  selector:
+    control-plane: controller-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: synapse-operator-controller-manager
+  namespace: synapse-operator-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8080/
+        - --logtostderr=true
+        - --v=10
+        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+      - args:
+        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=127.0.0.1:8080
+        - --leader-elect
+        command:
+        - /manager
+        image: quay.io/opdev/synapse-operator:v0.1.0
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 200m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: synapse-operator-controller-manager
+      terminationGracePeriodSeconds: 10
