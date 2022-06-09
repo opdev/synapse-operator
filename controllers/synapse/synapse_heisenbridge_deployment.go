@@ -52,7 +52,7 @@ func (r *SynapseReconciler) deploymentForHeisenbridge(s *synapsev1alpha1.Synapse
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image: "hif1/heisenbridge:1.10.1",
+						Image: "hif1/heisenbridge:1.13",
 						Name:  "heisenbridge",
 						VolumeMounts: []corev1.VolumeMount{{
 							Name:      "data-heisenbridge",

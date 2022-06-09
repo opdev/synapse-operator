@@ -69,7 +69,7 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, obj
 						}},
 					}},
 					Containers: []corev1.Container{{
-						Image: "matrixdotorg/synapse:v1.46.0",
+						Image: "matrixdotorg/synapse:v1.60.0",
 						Name:  "synapse",
 						Env: []corev1.EnvVar{{
 							Name:  "SYNAPSE_CONFIG_PATH",
