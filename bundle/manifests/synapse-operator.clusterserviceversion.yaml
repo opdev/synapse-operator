@@ -24,7 +24,7 @@ metadata:
     capabilities: Basic Install
     operators.operatorframework.io/builder: operator-sdk-v1.14.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-  name: synapse-operator.v0.0.1
+  name: synapse-operator.v0.1.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -117,7 +117,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/opdev/synapse-operator:v0.0.1
+                image: quay.io/opdev/synapse-operator:v0.1.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -200,4 +200,4 @@ spec:
   maturity: alpha
   provider:
     name: Opdev
-  version: 0.0.1
+  version: 0.1.0
