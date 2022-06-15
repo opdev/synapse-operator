@@ -839,6 +839,10 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				})
 
 				When("Enabling the Heisenbridge", func() {
+					const (
+						heisenbridgePort = 9898
+					)
+
 					var createdHeisenbridgeDeployment *appsv1.Deployment
 					var createdHeisenbridgeService *corev1.Service
 					var createdHeisenbridgeConfigMap *corev1.ConfigMap
@@ -903,7 +907,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						})
 
 						It("Should create a Deployment for Heisenbridge", func() {
-							By("Checking that a Synapse Deployment exists and is correctly configured")
 							checkResourcePresence(createdHeisenbridgeDeployment, heisenbridgeLookupKey, expectedOwnerReference)
 						})
 
@@ -987,7 +990,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							// required data for our tests. In particular, we
 							// will test if the URL has been correctly updated
 							inputHeisenbridgeConfigMapData = map[string]string{
-								"heisenbridge.yaml": "url: http://10.217.5.134:9898",
+								"heisenbridge.yaml": "url: http://10.217.5.134:" + strconv.Itoa(heisenbridgePort),
 							}
 
 							inputHeisenbridgeConfigMap = &corev1.ConfigMap{
@@ -1023,7 +1026,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						})
 
 						It("Should create a Deployment for Heisenbridge", func() {
-							By("Checking that a Synapse Deployment exists and is correctly configured")
 							checkResourcePresence(createdHeisenbridgeDeployment, heisenbridgeLookupKey, expectedOwnerReference)
 						})
 
@@ -1059,7 +1061,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 								_, ok = heisenbridge["url"]
 								g.Expect(ok).Should(BeTrue())
 
-								g.Expect(heisenbridge["url"]).To(Equal("http://" + heisenbridgeIP + ":9898"))
+								g.Expect(heisenbridge["url"]).To(Equal("http://" + heisenbridgeIP + ":" + strconv.Itoa(heisenbridgePort)))
 							}, timeout, interval).Should(Succeed())
 						})
 					})
