@@ -73,6 +73,34 @@ spec:
                           "-v" * 2 corresponds to "-vv" * 3 corresponds to "-vvv"'
                         type: integer
                     type: object
+                  mautrixSignal:
+                    description: 'Configuration options for the mautrix-signal bridge.
+                      The user can either: * disable the deployment of the bridge.
+                      * enable the bridge, without specifying additional configuration   options.
+                      The bridge will be deployed with a default configuration. *
+                      enable the bridge and specify an existing ConfigMap by its Name
+                      and   Namespace containing a config.yaml file.'
+                    properties:
+                      configMap:
+                        description: Holds information about the ConfigMap containing
+                          the config.yaml configuration file to be used as input for
+                          the configuration of the mautrix-signal Bridge.
+                        properties:
+                          name:
+                            description: Name of the ConfigMap in the given Namespace.
+                            type: string
+                          namespace:
+                            description: Namespace in which the ConfigMap is living.
+                              If left empty, the Synapse namespace is used.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      enabled:
+                        default: false
+                        description: Whether to deploy mautrix-signal or not
+                        type: boolean
+                    type: object
                 type: object
               createNewPostgreSQL:
                 default: false

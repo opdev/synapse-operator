@@ -89,6 +89,15 @@ type SynapseBridges struct {
 	// * enable the bridge and specify an existing ConfigMap by its Name and
 	//   Namespace containing a heisenbridge.yaml.
 	Heisenbridge SynapseHeisenbridge `json:"heisenbridge,omitempty"`
+
+	// Configuration options for the mautrix-signal bridge. The user can
+	// either:
+	// * disable the deployment of the bridge.
+	// * enable the bridge, without specifying additional configuration
+	//   options. The bridge will be deployed with a default configuration.
+	// * enable the bridge and specify an existing ConfigMap by its Name and
+	//   Namespace containing a config.yaml file.
+	MautrixSignal SynapseMautrixSignal `json:"mautrixSignal,omitempty"`
 }
 
 type SynapseHeisenbridge struct {
@@ -113,6 +122,29 @@ type SynapseHeisenbridge struct {
 }
 
 type SynapseHeisenbridgeConfigMap struct {
+	// +kubebuilder:validation:Required
+
+	// Name of the ConfigMap in the given Namespace.
+	Name string `json:"name"`
+
+	// Namespace in which the ConfigMap is living. If left empty, the Synapse
+	// namespace is used.
+	Namespace string `json:"namespace,omitempty"`
+}
+
+type SynapseMautrixSignal struct {
+	// +kubebuilder:default:=false
+
+	// Whether to deploy mautrix-signal or not
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Holds information about the ConfigMap containing the config.yaml
+	// configuration file to be used as input for the configuration of the
+	// mautrix-signal Bridge.
+	ConfigMap SynapseMautrixSignalConfigMap `json:"configMap,omitempty"`
+}
+
+type SynapseMautrixSignalConfigMap struct {
 	// +kubebuilder:validation:Required
 
 	// Name of the ConfigMap in the given Namespace.

@@ -316,6 +316,24 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						},
 					},
 				}),
+				Entry("when mautrix-signal ConfigMap doesn't possess a name", map[string]interface{}{
+					"spec": map[string]interface{}{
+						"homeserver": map[string]interface{}{
+							"configMap": map[string]interface{}{
+								"name":      InputConfigMapName,
+								"namespace": SynapseNamespace,
+							},
+						},
+						"bridges": map[string]interface{}{
+							"mautrixSignal": map[string]interface{}{
+								"enabled": false,
+								"configMap": map[string]interface{}{
+									"namespace": "random-namespace",
+								},
+							},
+						},
+					},
+				}),
 				// This should not work but passes
 				PEntry("when Synapse spec possesses an invalid field", map[string]interface{}{
 					"spec": map[string]interface{}{
@@ -410,6 +428,43 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							},
 							"bridges": map[string]interface{}{
 								"heisenbridge": map[string]interface{}{
+									"enabled": true,
+									"configMap": map[string]interface{}{
+										"name": "random-name",
+									},
+								},
+							},
+						},
+					},
+				),
+				Entry(
+					"when optional mautrix-signal bridge is enabled",
+					map[string]interface{}{
+						"spec": map[string]interface{}{
+							"homeserver": map[string]interface{}{
+								"configMap": map[string]interface{}{
+									"name": InputConfigMapName,
+								},
+							},
+							"bridges": map[string]interface{}{
+								"mautrixSignal": map[string]interface{}{
+									"enabled": true,
+								},
+							},
+						},
+					},
+				),
+				Entry(
+					"when optional mautrix-signal bridge is enabled and an input ConfigMap name is given",
+					map[string]interface{}{
+						"spec": map[string]interface{}{
+							"homeserver": map[string]interface{}{
+								"configMap": map[string]interface{}{
+									"name": InputConfigMapName,
+								},
+							},
+							"bridges": map[string]interface{}{
+								"mautrixSignal": map[string]interface{}{
 									"enabled": true,
 									"configMap": map[string]interface{}{
 										"name": "random-name",
