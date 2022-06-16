@@ -34,7 +34,7 @@ func (r *SynapseReconciler) reconcileResource(
 	log := ctrllog.FromContext(ctx)
 	log.Info(
 		"Reconciling resource",
-		"Kind", resource.GetObjectKind(),
+		"Kind", resource.GetObjectKind().GroupVersionKind().Kind,
 		"Name", objectMeta.Name,
 		"Namespace", objectMeta.Namespace,
 	)
@@ -43,7 +43,7 @@ func (r *SynapseReconciler) reconcileResource(
 		if k8serrors.IsNotFound(err) {
 			log.Info(
 				"Creating a new resource for Synapse",
-				"Kind", resource.GetObjectKind(),
+				"Kind", resource.GetObjectKind().GroupVersionKind().Kind,
 				"Name", objectMeta.Name,
 				"Namespace", objectMeta.Namespace,
 			)
@@ -53,7 +53,7 @@ func (r *SynapseReconciler) reconcileResource(
 				log.Error(
 					err,
 					"Failed to generate a new resource for Synapse",
-					"Kind", resource.GetObjectKind(),
+					"Kind", resource.GetObjectKind().GroupVersionKind().Kind,
 					"Name", objectMeta.Name,
 					"Namespace", objectMeta.Namespace,
 				)
@@ -65,7 +65,7 @@ func (r *SynapseReconciler) reconcileResource(
 				log.Error(
 					err,
 					"Failed to create a new resource for Synapse",
-					"Kind", resource.GetObjectKind(),
+					"Kind", resource.GetObjectKind().GroupVersionKind().Kind,
 					"Name", objectMeta.Name,
 					"Namespace", objectMeta.Namespace,
 				)
@@ -78,7 +78,7 @@ func (r *SynapseReconciler) reconcileResource(
 		log.Error(
 			err,
 			"Error reading resource",
-			"Kind", resource.GetObjectKind(),
+			"Kind", resource.GetObjectKind().GroupVersionKind().Kind,
 			"Name", objectMeta.Name,
 			"Namespace", objectMeta.Namespace,
 		)
@@ -86,8 +86,8 @@ func (r *SynapseReconciler) reconcileResource(
 	}
 
 	log.Info(
-		"Reconciling resource",
-		"Kind", resource.GetObjectKind(),
+		"Finished reconciling resource",
+		"Kind", resource.GetObjectKind().GroupVersionKind().Kind,
 		"Name", objectMeta.Name,
 		"Namespace", objectMeta.Namespace,
 	)
