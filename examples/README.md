@@ -116,7 +116,7 @@ An example is available under the `02-using-existing-configmap` directory. To ru
 it:
 
 ```shell
-$ kubectl create configmap my-custom-homeserver --from-file=02-using-existing-configmap/homeserver.yaml 
+$ kubectl create configmap my-custom-homeserver --from-file=examples/02-using-existing-configmap/homeserver.yaml 
 configmap/my-custom-homeserver created
 $ kubectl apply -f examples/02-using-existing-configmap/synapse.yaml
 synapse.synapse.opdev.io/using-existing-configmap created
@@ -222,7 +222,7 @@ section of the `Synapse` resource to reference the `ConfigMap`, as illustrated
 in the `04-deploying-heisenbridge/B-using-existing-configmap` directory:
 
 ```shell
-$ kubectl create configmap my-custom-heisenbridge --from-file=04-deploying-heisenbridge/B-using-existing-configmap/heisenbridge.yaml 
+$ kubectl create configmap my-custom-heisenbridge --from-file=examples/04-deploying-heisenbridge/B-using-existing-configmap/heisenbridge.yaml 
 configmap/my-custom-heisenbridge created
 $ kubectl apply -f examples/04-deploying-heisenbridge/B-using-existing-configmap/synapse.yaml 
 synapse.synapse.opdev.io/synapse-with-heisenbridge created
