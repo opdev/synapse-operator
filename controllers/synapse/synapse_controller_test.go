@@ -1131,11 +1131,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					var createdSignaldPVC *corev1.PersistentVolumeClaim
 					var createdMautrixSignalDeployment *appsv1.Deployment
 					var createdMautrixSignalPVC *corev1.PersistentVolumeClaim
-					var createdMautrixSignalSQLitePVC *corev1.PersistentVolumeClaim
 					var createdMautrixSignalService *corev1.Service
 					var createdMautrixSignalConfigMap *corev1.ConfigMap
 					var mautrixSignalLookupKey types.NamespacedName
-					var mautrixSignalSQLiteLookupKey types.NamespacedName
 					var signaldLookupKey types.NamespacedName
 
 					var initMautrixSignalVariables = func() {
@@ -1144,13 +1142,11 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						createdSignaldPVC = &corev1.PersistentVolumeClaim{}
 						createdMautrixSignalDeployment = &appsv1.Deployment{}
 						createdMautrixSignalPVC = &corev1.PersistentVolumeClaim{}
-						createdMautrixSignalSQLitePVC = &corev1.PersistentVolumeClaim{}
 						createdMautrixSignalService = &corev1.Service{}
 						createdMautrixSignalConfigMap = &corev1.ConfigMap{}
 
 						signaldLookupKey = types.NamespacedName{Name: SynapseName + "-signald", Namespace: SynapseNamespace}
 						mautrixSignalLookupKey = types.NamespacedName{Name: SynapseName + "-mautrixsignal", Namespace: SynapseNamespace}
-						mautrixSignalSQLiteLookupKey = types.NamespacedName{Name: SynapseName + "-mautrixsignal-sqlite", Namespace: SynapseNamespace}
 					}
 
 					var cleanupMautrixSignalResources = func() {
@@ -1165,9 +1161,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 						By("Cleaning up the mautrix-signal PVC")
 						deleteResource(createdMautrixSignalPVC, mautrixSignalLookupKey, true)
-
-						By("Cleaning up the mautrix-signal SQLite PVC")
-						deleteResource(createdMautrixSignalSQLitePVC, mautrixSignalSQLiteLookupKey, true)
 
 						By("Cleaning up the mautrix-signal Service")
 						deleteResource(createdMautrixSignalService, mautrixSignalLookupKey, false)
@@ -1228,10 +1221,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 						It("Should create a PVC for mautrix-signal", func() {
 							checkResourcePresence(createdMautrixSignalPVC, mautrixSignalLookupKey, expectedOwnerReference)
-						})
-
-						It("Should create a PVC for mautrix-signal SQLite database", func() {
-							checkResourcePresence(createdMautrixSignalSQLitePVC, mautrixSignalSQLiteLookupKey, expectedOwnerReference)
 						})
 
 						It("Should create a Service for mautrix-signal", func() {
@@ -1381,10 +1370,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 						It("Should create a PVC for mautrix-signal", func() {
 							checkResourcePresence(createdMautrixSignalPVC, mautrixSignalLookupKey, expectedOwnerReference)
-						})
-
-						It("Should create a PVC for mautrix-signal SQLite database", func() {
-							checkResourcePresence(createdMautrixSignalSQLitePVC, mautrixSignalSQLiteLookupKey, expectedOwnerReference)
 						})
 
 						It("Should create a Service for mautrix-signal", func() {

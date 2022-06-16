@@ -348,6 +348,184 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
+	if synapse.Spec.Bridges.MautrixSignal.Enabled {
+		log.Info("mautrix-signal is enabled - deploying mautrix-signal")
+		// mautrix-signal is composed of a ConfigMap, a Service and 1 Deployment.
+		// Resources associated to the mautrix-signal are append with "-mautrixsignal"
+		// In addition, a second deployment is needed to run signald. This is append with "-signald"
+		createdMautrixSignalService := &corev1.Service{}
+		objectMetaMautrixSignal := setObjectMeta(synapse.Name+"-mautrixsignal", synapse.Namespace, map[string]string{})
+		mautrixSignalKey := types.NamespacedName{Name: synapse.Name + "-mautrixsignal", Namespace: synapse.Namespace}
+		objectMetaSignald := setObjectMeta(synapse.Name+"-signald", synapse.Namespace, map[string]string{})
+
+		// First create the service as we need its IP address for the
+		// config.yaml configuration file
+		if err := r.reconcileResource(
+			ctx,
+			r.serviceForMautrixSignal,
+			&synapse,
+			createdMautrixSignalService,
+			objectMetaMautrixSignal,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Get Service IP and update the Synapse status
+		mautrixSignalIP, err := r.getServiceIP(ctx, mautrixSignalKey, createdMautrixSignalService)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		synapse.Status.BridgesConfiguration.MautrixSignal.IP = mautrixSignalIP
+		if err := r.updateSynapseStatus(ctx, &synapse); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// The ConfigMap for mautrix-signal, containing the config.yaml config
+		// file. It's either a copy of a user-provided ConfigMap, if defined in
+		// Spec.Bridges.MautrixSignal.ConfigMap, or a new ConfigMap containing
+		// a default config.yaml.
+		createdMautrixSignalConfigMap := &corev1.ConfigMap{}
+
+		// The user may specify a ConfigMap, containing the config.yaml config
+		// file, under Spec.Bridges.MautrixSignal.ConfigMap
+		inputConfigMapName := synapse.Spec.Bridges.MautrixSignal.ConfigMap.Name
+		setConfigMapNamespace := synapse.Spec.Bridges.MautrixSignal.ConfigMap.Namespace
+		inputConfigMapNamespace := r.getConfigMapNamespace(synapse, setConfigMapNamespace)
+		if inputConfigMapName != "" {
+			// If the user provided a custom mautrix-signal configuration via a
+			// ConfigMap, we need to validate that the ConfigMap exists, and
+			// create a copy in createdMautrixSignalConfigMap
+
+			// Get and check the input ConfigMap for mautrix-signal
+			var inputMautrixSignalConfigMap = &corev1.ConfigMap{}
+			keyForConfigMap := types.NamespacedName{
+				Name:      inputConfigMapName,
+				Namespace: inputConfigMapNamespace,
+			}
+
+			if err := r.Get(ctx, keyForConfigMap, inputMautrixSignalConfigMap); err != nil {
+				reason := "ConfigMap " + inputConfigMapName + " does not exist in namespace " + inputConfigMapNamespace
+				if err := r.setFailedState(ctx, &synapse, reason); err != nil {
+					log.Error(err, "Error updating Synapse State")
+				}
+
+				log.Error(
+					err,
+					"Failed to get ConfigMap",
+					"ConfigMap.Namespace",
+					inputConfigMapNamespace,
+					"ConfigMap.Name",
+					inputConfigMapName,
+				)
+				return ctrl.Result{RequeueAfter: time.Duration(30)}, err
+			}
+
+			// Create a copy of the inputMautrixSignalConfigMap defined in Spec.Bridges.MautrixSignal.ConfigMap
+			// Here we use the createdMautrixSignalConfigMap function as createResourceFunc
+			if err := r.reconcileResource(
+				ctx,
+				r.configMapForMautrixSignalCopy,
+				&synapse,
+				createdMautrixSignalConfigMap,
+				objectMetaMautrixSignal,
+			); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			// Correct data in mautrix-signal ConfigMap
+			if err := r.updateConfigMap(
+				ctx,
+				createdMautrixSignalConfigMap,
+				synapse,
+				r.updateMautrixSignalData,
+				"config.yaml",
+			); err != nil {
+				return ctrl.Result{}, err
+			}
+		} else {
+			// If the user hasn't provided a ConfigMap with a custom
+			// config.yaml, we create a new ConfigMap with a default
+			// config.yaml.
+
+			// Here we use configMapForMautrixSignal as createResourceFunc
+			if err := r.reconcileResource(
+				ctx,
+				r.configMapForMautrixSignal,
+				&synapse,
+				&corev1.ConfigMap{},
+				objectMetaMautrixSignal,
+			); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
+		// Create a PVC for signald
+		if err := r.reconcileResource(
+			ctx,
+			r.persistentVolumeClaimForSignald,
+			&synapse,
+			&corev1.PersistentVolumeClaim{},
+			objectMetaSignald,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Create Deployment for signald
+		if err := r.reconcileResource(
+			ctx,
+			r.deploymentForSignald,
+			&synapse,
+			&appsv1.Deployment{},
+			objectMetaSignald,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Create a PVC for mautrix-signal
+		if err := r.reconcileResource(
+			ctx,
+			r.persistentVolumeClaimForMautrixSignal,
+			&synapse,
+			&corev1.PersistentVolumeClaim{},
+			objectMetaMautrixSignal,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Create Deployment for mautrix-signal
+		if err := r.reconcileResource(
+			ctx,
+			r.deploymentForMautrixSignal,
+			&synapse,
+			&appsv1.Deployment{},
+			objectMetaMautrixSignal,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Create Deployment for mautrix-signal
+		if err := r.reconcileResource(
+			ctx,
+			r.deploymentForSignald,
+			&synapse,
+			&appsv1.Deployment{},
+			objectMetaSignald,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Update the Synapse ConfigMap to enable mautrix-signal
+		if err := r.updateConfigMap(
+			ctx,
+			&createdConfigMap,
+			synapse,
+			r.updateHomeserverWithMautrixSignalInfos,
+			"homeserver.yaml",
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Reconcile Synapse resources: PVC, Deployment and Service
 	if err := r.reconcileResource(
 		ctx,

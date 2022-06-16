@@ -2849,3 +2849,16 @@ func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
 	homeserver["app_service_config_files"] = []string{"/data-heisenbridge/heisenbridge.yaml"}
 	return nil
 }
+
+// updateHomeserverWithMautrixSignalInfos is a function of type updateDataFunc
+// function to be passed as an argument in a call to updateConfigMap.
+//
+// It enables the mautrix-signal bridge as an AppService in Synapse.
+func (r *SynapseReconciler) updateHomeserverWithMautrixSignalInfos(
+	s synapsev1alpha1.Synapse,
+	homeserver map[string]interface{},
+) error {
+	// Add mautrix-signal configuration file to the list of application services
+	homeserver["app_service_config_files"] = []string{"/data-mautrixsignal/registration.yaml"}
+	return nil
+}
