@@ -1121,6 +1121,343 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						})
 					})
 				})
+
+				When("Enabling the mautrix-signal", func() {
+					const (
+						mautrixSignalPort = 29328
+					)
+
+					var createdSignaldDeployment *appsv1.Deployment
+					var createdSignaldPVC *corev1.PersistentVolumeClaim
+					var createdMautrixSignalDeployment *appsv1.Deployment
+					var createdMautrixSignalPVC *corev1.PersistentVolumeClaim
+					var createdMautrixSignalSQLitePVC *corev1.PersistentVolumeClaim
+					var createdMautrixSignalService *corev1.Service
+					var createdMautrixSignalConfigMap *corev1.ConfigMap
+					var mautrixSignalLookupKey types.NamespacedName
+					var mautrixSignalSQLiteLookupKey types.NamespacedName
+					var signaldLookupKey types.NamespacedName
+
+					var initMautrixSignalVariables = func() {
+						// Init vars
+						createdSignaldDeployment = &appsv1.Deployment{}
+						createdSignaldPVC = &corev1.PersistentVolumeClaim{}
+						createdMautrixSignalDeployment = &appsv1.Deployment{}
+						createdMautrixSignalPVC = &corev1.PersistentVolumeClaim{}
+						createdMautrixSignalSQLitePVC = &corev1.PersistentVolumeClaim{}
+						createdMautrixSignalService = &corev1.Service{}
+						createdMautrixSignalConfigMap = &corev1.ConfigMap{}
+
+						signaldLookupKey = types.NamespacedName{Name: SynapseName + "-signald", Namespace: SynapseNamespace}
+						mautrixSignalLookupKey = types.NamespacedName{Name: SynapseName + "-mautrixsignal", Namespace: SynapseNamespace}
+						mautrixSignalSQLiteLookupKey = types.NamespacedName{Name: SynapseName + "-mautrixsignal-sqlite", Namespace: SynapseNamespace}
+					}
+
+					var cleanupMautrixSignalResources = func() {
+						By("Cleaning up the signald Deployment")
+						deleteResource(createdSignaldDeployment, signaldLookupKey, false)
+
+						By("Cleaning up the mautrix-signal Deployment")
+						deleteResource(createdMautrixSignalDeployment, mautrixSignalLookupKey, false)
+
+						By("Cleaning up the signald PVC")
+						deleteResource(createdSignaldPVC, signaldLookupKey, true)
+
+						By("Cleaning up the mautrix-signal PVC")
+						deleteResource(createdMautrixSignalPVC, mautrixSignalLookupKey, true)
+
+						By("Cleaning up the mautrix-signal SQLite PVC")
+						deleteResource(createdMautrixSignalSQLitePVC, mautrixSignalSQLiteLookupKey, true)
+
+						By("Cleaning up the mautrix-signal Service")
+						deleteResource(createdMautrixSignalService, mautrixSignalLookupKey, false)
+
+						By("Cleaning up the mautrix-signal ConfigMap")
+						deleteResource(createdMautrixSignalConfigMap, mautrixSignalLookupKey, false)
+					}
+
+					When("Using the default configuration", func() {
+						BeforeAll(func() {
+							initSynapseVariables()
+							initMautrixSignalVariables()
+
+							inputConfigmapData = map[string]string{
+								"homeserver.yaml": "server_name: " + ServerName + "\n" +
+									"report_stats: " + strconv.FormatBool(ReportStats),
+							}
+
+							synapseSpec = synapsev1alpha1.SynapseSpec{
+								Homeserver: synapsev1alpha1.SynapseHomeserver{
+									ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
+										Name: InputConfigMapName,
+									},
+								},
+								Bridges: synapsev1alpha1.SynapseBridges{
+									MautrixSignal: synapsev1alpha1.SynapseMautrixSignal{
+										Enabled: true,
+									},
+								},
+							}
+
+							createSynapseConfigMap()
+							createSynapseInstance()
+						})
+
+						AfterAll(func() {
+							// Cleanup mautrix-signal resources
+							cleanupSynapseResources()
+							cleanupSynapseConfigMap()
+							cleanupMautrixSignalResources()
+						})
+
+						It("Should create a Deployment for signald", func() {
+							checkResourcePresence(createdSignaldDeployment, signaldLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a PVC for signald", func() {
+							checkResourcePresence(createdSignaldPVC, signaldLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a ConfigMap for mautrix-signal", func() {
+							checkResourcePresence(createdMautrixSignalConfigMap, mautrixSignalLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a Deployment for mautrix-signal", func() {
+							checkResourcePresence(createdMautrixSignalDeployment, mautrixSignalLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a PVC for mautrix-signal", func() {
+							checkResourcePresence(createdMautrixSignalPVC, mautrixSignalLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a PVC for mautrix-signal SQLite database", func() {
+							checkResourcePresence(createdMautrixSignalSQLitePVC, mautrixSignalSQLiteLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a Service for mautrix-signal", func() {
+							checkResourcePresence(createdMautrixSignalService, mautrixSignalLookupKey, expectedOwnerReference)
+						})
+
+						It("Should add the mautrix-signal IP to the Synapse Status", func() {
+							// Get mautrix-signal IP
+							var mautrixSignalIP string
+							Eventually(func() bool {
+								err := k8sClient.Get(ctx, mautrixSignalLookupKey, createdMautrixSignalService)
+								if err != nil {
+									return false
+								}
+								mautrixSignalIP = createdMautrixSignalService.Spec.ClusterIP
+								return mautrixSignalIP != ""
+							}, timeout, interval).Should(BeTrue())
+
+							Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).To(Succeed())
+							Expect(synapse.Status.BridgesConfiguration.MautrixSignal.IP).To(Equal(mautrixSignalIP))
+						})
+
+						It("Should update the Synapse homeserver.yaml", func() {
+							Eventually(func(g Gomega) {
+								g.Expect(k8sClient.Get(ctx,
+									types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace},
+									createdConfigMap,
+								)).Should(Succeed())
+
+								cm_data, ok := createdConfigMap.Data["homeserver.yaml"]
+								g.Expect(ok).Should(BeTrue())
+
+								homeserver := make(map[string]interface{})
+								g.Expect(yaml.Unmarshal([]byte(cm_data), homeserver)).Should(Succeed())
+
+								_, ok = homeserver["app_service_config_files"]
+								g.Expect(ok).Should(BeTrue())
+
+								g.Expect(homeserver["app_service_config_files"]).Should(ContainElement("/data-mautrixsignal/registration.yaml"))
+							}, timeout, interval).Should(Succeed())
+						})
+					})
+
+					When("The user provides an input ConfigMap", func() {
+						var inputMautrixSignalConfigMap *corev1.ConfigMap
+						var inputMautrixSignalConfigMapData map[string]string
+						var mautrixSignalIP string
+
+						const InputMautrixSignalConfigMapName = "mautrix-signal-input"
+
+						BeforeAll(func() {
+							initSynapseVariables()
+							initMautrixSignalVariables()
+
+							mautrixSignalIP = ""
+
+							inputConfigmapData = map[string]string{
+								"homeserver.yaml": "server_name: " + ServerName + "\n" +
+									"report_stats: " + strconv.FormatBool(ReportStats),
+							}
+
+							synapseSpec = synapsev1alpha1.SynapseSpec{
+								Homeserver: synapsev1alpha1.SynapseHomeserver{
+									ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
+										Name: InputConfigMapName,
+									},
+								},
+								Bridges: synapsev1alpha1.SynapseBridges{
+									MautrixSignal: synapsev1alpha1.SynapseMautrixSignal{
+										Enabled: true,
+										ConfigMap: synapsev1alpha1.SynapseMautrixSignalConfigMap{
+											Name: InputMautrixSignalConfigMapName,
+										},
+									},
+								},
+							}
+
+							By("Creating a ConfigMap containing a basic config.yaml")
+							// Incomplete config.yaml, containing only the
+							// required data for our tests. We test that those
+							// values are correctly updated
+							configYaml := `
+                            homeserver:
+                                address: http://localhost:8008
+                                domain: mydomain.com
+                            appservice:
+                                address: http://localhost:29328
+                            signal:
+                                socket_path: /var/run/signald/signald.sock
+                            bridge:
+                                permissions:
+                                    "*": "relay"
+                                    "mydomain.com": "user"
+                                    "@admin:mydomain.com": "admin"
+                            logging:
+                                handlers:
+                                    file:
+                                        filename: ./mautrix-signal.log`
+
+							inputMautrixSignalConfigMapData = map[string]string{
+								"config.yaml": configYaml,
+							}
+
+							inputMautrixSignalConfigMap = &corev1.ConfigMap{
+								ObjectMeta: metav1.ObjectMeta{
+									Name:      InputMautrixSignalConfigMapName,
+									Namespace: SynapseNamespace,
+								},
+								Data: inputMautrixSignalConfigMapData,
+							}
+							Expect(k8sClient.Create(ctx, inputMautrixSignalConfigMap)).Should(Succeed())
+
+							createSynapseConfigMap()
+							createSynapseInstance()
+						})
+
+						AfterAll(func() {
+							// Cleanup mautrix-signal resources
+							By("Cleaning up the mautrix-signal ConfigMap")
+							mautrixSignalConfigMapLookupKey := types.NamespacedName{
+								Name:      InputMautrixSignalConfigMapName,
+								Namespace: SynapseNamespace,
+							}
+
+							deleteResource(inputMautrixSignalConfigMap, mautrixSignalConfigMapLookupKey, false)
+
+							cleanupSynapseResources()
+							cleanupSynapseConfigMap()
+							cleanupMautrixSignalResources()
+						})
+
+						It("Should create a Deployment for signald", func() {
+							checkResourcePresence(createdMautrixSignalDeployment, signaldLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a PVC for signald", func() {
+							checkResourcePresence(createdSignaldPVC, signaldLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a ConfigMap for mautrix-signal", func() {
+							checkResourcePresence(createdMautrixSignalConfigMap, mautrixSignalLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a Deployment for mautrix-signal", func() {
+							checkResourcePresence(createdMautrixSignalDeployment, mautrixSignalLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a PVC for mautrix-signal", func() {
+							checkResourcePresence(createdMautrixSignalPVC, mautrixSignalLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a PVC for mautrix-signal SQLite database", func() {
+							checkResourcePresence(createdMautrixSignalSQLitePVC, mautrixSignalSQLiteLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a Service for mautrix-signal", func() {
+							checkResourcePresence(createdMautrixSignalService, mautrixSignalLookupKey, expectedOwnerReference)
+						})
+
+						It("Should update the Synapse Status with mautrix-signal configuration information", func() {
+							// Get mautrix-signal IP
+							Eventually(func() bool {
+								err := k8sClient.Get(ctx, mautrixSignalLookupKey, createdMautrixSignalService)
+								if err != nil {
+									return false
+								}
+								mautrixSignalIP = createdMautrixSignalService.Spec.ClusterIP
+								return mautrixSignalIP != ""
+							}, timeout, interval).Should(BeTrue())
+
+							Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).To(Succeed())
+							Expect(synapse.Status.BridgesConfiguration.MautrixSignal.IP).To(Equal(mautrixSignalIP))
+						})
+
+						It("Should overwrite necessary values in the created mautrix-signal ConfigMap", func() {
+							Eventually(func(g Gomega) {
+								synapseIP := synapse.Status.IP
+								synapseServerName := synapse.Status.HomeserverConfiguration.ServerName
+
+								By("Verifying that the mautrixsignal ConfigMap exists")
+								g.Expect(k8sClient.Get(ctx, mautrixSignalLookupKey, inputMautrixSignalConfigMap)).Should(Succeed())
+
+								cm_data, ok := inputMautrixSignalConfigMap.Data["config.yaml"]
+								g.Expect(ok).Should(BeTrue())
+
+								config := make(map[string]interface{})
+								g.Expect(yaml.Unmarshal([]byte(cm_data), config)).Should(Succeed())
+
+								By("Verifying that the homeserver configuration has been updated")
+								configHomeserver, ok := config["homeserver"].(map[interface{}]interface{})
+								g.Expect(ok).Should(BeTrue())
+								g.Expect(configHomeserver["address"]).To(Equal("http://" + synapseIP + ":8008"))
+								g.Expect(configHomeserver["domain"]).To(Equal(synapseServerName))
+
+								By("Verifying that the appservice configuration has been updated")
+								configAppservice, ok := config["appservice"].(map[interface{}]interface{})
+								g.Expect(ok).Should(BeTrue())
+								g.Expect(configAppservice["address"]).To(Equal("http://" + mautrixSignalIP + ":" + strconv.Itoa(mautrixSignalPort)))
+
+								By("Verifying that the signal configuration has been updated")
+								configSignal, ok := config["signal"].(map[interface{}]interface{})
+								g.Expect(ok).Should(BeTrue())
+								g.Expect(configSignal["socket_path"]).To(Equal("/signald/signald.sock"))
+
+								By("Verifying that the permissions have been updated")
+								configBridge, ok := config["bridge"].(map[interface{}]interface{})
+								g.Expect(ok).Should(BeTrue())
+								configBridgePermissions, ok := configBridge["permissions"].(map[interface{}]interface{})
+								g.Expect(ok).Should(BeTrue())
+								g.Expect(configBridgePermissions).Should(HaveKeyWithValue("*", "relay"))
+								g.Expect(configBridgePermissions).Should(HaveKeyWithValue(synapseServerName, "user"))
+								g.Expect(configBridgePermissions).Should(HaveKeyWithValue("@admin:"+synapseServerName, "admin"))
+
+								By("Verifying that the log configuration file path have been updated")
+								configLogging, ok := config["logging"].(map[interface{}]interface{})
+								g.Expect(ok).Should(BeTrue())
+								configLoggingHandlers, ok := configLogging["handlers"].(map[interface{}]interface{})
+								g.Expect(ok).Should(BeTrue())
+								configLoggingHandlersFile, ok := configLoggingHandlers["file"].(map[interface{}]interface{})
+								g.Expect(ok).Should(BeTrue())
+								g.Expect(configLoggingHandlersFile["filename"]).To(Equal("/data/mautrix-signal.log"))
+							}, timeout, interval).Should(Succeed())
+						})
+					})
+				})
+
 			})
 		})
 
