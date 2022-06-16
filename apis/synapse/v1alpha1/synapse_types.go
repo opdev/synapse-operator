@@ -182,10 +182,18 @@ type SynapseStatus struct {
 type SynapseStatusBridgesConfiguration struct {
 	// Status of the Heisenbridge
 	Heisenbridge SynapseStatusHeisenbridge `json:"heisenbridge,omitempty"`
+
+	// Status of the mautrix-signal bridge
+	MautrixSignal SynapseStatusMautrixSignal `json:"mautrixSignal,omitempty"`
 }
 
 type SynapseStatusHeisenbridge struct {
 	// IP at which the Heisenbridge is available
+	IP string `json:"ip,omitempty"`
+}
+
+type SynapseStatusMautrixSignal struct {
+	// IP at which the mautrix-signal bridge is available
 	IP string `json:"ip,omitempty"`
 }
 

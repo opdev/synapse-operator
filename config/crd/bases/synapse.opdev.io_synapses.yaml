@@ -160,6 +160,13 @@ spec:
                         description: IP at which the Heisenbridge is available
                         type: string
                     type: object
+                  mautrixSignal:
+                    description: Status of the mautrix-signal bridge
+                    properties:
+                      ip:
+                        description: IP at which the mautrix-signal bridge is available
+                        type: string
+                    type: object
                 type: object
               databaseConnectionInfo:
                 description: Connection information to the external PostgreSQL Database
