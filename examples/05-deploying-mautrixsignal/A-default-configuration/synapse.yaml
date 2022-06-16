@@ -1,0 +1,12 @@
+apiVersion: synapse.opdev.io/v1alpha1
+kind: Synapse
+metadata:
+  name: synapse-with-mautrixsignal
+spec:
+  homeserver:
+    values:
+      serverName: example2.com
+      reportStats: true
+  bridges:
+    mautrixSignal:
+      enabled: true

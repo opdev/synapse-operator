@@ -177,10 +177,21 @@ configmap/synapse-with-postgresql-ssh-config              2      98s
 
 ## Deploying a bridge
 
-For now, only the deployment of the
-[Heisenbridge](https://github.com/hifi/heisenbridge) is supported.
+The synapse Operator supports the deployment of:
+* [Heisenbridge](https://github.com/hifi/heisenbridge): a bouncer-style IRC
+  bridge.
+* [mautrix-signal](https://github.com/mautrix/signal): a double-pupetting
+  bridge for Signal.
 
-### Using the default Heisenbridge configuration
+The bridges don't have any dependency to one another. You can choose to deploy
+one, several, or none of them.
+
+For both bridges, you can choose between using the default configuration file
+and providing your custom configuration file.
+
+### Using the default configuration file
+
+In this case, the Synapse operator provides default configuration values.
 
 An example of a `Synapse` resource using the default Heisenbridge configuration
 is available under the `04-deploying-heisenbridge/A-default-configuration`
@@ -213,13 +224,19 @@ configmap/synapse-with-heisenbridge                1      22s
 configmap/synapse-with-heisenbridge-heisenbridge   1      22s
 ```
 
-### Using an existing `heisenbridge.yaml` configuration file
+A similar example for mautrix-signal is available under the
+`05-deploying-mautrixsignal/A-default-configuration` directory.
 
-If the default `heisenbridge.yaml` doesn't answer your needs, you can use a
-custom configuration file. You first have to add your custom
-`heisenbridge.yaml` to a `ConfigMap` and configure the `Heisenbridge.ConfigMap`
-section of the `Synapse` resource to reference the `ConfigMap`, as illustrated
-in the `04-deploying-heisenbridge/B-using-existing-configmap` directory:
+### Providing a custom configuration file
+
+If the default configuration file doesn't answer your needs, you can use a
+custom configuration file. You first have to add your custom config file
+(for instance `heisenbridge.yaml`) to a `ConfigMap` and configure the
+corresponding section of the `Synapse` resource (for instance
+`Heisenbridge.ConfigMap`) to reference the `ConfigMap`.
+
+For heisenbridge, this is illustrated in the
+`04-deploying-heisenbridge/B-using-existing-configmap` directory:
 
 ```shell
 $ kubectl create configmap my-custom-heisenbridge --from-file=examples/04-deploying-heisenbridge/B-using-existing-configmap/heisenbridge.yaml 
@@ -249,3 +266,6 @@ configmap/my-custom-heisenbridge      1      92s
 configmap/openshift-service-ca.crt    1      32d
 configmap/synapse-with-heisenbridge   1      78s
 ```
+
+A similar example for mautrix-signal is available under the
+`05-deploying-mautrixsignal/B-using-existing-configmap` directory.
