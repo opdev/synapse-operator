@@ -222,7 +222,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// Resources associated to the Heisenbridge are append with "-heisenbridge"
 		createdHeisenbridgeService := &corev1.Service{}
 		objectMetaHeisenbridge := setObjectMeta(synapse.Name+"-heisenbridge", synapse.Namespace, map[string]string{})
-		heisenbergKey := types.NamespacedName{Name: synapse.Name + "-heisenbridge", Namespace: synapse.Namespace}
+		heisenbridgeKey := types.NamespacedName{Name: synapse.Name + "-heisenbridge", Namespace: synapse.Namespace}
 
 		// First create the service as we need its IP address for the
 		// heisenbridge.yaml configuration file
@@ -237,7 +237,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 		// Get Service IP and update the Synapse status
-		heisenbridgeIP, err := r.getServiceIP(ctx, heisenbergKey, createdHeisenbridgeService)
+		heisenbridgeIP, err := r.getServiceIP(ctx, heisenbridgeKey, createdHeisenbridgeService)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
