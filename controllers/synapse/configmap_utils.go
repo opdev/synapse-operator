@@ -45,7 +45,9 @@ func (r *SynapseReconciler) updateConfigMap(
 		return err
 	}
 
-	r.updateConfigMapData(cm, s, updateData, filename)
+	if err := r.updateConfigMapData(cm, s, updateData, filename); err != nil {
+		return err
+	}
 
 	// Update ConfigMap
 	if err := r.Client.Update(ctx, cm); err != nil {
