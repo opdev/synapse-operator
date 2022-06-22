@@ -2752,6 +2752,7 @@ func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synaps
 		return err
 	}
 
+	// Populate the Status.HomeserverConfiguration with values defined in homeserver.yaml
 	synapse.Status.HomeserverConfiguration.ServerName = server_name
 	synapse.Status.HomeserverConfiguration.ReportStats = report_stats
 
@@ -2836,6 +2837,10 @@ func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1
 	return databaseDataMap, nil
 }
 
+// updateHomeserverWithHeisenbridgeInfos is a function of type updateDataFunc
+// function to be passed as an argument in a call to updateConfigMap.
+//
+// It enables the Heisenbridge as an AppService in Synapse.
 func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
 	s synapsev1alpha1.Synapse,
 	homeserver map[string]interface{},

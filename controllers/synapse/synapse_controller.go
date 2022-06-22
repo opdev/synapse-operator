@@ -70,7 +70,7 @@ type HomeserverPgsqlDatabase struct {
 func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	var synapse synapsev1alpha1.Synapse
+	var synapse synapsev1alpha1.Synapse // The Synapse object being reconciled
 
 	// Load the Synapse by name
 	if err := r.Get(ctx, req.NamespacedName, &synapse); err != nil {
@@ -103,7 +103,13 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// homeserver.yaml.
 	var createdConfigMap corev1.ConfigMap
 
+	// Synapse should either have a Spec.Homeserver.ConfigMap or Spec.Homeserver.Values
 	if synapse.Spec.Homeserver.ConfigMap != nil {
+		// If the user provided a ConfigMap for the Homeserver config file:
+		// * We ensure that it exists and is a valid yaml file
+		// * We populate the Status.HomeserverConfiguration with the values defined in the input ConfigMap
+		// * We create a copy of the user-provided ConfigMap in createdConfigMap.
+
 		var inputConfigMap corev1.ConfigMap // the user-provided ConfigMap. It should contain a valid homeserver.yaml
 		// Get and validate the inputConfigMap
 		ConfigMapName := synapse.Spec.Homeserver.ConfigMap.Name
@@ -145,9 +151,15 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, nil
 		}
 	} else {
+		// If the user hasn't provided a ConfigMap with a custom
+		// homeserver.yaml, we create a new ConfigMap. The default
+		// homeserver.yaml is configured with values defined in
+		// Spec.Homeserver.Values
 		synapse.Status.HomeserverConfiguration.ServerName = synapse.Spec.Homeserver.Values.ServerName
 		synapse.Status.HomeserverConfiguration.ReportStats = synapse.Spec.Homeserver.Values.ReportStats
 
+		// Create a new ConfigMap for Synapse
+		// Here we use the configMapForSynapse function as createResourceFunc
 		if err := r.reconcileResource(
 			ctx,
 			r.configMapForSynapse,
@@ -297,7 +309,11 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				return ctrl.Result{}, err
 			}
 		} else {
-			// Create ConfigMap for Heisenbridge
+			// If the user hasn't provided a ConfigMap with a custom
+			// config.yaml, we create a new ConfigMap with a default
+			// config.yaml.
+
+			// Here we use configMapForHeisenbridge as createResourceFunc
 			if err := r.reconcileResource(
 				ctx,
 				r.configMapForHeisenbridge,
