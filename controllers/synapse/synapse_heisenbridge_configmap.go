@@ -82,6 +82,11 @@ func (r *SynapseReconciler) configMapForHeisenbridgeCopy(
 	return copyConfigMap, nil
 }
 
+// updateHeisenbridgeWithURL is a function of type updateDataFunc function to
+// be passed as an argument in a call to updateConfigMap.
+//
+// It configures the correct Heisenbridge URL, needed for Synapse to reach the
+// bridge.
 func (r *SynapseReconciler) updateHeisenbridgeWithURL(
 	s synapsev1alpha1.Synapse,
 	heisenbridge map[string]interface{},

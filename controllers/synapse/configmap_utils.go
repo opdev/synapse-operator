@@ -16,6 +16,7 @@ limitations under the License.
 
 package synapse
 
+/* This file puts together generic functions for ConfiMap manipulation */
 import (
 	"context"
 	"errors"
@@ -27,8 +28,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// Defines a function type. Functions of the updateDataFunc type implements the
+// logic to update the data of a configmap, defined by the 'data' argument.
 type updateDataFunc func(s synapsev1alpha1.Synapse, data map[string]interface{}) error
 
+// A generic function to update an existing ConfigMap. It takes as arguments:
+// * The context
+// * The name of the ConfigMap to update
+// * The Synapse object being reconciled
+// * The function to be called to actually update the ConfigMap's content
+// * The name of the file to update in the ConfigMap
 func (r *SynapseReconciler) updateConfigMap(
 	ctx context.Context,
 	cm *corev1.ConfigMap,
