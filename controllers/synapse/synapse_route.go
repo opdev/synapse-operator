@@ -17,7 +17,7 @@ limitations under the License.
 package synapse
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -27,23 +27,23 @@ import (
 )
 
 // serviceForSynapse returns a synapse Service object
-func (r *SynapseReconciler) serviceForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
-	service := &corev1.Service{
+func (r *SynapseReconciler) routeForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) client.Object {
+	weight := int32(100)
+	route := &routev1.Route{
 		ObjectMeta: objectMeta,
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{{
-				Name:       "unsecure-http",
-				Protocol:   corev1.ProtocolTCP,
-				Port:       8008,
-				TargetPort: intstr.FromInt(8008),
-			}},
-			Selector: labelsForSynapse(s.Name),
-			Type:     corev1.ServiceTypeClusterIP,
+		Spec: routev1.RouteSpec{
+			Host: objectMeta.Name + "-" + objectMeta.Namespace + "." + s.Spec.Homeserver.Values.ServerName,
+			Port: &routev1.RoutePort{
+				TargetPort: intstr.FromString("unsecure-http"),
+			},
+			To: routev1.RouteTargetReference{
+				Kind:   "Service",
+				Name:   "synapse-sample",
+				Weight: &weight,
+			},
 		},
 	}
 	// Set Synapse instance as the owner and controller
-	if err := ctrl.SetControllerReference(s, service, r.Scheme); err != nil {
-		return &corev1.Service{}, err
-	}
-	return service, nil
+	ctrl.SetControllerReference(s, route, r.Scheme)
+	return route
 }

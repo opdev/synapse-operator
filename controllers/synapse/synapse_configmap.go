@@ -799,7 +799,7 @@ database:
 # A yaml python logging config file as described by
 # https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
 #
-log_config: "/data/example.com.log.config"
+log_config: "/data/` + s.Spec.Homeserver.Values.ServerName + `.log.config"
 
 
 ## Ratelimiting ##
@@ -1461,7 +1461,7 @@ form_secret: "uD#~UE2pAzLUQIvj8x1;0iCzNL-UcUs1._WtUGXHRp@1Ogmyg4"
 
 # Path to the signing key to sign messages with
 #
-signing_key_path: "data/example.com.signing.key"
+signing_key_path: "data/` + s.Spec.Homeserver.Values.ServerName + `.signing.key"
 
 # The keys that the server used to sign messages with but won't use
 # to sign new messages.
