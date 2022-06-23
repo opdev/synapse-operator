@@ -1129,6 +1129,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 					var createdSignaldDeployment *appsv1.Deployment
 					var createdSignaldPVC *corev1.PersistentVolumeClaim
+					var createdMautrixSignalServiceAccount *corev1.ServiceAccount
+					var createdMautrixSignalRoleBinding *rbacv1.RoleBinding
 					var createdMautrixSignalDeployment *appsv1.Deployment
 					var createdMautrixSignalPVC *corev1.PersistentVolumeClaim
 					var createdMautrixSignalService *corev1.Service
@@ -1140,6 +1142,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						// Init vars
 						createdSignaldDeployment = &appsv1.Deployment{}
 						createdSignaldPVC = &corev1.PersistentVolumeClaim{}
+						createdMautrixSignalServiceAccount = &corev1.ServiceAccount{}
+						createdMautrixSignalRoleBinding = &rbacv1.RoleBinding{}
 						createdMautrixSignalDeployment = &appsv1.Deployment{}
 						createdMautrixSignalPVC = &corev1.PersistentVolumeClaim{}
 						createdMautrixSignalService = &corev1.Service{}
@@ -1167,6 +1171,12 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 						By("Cleaning up the mautrix-signal ConfigMap")
 						deleteResource(createdMautrixSignalConfigMap, mautrixSignalLookupKey, false)
+
+						By("Cleaning up mautrix-signal RoleBinding")
+						deleteResource(createdMautrixSignalRoleBinding, mautrixSignalLookupKey, false)
+
+						By("Cleaning up mautrix-signal ServiceAccount")
+						deleteResource(createdMautrixSignalServiceAccount, mautrixSignalLookupKey, false)
 					}
 
 					When("Using the default configuration", func() {
@@ -1213,6 +1223,14 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 						It("Should create a ConfigMap for mautrix-signal", func() {
 							checkResourcePresence(createdMautrixSignalConfigMap, mautrixSignalLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a Role Binding for mautrix-signal", func() {
+							checkResourcePresence(createdMautrixSignalRoleBinding, mautrixSignalLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a Service Account for mautrix-signal", func() {
+							checkResourcePresence(createdMautrixSignalServiceAccount, mautrixSignalLookupKey, expectedOwnerReference)
 						})
 
 						It("Should create a Deployment for mautrix-signal", func() {
@@ -1362,6 +1380,14 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 						It("Should create a ConfigMap for mautrix-signal", func() {
 							checkResourcePresence(createdMautrixSignalConfigMap, mautrixSignalLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a Role Binding for mautrix-signal", func() {
+							checkResourcePresence(createdMautrixSignalRoleBinding, mautrixSignalLookupKey, expectedOwnerReference)
+						})
+
+						It("Should create a Service Account for mautrix-signal", func() {
+							checkResourcePresence(createdMautrixSignalServiceAccount, mautrixSignalLookupKey, expectedOwnerReference)
 						})
 
 						It("Should create a Deployment for mautrix-signal", func() {

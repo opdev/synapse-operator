@@ -37,10 +37,13 @@ func (r *SynapseReconciler) deploymentForMautrixSignal(s *synapsev1alpha1.Synaps
 	ls := labelsForMautrixSignal(s.Name)
 	replicas := int32(1)
 
-	// The created mautrix-signal ConfigMap Name share the same name as the
-	// mautrix-signal Deployment
+	// The associated mautrix-signal objects (ConfigMap, PVC, SA) share the
+	// same name as the mautrix-signal Deployment
 	mautrixSignalConfigMapName := objectMeta.Name
 	mautrixSignalPVCName := objectMeta.Name
+	mautrixSignalServiceAccountName := objectMeta.Name
+
+	// The Signald PVC name is the Synapse object name with "-signald" appended
 	SignaldPVCName := s.ObjectMeta.Name + "-signald"
 
 	dep := &appsv1.Deployment{
@@ -55,6 +58,10 @@ func (r *SynapseReconciler) deploymentForMautrixSignal(s *synapsev1alpha1.Synaps
 					Labels: ls,
 				},
 				Spec: corev1.PodSpec{
+					// mautrix-signal must run with user 1337.
+					// We must run the workload with a Service Account
+					// associated to the 'anyuid' SCC.
+					ServiceAccountName: mautrixSignalServiceAccountName,
 					// The init container is responsible of copying the
 					// config.yaml from the read-only ConfigMap to the
 					// mautrixsignal-data volume. The mautrixsignal process
