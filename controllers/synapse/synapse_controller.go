@@ -481,6 +481,28 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 
+		// Create the SA for mautrix-signal
+		if err := r.reconcileResource(
+			ctx,
+			r.serviceAccountForMautrixSignal,
+			&synapse,
+			&corev1.ServiceAccount{},
+			objectMetaMautrixSignal,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Create the RoleBinding for mautrix-signal
+		if err := r.reconcileResource(
+			ctx,
+			r.roleBindingForMautrixSignal,
+			&synapse,
+			&rbacv1.RoleBinding{},
+			objectMetaMautrixSignal,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		// Create a PVC for mautrix-signal
 		if err := r.reconcileResource(
 			ctx,

@@ -88,6 +88,9 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, obj
 							ContainerPort: 8008,
 						}},
 					}},
+					// Synapse must run with user 991.
+					// We must run the workload with a Service Account
+					// associated to the 'anyuid' SCC.
 					ServiceAccountName: s.Name,
 					Volumes: []corev1.Volume{{
 						Name: "homeserver",
