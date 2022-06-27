@@ -32,7 +32,7 @@ func (r *SynapseReconciler) serviceForHeisenbridge(s *synapsev1alpha1.Synapse, o
 		ObjectMeta: objectMeta,
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{{
-				Name:       "http",
+				Name:       "heisenbridge",
 				Protocol:   corev1.ProtocolTCP,
 				Port:       9898,
 				TargetPort: intstr.FromInt(9898),

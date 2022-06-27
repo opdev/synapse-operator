@@ -32,7 +32,7 @@ func (r *SynapseReconciler) serviceForSynapse(s *synapsev1alpha1.Synapse, object
 		ObjectMeta: objectMeta,
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{{
-				Name:       "http",
+				Name:       "synapse_unsecure",
 				Protocol:   corev1.ProtocolTCP,
 				Port:       8008,
 				TargetPort: intstr.FromInt(8008),

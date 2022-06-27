@@ -32,7 +32,7 @@ func (r *SynapseReconciler) serviceForMautrixSignal(s *synapsev1alpha1.Synapse, 
 		ObjectMeta: objectMeta,
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{{
-				Name:       "http",
+				Name:       "mautrix-signal",
 				Protocol:   corev1.ProtocolTCP,
 				Port:       29328,
 				TargetPort: intstr.FromInt(29328),
