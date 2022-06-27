@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -61,6 +62,18 @@ type HomeserverPgsqlDatabase struct {
 //+kubebuilder:rbac:groups=synapse.opdev.io,resources=synapses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=synapse.opdev.io,resources=synapses/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=synapse.opdev.io,resources=synapses/finalizers,verbs=update
+
+func (r *SynapseReconciler) GetHeisenbridgeResourceName(synapse synapsev1alpha1.Synapse) string {
+	return strings.Join([]string{synapse.Name, "heisenbridge"}, "-")
+}
+
+func (r *SynapseReconciler) GetSignaldResourceName(synapse synapsev1alpha1.Synapse) string {
+	return strings.Join([]string{synapse.Name, "signald"}, "-")
+}
+
+func (r *SynapseReconciler) GetMautrixSignalResourceName(synapse synapsev1alpha1.Synapse) string {
+	return strings.Join([]string{synapse.Name, "mautrixsignal"}, "-")
+}
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -221,8 +234,8 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// Heisenbridge is composed of a ConfigMap, a Service and a Deployment.
 		// Resources associated to the Heisenbridge are append with "-heisenbridge"
 		createdHeisenbridgeService := &corev1.Service{}
-		objectMetaHeisenbridge := setObjectMeta(synapse.Name+"-heisenbridge", synapse.Namespace, map[string]string{})
-		heisenbridgeKey := types.NamespacedName{Name: synapse.Name + "-heisenbridge", Namespace: synapse.Namespace}
+		objectMetaHeisenbridge := setObjectMeta(r.GetHeisenbridgeResourceName(synapse), synapse.Namespace, map[string]string{})
+		heisenbridgeKey := types.NamespacedName{Name: r.GetHeisenbridgeResourceName(synapse), Namespace: synapse.Namespace}
 
 		// First create the service as we need its IP address for the
 		// heisenbridge.yaml configuration file
@@ -354,9 +367,9 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// Resources associated to the mautrix-signal are append with "-mautrixsignal"
 		// In addition, a second deployment is needed to run signald. This is append with "-signald"
 		createdMautrixSignalService := &corev1.Service{}
-		objectMetaMautrixSignal := setObjectMeta(synapse.Name+"-mautrixsignal", synapse.Namespace, map[string]string{})
-		mautrixSignalKey := types.NamespacedName{Name: synapse.Name + "-mautrixsignal", Namespace: synapse.Namespace}
-		objectMetaSignald := setObjectMeta(synapse.Name+"-signald", synapse.Namespace, map[string]string{})
+		objectMetaMautrixSignal := setObjectMeta(r.GetMautrixSignalResourceName(synapse), synapse.Namespace, map[string]string{})
+		mautrixSignalKey := types.NamespacedName{Name: r.GetMautrixSignalResourceName(synapse), Namespace: synapse.Namespace}
+		objectMetaSignald := setObjectMeta(r.GetSignaldResourceName(synapse), synapse.Namespace, map[string]string{})
 
 		// First create the service as we need its IP address for the
 		// config.yaml configuration file
