@@ -30,28 +30,6 @@ import (
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 )
 
-// Helper function for struct construction requiring a boolean pointer
-func BoolAddr(b bool) *bool {
-	boolVar := b
-	return &boolVar
-}
-
-func convert(i interface{}) interface{} {
-	switch x := i.(type) {
-	case map[interface{}]interface{}:
-		m2 := map[string]interface{}{}
-		for k, v := range x {
-			m2[k.(string)] = convert(v)
-		}
-		return m2
-	case []interface{}:
-		for i, v := range x {
-			x[i] = convert(v)
-		}
-	}
-	return i
-}
-
 var _ = Describe("Integration tests for the Synapse controller", Ordered, Label("integration"), func() {
 	// Define utility constants for object names and testing timeouts/durations and intervals.
 	const (
@@ -70,6 +48,10 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 	var testEnv *envtest.Environment
 	var ctx context.Context
 	var cancel context.CancelFunc
+
+	var deleteResource func(client.Object, types.NamespacedName, bool)
+	var checkSubresourceAbsence func(string)
+	var checkResourcePresence func(client.Object, types.NamespacedName, metav1.OwnerReference)
 
 	// Common function to start envTest
 	var startenvTest = func() {
@@ -97,79 +79,18 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 		}).SetupWithManager(k8sManager)
 		Expect(err).ToNot(HaveOccurred())
 
+		deleteResource = deleteResourceFunc(k8sClient, ctx, timeout, interval)
+		checkSubresourceAbsence = checkSubresourceAbsenceFunc(SynapseName, SynapseNamespace, k8sClient, ctx, timeout, interval)
+		checkResourcePresence = checkResourcePresenceFunc(k8sClient, ctx, timeout, interval)
+
 		go func() {
 			defer GinkgoRecover()
 			Expect(k8sManager.Start(ctx)).ToNot(HaveOccurred(), "failed to run manager")
 		}()
 	}
 
-	// Verify the absence of Synapse sub-resources
-	// This function common to multiple tests
-	var checkSubresourceAbsence = func(expectedReason string) {
-		s := &synapsev1alpha1.Synapse{}
-		synapseLookupKey := types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace}
-		expectedState := "FAILED"
-
-		By("Verifying that the Synapse object was created")
-		Eventually(func() bool {
-			err := k8sClient.Get(ctx, synapseLookupKey, &synapsev1alpha1.Synapse{})
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
-
-		By("Checking the Synapse status")
-		// Status may need some time to be updated
-		Eventually(func(g Gomega) {
-			g.Expect(k8sClient.Get(ctx, synapseLookupKey, s)).Should(Succeed())
-			g.Expect(s.Status.State).To(Equal(expectedState))
-			g.Expect(s.Status.Reason).To(Equal(expectedReason))
-		}, timeout, interval).Should(Succeed())
-
-		By("Checking that synapse sub-resources have not been created")
-		Consistently(func(g Gomega) {
-			g.Expect(k8sClient.Get(ctx, synapseLookupKey, &corev1.ServiceAccount{})).ShouldNot(Succeed())
-			g.Expect(k8sClient.Get(ctx, synapseLookupKey, &rbacv1.RoleBinding{})).ShouldNot(Succeed())
-			g.Expect(k8sClient.Get(ctx, synapseLookupKey, &corev1.PersistentVolumeClaim{})).ShouldNot(Succeed())
-			g.Expect(k8sClient.Get(ctx, synapseLookupKey, &appsv1.Deployment{})).ShouldNot(Succeed())
-			g.Expect(k8sClient.Get(ctx, synapseLookupKey, &corev1.Service{})).ShouldNot(Succeed())
-		}, timeout, interval).Should(Succeed())
-	}
-
-	var checkResourcePresence = func(resource client.Object, lookupKey types.NamespacedName, expectedOwnerReference metav1.OwnerReference) {
-		Eventually(func() bool {
-			err := k8sClient.Get(ctx, lookupKey, resource)
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
-
-		Expect(resource.GetOwnerReferences()).To(ContainElement(expectedOwnerReference))
-	}
-
-	var deleteResource = func(resource client.Object, lookupKey types.NamespacedName, removeFinalizers bool) {
-		// Using 'Eventually' to eliminate race conditions where the Synapse
-		// Operator didn't have time to create a sub resource.
-		Eventually(func() bool {
-			err := k8sClient.Get(ctx, lookupKey, resource)
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
-
-		if removeFinalizers {
-			// Manually remove the finalizers
-			resource.SetFinalizers([]string{})
-			Expect(k8sClient.Update(ctx, resource)).Should(Succeed())
-		}
-
-		// Deleting
-		Expect(k8sClient.Delete(ctx, resource)).Should(Succeed())
-
-		// Check that the resource was successfully removed
-		Eventually(func() bool {
-			err := k8sClient.Get(ctx, lookupKey, resource)
-			return err == nil
-		}, timeout, interval).Should(BeFalse())
-	}
-
 	Context("When a corectly configured Kubernetes cluster is present", func() {
 		var _ = BeforeAll(func() {
-
 			logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 			ctx, cancel = context.WithCancel(context.TODO())
