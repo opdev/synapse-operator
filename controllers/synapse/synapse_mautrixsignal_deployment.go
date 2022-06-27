@@ -44,7 +44,7 @@ func (r *SynapseReconciler) deploymentForMautrixSignal(s *synapsev1alpha1.Synaps
 	mautrixSignalServiceAccountName := objectMeta.Name
 
 	// The Signald PVC name is the Synapse object name with "-signald" appended
-	SignaldPVCName := s.ObjectMeta.Name + "-signald"
+	SignaldPVCName := r.GetSignaldResourceName(*s)
 
 	dep := &appsv1.Deployment{
 		ObjectMeta: objectMeta,
