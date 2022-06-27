@@ -28,6 +28,7 @@ import (
 
 // serviceAccountForSynapse returns a synapse ServiceAccount object
 func (r *SynapseReconciler) serviceAccountForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
+	// TODO: https://github.com/opdev/synapse-operator/issues/19
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: objectMeta,
 	}
@@ -41,6 +42,7 @@ func (r *SynapseReconciler) serviceAccountForSynapse(s *synapsev1alpha1.Synapse,
 
 // roleBindingForSynapse returns a synapse RoleBinding object
 func (r *SynapseReconciler) roleBindingForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
+	// TODO: https://github.com/opdev/synapse-operator/issues/19
 	rb := &rbacv1.RoleBinding{
 		ObjectMeta: objectMeta,
 		RoleRef: rbacv1.RoleRef{

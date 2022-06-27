@@ -28,6 +28,7 @@ import (
 
 // serviceAccountForMautrixSignal returns a ServiceAccount object for running the mautrix-signal bridge
 func (r *SynapseReconciler) serviceAccountForMautrixSignal(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
+	// TODO: https://github.com/opdev/synapse-operator/issues/19
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: objectMeta,
 	}
@@ -41,6 +42,7 @@ func (r *SynapseReconciler) serviceAccountForMautrixSignal(s *synapsev1alpha1.Sy
 
 // roleBindingForMautrixSignal returns a RoleBinding object for the mautrix-signal bridge
 func (r *SynapseReconciler) roleBindingForMautrixSignal(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
+	// TODO: https://github.com/opdev/synapse-operator/issues/19
 	rb := &rbacv1.RoleBinding{
 		ObjectMeta: objectMeta,
 		RoleRef: rbacv1.RoleRef{
