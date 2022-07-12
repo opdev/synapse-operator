@@ -2842,11 +2842,11 @@ func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1
 //
 // It enables the Heisenbridge as an AppService in Synapse.
 func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
-	s synapsev1alpha1.Synapse,
+	_ synapsev1alpha1.Synapse,
 	homeserver map[string]interface{},
 ) error {
 	// Add heisenbridge configuration file to the list of application services
-	homeserver["app_service_config_files"] = []string{"/data-heisenbridge/heisenbridge.yaml"}
+	r.addAppServiceToHomeserver(homeserver, "/data-heisenbridge/heisenbridge.yaml")
 	return nil
 }
 
@@ -2855,10 +2855,25 @@ func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
 //
 // It enables the mautrix-signal bridge as an AppService in Synapse.
 func (r *SynapseReconciler) updateHomeserverWithMautrixSignalInfos(
-	s synapsev1alpha1.Synapse,
+	_ synapsev1alpha1.Synapse,
 	homeserver map[string]interface{},
 ) error {
 	// Add mautrix-signal configuration file to the list of application services
-	homeserver["app_service_config_files"] = []string{"/data-mautrixsignal/registration.yaml"}
+	r.addAppServiceToHomeserver(homeserver, "/data-mautrixsignal/registration.yaml")
 	return nil
+}
+
+func (r *SynapseReconciler) addAppServiceToHomeserver(
+	homeserver map[string]interface{},
+	configFilePath string,
+) {
+	homeserverAppService, ok := homeserver["app_service_config_files"].([]string)
+	if !ok {
+		// "app_service_config_files" key not present, or malformed. Overwrite with
+		// the given app_service config file.
+		homeserver["app_service_config_files"] = []string{configFilePath}
+	} else {
+		// There are already app services registered. Adding to the list.
+		homeserver["app_service_config_files"] = append(homeserverAppService, configFilePath)
+	}
 }
