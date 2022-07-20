@@ -30,13 +30,12 @@ import (
 // configMapForSynapse returns a synapse ConfigMap object
 func (r *SynapseReconciler) configMapForMautrixSignal(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	synapseServerName := s.Status.HomeserverConfiguration.ServerName
-	synapseIP := s.Status.IP
 
 	configYaml := `
 # Homeserver details
 homeserver:
     # The address that this appservice can use to connect to the homeserver.
-    address: http://` + synapseIP + `:8008
+    address: http://` + r.GetSynapseServiceFQDN(*s) + `:8008
     # The domain of the homeserver (for MXIDs, etc).
     domain: ` + synapseServerName + `
     # Whether or not to verify the SSL certificate of the homeserver.
@@ -61,7 +60,7 @@ homeserver:
 # Changing these values requires regeneration of the registration.
 appservice:
     # The address that the homeserver can use to connect to this appservice.
-    address: http://` + s.Status.BridgesConfiguration.MautrixSignal.IP + `:29328
+    address: http://` + r.GetMautrixSignalServiceFQDN(*s) + `:29328
     # When using https:// the TLS certificate and key files for the address.
     tls_cert: false
     tls_key: false
@@ -389,7 +388,6 @@ func (r *SynapseReconciler) updateMautrixSignalData(
 	config map[string]interface{},
 ) error {
 	synapseServerName := s.Status.HomeserverConfiguration.ServerName
-	synapseIP := s.Status.IP
 
 	// Update the homeserver section so that the bridge can reach Synapse
 	configHomeserver, ok := config["homeserver"].(map[interface{}]interface{})
@@ -397,7 +395,7 @@ func (r *SynapseReconciler) updateMautrixSignalData(
 		err := errors.New("cannot parse mautrix-signal config.yaml: error parsing 'homeserver' section")
 		return err
 	}
-	configHomeserver["address"] = "http://" + synapseIP + ":8008"
+	configHomeserver["address"] = "http://" + r.GetSynapseServiceFQDN(s) + ":8008"
 	configHomeserver["domain"] = synapseServerName
 	config["homeserver"] = configHomeserver
 
@@ -407,7 +405,7 @@ func (r *SynapseReconciler) updateMautrixSignalData(
 		err := errors.New("cannot parse mautrix-signal config.yaml: error parsing 'appservice' section")
 		return err
 	}
-	configAppservice["address"] = "http://" + s.Status.BridgesConfiguration.MautrixSignal.IP + ":29328"
+	configAppservice["address"] = "http://" + r.GetMautrixSignalServiceFQDN(s) + ":29328"
 	config["appservice"] = configAppservice
 
 	// Update the path to the signal socket path
