@@ -29,7 +29,7 @@ import (
 func (r *SynapseReconciler) configMapForHeisenbridge(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	heisenbridgeYaml := `
 id: heisenbridge
-url: http://` + s.Status.BridgesConfiguration.Heisenbridge.IP + `:9898
+url: http://` + r.GetHeisenbridgeServiceFQDN(*s) + `:9898
 as_token: EUFqSPQusV4mXkPKbwdHyIhthELQ1Xf9S5lSEzTrrlb0uz0ZJRHhwEljT71ByObe
 hs_token: If6r2GGlsNN4MnoW3djToADNdq0JuIJ1WNM4rKHO73WuG5QvVubj1Q4JHrmQBcS6
 rate_limited: false
@@ -91,6 +91,6 @@ func (r *SynapseReconciler) updateHeisenbridgeWithURL(
 	s synapsev1alpha1.Synapse,
 	heisenbridge map[string]interface{},
 ) error {
-	heisenbridge["url"] = "http://" + s.Status.BridgesConfiguration.Heisenbridge.IP + ":9898"
+	heisenbridge["url"] = "http://" + r.GetHeisenbridgeServiceFQDN(s) + ":9898"
 	return nil
 }

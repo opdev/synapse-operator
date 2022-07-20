@@ -75,6 +75,18 @@ func (r *SynapseReconciler) GetMautrixSignalResourceName(synapse synapsev1alpha1
 	return strings.Join([]string{synapse.Name, "mautrixsignal"}, "-")
 }
 
+func (r *SynapseReconciler) GetSynapseServiceFQDN(synapse synapsev1alpha1.Synapse) string {
+	return strings.Join([]string{synapse.Name, synapse.Namespace, "svc", "cluster", "local"}, ".")
+}
+
+func (r *SynapseReconciler) GetHeisenbridgeServiceFQDN(synapse synapsev1alpha1.Synapse) string {
+	return strings.Join([]string{r.GetHeisenbridgeResourceName(synapse), synapse.Namespace, "svc", "cluster", "local"}, ".")
+}
+
+func (r *SynapseReconciler) GetMautrixSignalServiceFQDN(synapse synapsev1alpha1.Synapse) string {
+	return strings.Join([]string{r.GetMautrixSignalResourceName(synapse), synapse.Namespace, "svc", "cluster", "local"}, ".")
+}
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
