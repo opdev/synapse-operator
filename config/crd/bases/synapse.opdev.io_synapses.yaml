@@ -150,24 +150,6 @@ spec:
           status:
             description: SynapseStatus defines the observed state of Synapse
             properties:
-              bridgesConfiguration:
-                description: Configuration of deployed bridges
-                properties:
-                  heisenbridge:
-                    description: Status of the Heisenbridge
-                    properties:
-                      ip:
-                        description: IP at which the Heisenbridge is available
-                        type: string
-                    type: object
-                  mautrixSignal:
-                    description: Status of the mautrix-signal bridge
-                    properties:
-                      ip:
-                        description: IP at which the mautrix-signal bridge is available
-                        type: string
-                    type: object
-                type: object
               databaseConnectionInfo:
                 description: Connection information to the external PostgreSQL Database
                 properties:
@@ -198,10 +180,6 @@ spec:
                     description: The public-facing domain of the server
                     type: string
                 type: object
-              ip:
-                description: Synapse IP address (corresponding to the Synapse Service
-                  IP address)
-                type: string
               reason:
                 description: Reason for the current Synapse State
                 type: string

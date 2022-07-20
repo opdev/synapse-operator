@@ -496,17 +496,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				})
 
 				It("Should should update the Synapse Status", func() {
-					// Get ServiceIP
-					var synapseIP string
-					Eventually(func() bool {
-						err := k8sClient.Get(ctx, synapseLookupKey, createdService)
-						if err != nil {
-							return false
-						}
-						synapseIP = createdService.Spec.ClusterIP
-						return synapseIP != ""
-					}, timeout, interval).Should(BeTrue())
-
 					expectedStatus := synapsev1alpha1.SynapseStatus{
 						State:  "RUNNING",
 						Reason: "",
@@ -514,7 +503,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							ServerName:  ServerName,
 							ReportStats: ReportStats,
 						},
-						IP: synapseIP,
 					}
 					// Status may need some time to be updated
 					Eventually(func() synapsev1alpha1.SynapseStatus {
@@ -608,17 +596,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					})
 
 					It("Should should update the Synapse Status", func() {
-						// Get ServiceIP
-						var synapseIP string
-						Eventually(func() bool {
-							err := k8sClient.Get(ctx, synapseLookupKey, createdService)
-							if err != nil {
-								return false
-							}
-							synapseIP = createdService.Spec.ClusterIP
-							return synapseIP != ""
-						}, timeout, interval).Should(BeTrue())
-
 						expectedStatus := synapsev1alpha1.SynapseStatus{
 							State:  "RUNNING",
 							Reason: "",
@@ -626,7 +603,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 								ServerName:  ServerName,
 								ReportStats: ReportStats,
 							},
-							IP: synapseIP,
 						}
 						// Status may need some time to be updated
 						Eventually(func() synapsev1alpha1.SynapseStatus {
@@ -890,22 +866,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							checkResourcePresence(createdHeisenbridgeService, heisenbridgeLookupKey, expectedOwnerReference)
 						})
 
-						It("Should add the Heisenbridge IP to the Synapse Status", func() {
-							// Get Heisenbridge IP
-							var heisenbridgeIP string
-							Eventually(func() bool {
-								err := k8sClient.Get(ctx, heisenbridgeLookupKey, createdHeisenbridgeService)
-								if err != nil {
-									return false
-								}
-								heisenbridgeIP = createdHeisenbridgeService.Spec.ClusterIP
-								return heisenbridgeIP != ""
-							}, timeout, interval).Should(BeTrue())
-
-							Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).To(Succeed())
-							Expect(synapse.Status.BridgesConfiguration.Heisenbridge.IP).To(Equal(heisenbridgeIP))
-						})
-
 						It("Should update the Synapse homeserver.yaml", func() {
 							Eventually(func(g Gomega) {
 								g.Expect(k8sClient.Get(ctx,
@@ -930,15 +890,13 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					When("The user provides an input ConfigMap", func() {
 						var inputHeisenbridgeConfigMap *corev1.ConfigMap
 						var inputHeisenbridgeConfigMapData map[string]string
-						var heisenbridgeIP string
 
 						const InputHeisenbridgeConfigMapName = "heisenbridge-input"
+						const heisenbridgeFQDN = SynapseName + "-heisenbridge." + SynapseNamespace + ".svc.cluster.local"
 
 						BeforeAll(func() {
 							initSynapseVariables()
 							initHeisenbridgeVariables()
-
-							heisenbridgeIP = ""
 
 							inputConfigmapData = map[string]string{
 								"homeserver.yaml": "server_name: " + ServerName + "\n" +
@@ -1009,21 +967,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							checkResourcePresence(createdHeisenbridgeService, heisenbridgeLookupKey, expectedOwnerReference)
 						})
 
-						It("Should update the Synapse Status with Heisenbridge configuration information", func() {
-							// Get Heisenbridge IP
-							Eventually(func() bool {
-								err := k8sClient.Get(ctx, heisenbridgeLookupKey, createdHeisenbridgeService)
-								if err != nil {
-									return false
-								}
-								heisenbridgeIP = createdHeisenbridgeService.Spec.ClusterIP
-								return heisenbridgeIP != ""
-							}, timeout, interval).Should(BeTrue())
-
-							Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).To(Succeed())
-							Expect(synapse.Status.BridgesConfiguration.Heisenbridge.IP).To(Equal(heisenbridgeIP))
-						})
-
 						It("Should add url value to the created Heisenbridge ConfigMap", func() {
 							Eventually(func(g Gomega) {
 								g.Expect(k8sClient.Get(ctx, heisenbridgeLookupKey, inputHeisenbridgeConfigMap)).Should(Succeed())
@@ -1037,7 +980,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 								_, ok = heisenbridge["url"]
 								g.Expect(ok).Should(BeTrue())
 
-								g.Expect(heisenbridge["url"]).To(Equal("http://" + heisenbridgeIP + ":" + strconv.Itoa(heisenbridgePort)))
+								g.Expect(heisenbridge["url"]).To(Equal("http://" + heisenbridgeFQDN + ":" + strconv.Itoa(heisenbridgePort)))
 							}, timeout, interval).Should(Succeed())
 						})
 					})
@@ -1166,22 +1109,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							checkResourcePresence(createdMautrixSignalService, mautrixSignalLookupKey, expectedOwnerReference)
 						})
 
-						It("Should add the mautrix-signal IP to the Synapse Status", func() {
-							// Get mautrix-signal IP
-							var mautrixSignalIP string
-							Eventually(func() bool {
-								err := k8sClient.Get(ctx, mautrixSignalLookupKey, createdMautrixSignalService)
-								if err != nil {
-									return false
-								}
-								mautrixSignalIP = createdMautrixSignalService.Spec.ClusterIP
-								return mautrixSignalIP != ""
-							}, timeout, interval).Should(BeTrue())
-
-							Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).To(Succeed())
-							Expect(synapse.Status.BridgesConfiguration.MautrixSignal.IP).To(Equal(mautrixSignalIP))
-						})
-
 						It("Should update the Synapse homeserver.yaml", func() {
 							Eventually(func(g Gomega) {
 								g.Expect(k8sClient.Get(ctx,
@@ -1206,15 +1133,14 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					When("The user provides an input ConfigMap", func() {
 						var inputMautrixSignalConfigMap *corev1.ConfigMap
 						var inputMautrixSignalConfigMapData map[string]string
-						var mautrixSignalIP string
 
 						const InputMautrixSignalConfigMapName = "mautrix-signal-input"
+						const mautrixSignalFQDN = SynapseName + "-mautrixsignal." + SynapseNamespace + ".svc.cluster.local"
+						const synapseFQDN = SynapseName + "." + SynapseNamespace + ".svc.cluster.local"
 
 						BeforeAll(func() {
 							initSynapseVariables()
 							initMautrixSignalVariables()
-
-							mautrixSignalIP = ""
 
 							inputConfigmapData = map[string]string{
 								"homeserver.yaml": "server_name: " + ServerName + "\n" +
@@ -1323,26 +1249,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							checkResourcePresence(createdMautrixSignalService, mautrixSignalLookupKey, expectedOwnerReference)
 						})
 
-						It("Should update the Synapse Status with mautrix-signal configuration information", func() {
-							// Get mautrix-signal IP
-							Eventually(func() bool {
-								err := k8sClient.Get(ctx, mautrixSignalLookupKey, createdMautrixSignalService)
-								if err != nil {
-									return false
-								}
-								mautrixSignalIP = createdMautrixSignalService.Spec.ClusterIP
-								return mautrixSignalIP != ""
-							}, timeout, interval).Should(BeTrue())
-
-							Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).To(Succeed())
-							Expect(synapse.Status.BridgesConfiguration.MautrixSignal.IP).To(Equal(mautrixSignalIP))
-						})
-
 						It("Should overwrite necessary values in the created mautrix-signal ConfigMap", func() {
 							Eventually(func(g Gomega) {
-								synapseIP := synapse.Status.IP
-								synapseServerName := synapse.Status.HomeserverConfiguration.ServerName
-
 								By("Verifying that the mautrixsignal ConfigMap exists")
 								g.Expect(k8sClient.Get(ctx, mautrixSignalLookupKey, inputMautrixSignalConfigMap)).Should(Succeed())
 
@@ -1355,13 +1263,13 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 								By("Verifying that the homeserver configuration has been updated")
 								configHomeserver, ok := config["homeserver"].(map[interface{}]interface{})
 								g.Expect(ok).Should(BeTrue())
-								g.Expect(configHomeserver["address"]).To(Equal("http://" + synapseIP + ":8008"))
-								g.Expect(configHomeserver["domain"]).To(Equal(synapseServerName))
+								g.Expect(configHomeserver["address"]).To(Equal("http://" + synapseFQDN + ":8008"))
+								g.Expect(configHomeserver["domain"]).To(Equal(ServerName))
 
 								By("Verifying that the appservice configuration has been updated")
 								configAppservice, ok := config["appservice"].(map[interface{}]interface{})
 								g.Expect(ok).Should(BeTrue())
-								g.Expect(configAppservice["address"]).To(Equal("http://" + mautrixSignalIP + ":" + strconv.Itoa(mautrixSignalPort)))
+								g.Expect(configAppservice["address"]).To(Equal("http://" + mautrixSignalFQDN + ":" + strconv.Itoa(mautrixSignalPort)))
 
 								By("Verifying that the signal configuration has been updated")
 								configSignal, ok := config["signal"].(map[interface{}]interface{})
@@ -1374,8 +1282,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 								configBridgePermissions, ok := configBridge["permissions"].(map[interface{}]interface{})
 								g.Expect(ok).Should(BeTrue())
 								g.Expect(configBridgePermissions).Should(HaveKeyWithValue("*", "relay"))
-								g.Expect(configBridgePermissions).Should(HaveKeyWithValue(synapseServerName, "user"))
-								g.Expect(configBridgePermissions).Should(HaveKeyWithValue("@admin:"+synapseServerName, "admin"))
+								g.Expect(configBridgePermissions).Should(HaveKeyWithValue(ServerName, "user"))
+								g.Expect(configBridgePermissions).Should(HaveKeyWithValue("@admin:"+ServerName, "admin"))
 
 								By("Verifying that the log configuration file path have been updated")
 								configLogging, ok := config["logging"].(map[interface{}]interface{})
