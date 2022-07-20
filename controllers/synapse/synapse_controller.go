@@ -538,17 +538,6 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 
-		// Create Deployment for mautrix-signal
-		if err := r.reconcileResource(
-			ctx,
-			r.deploymentForSignald,
-			&synapse,
-			&appsv1.Deployment{},
-			objectMetaSignald,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
 		// Update the Synapse ConfigMap to enable mautrix-signal
 		if err := r.updateConfigMap(
 			ctx,
