@@ -17,6 +17,8 @@ limitations under the License.
 package synapse
 
 import (
+	"context"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
 
 // labelsForSynapse returns the labels for selecting the resources
@@ -32,7 +35,26 @@ func labelsForHeisenbridge(name string) map[string]string {
 	return map[string]string{"app": "heisenbridge", "synapse_cr": name}
 }
 
-// deploymentForSynapse returns a synapse Deployment object
+// reconcileHeisenbridgeDeployment is a function of type subreconcilerFuncs, to
+// be called in the main reconciliation loop.
+//
+// It reconciles the Deployment for Heisenbridge to its desired state.
+func (r *SynapseReconciler) reconcileHeisenbridgeDeployment(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	objectMetaHeisenbridge := setObjectMeta(r.GetHeisenbridgeResourceName(*synapse), synapse.Namespace, map[string]string{})
+	if err := r.reconcileResource(
+		ctx,
+		r.deploymentForHeisenbridge,
+		synapse,
+		&appsv1.Deployment{},
+		objectMetaHeisenbridge,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
+}
+
+// deploymentForHeisenbridge returns a Heisenbridge Deployment object
 func (r *SynapseReconciler) deploymentForHeisenbridge(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	ls := labelsForHeisenbridge(s.Name)
 	replicas := int32(1)

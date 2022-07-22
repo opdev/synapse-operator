@@ -17,6 +17,8 @@ limitations under the License.
 package synapse
 
 import (
+	"context"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,12 +26,32 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
 
 // labelsForSynapse returns the labels for selecting the resources
 // belonging to the given synapse CR name.
 func labelsForSignald(name string) map[string]string {
 	return map[string]string{"app": "heisenbridge", "synapse_cr": name}
+}
+
+// reconcileSignaldDeployment is a function of type subreconcilerFuncs, to be
+// called in the main reconciliation loop.
+//
+// It reconciles the Deployment for signald to its desired state.
+func (r *SynapseReconciler) reconcileSignaldDeployment(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	objectMetaSignald := setObjectMeta(r.GetSignaldResourceName(*synapse), synapse.Namespace, map[string]string{})
+	if err := r.reconcileResource(
+		ctx,
+		r.deploymentForSignald,
+		synapse,
+		&appsv1.Deployment{},
+		objectMetaSignald,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
 }
 
 // deploymentForSynapse returns a synapse Deployment object
