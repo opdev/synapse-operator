@@ -17,6 +17,8 @@ limitations under the License.
 package synapse
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +26,26 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
+
+// reconcileSynapseServiceAccount is a function of type subreconcilerFuncs, to
+// be called in the main reconciliation loop.
+//
+// It reconciles the ServiceAccount for synapse to its desired state.
+func (r *SynapseReconciler) reconcileSynapseServiceAccount(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	objectMetaForSynapse := setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
+	if err := r.reconcileResource(
+		ctx,
+		r.serviceAccountForSynapse,
+		synapse,
+		&corev1.ServiceAccount{},
+		objectMetaForSynapse,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+	return reconc.ContinueReconciling()
+}
 
 // serviceAccountForSynapse returns a synapse ServiceAccount object
 func (r *SynapseReconciler) serviceAccountForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
@@ -38,6 +59,25 @@ func (r *SynapseReconciler) serviceAccountForSynapse(s *synapsev1alpha1.Synapse,
 		return &corev1.ServiceAccount{}, err
 	}
 	return sa, nil
+}
+
+// reconcileSynapseRoleBinding is a function of type subreconcilerFuncs, to be
+// called in the main reconciliation loop.
+//
+// It reconciles the RoleBinding for synapse to its desired state.
+func (r *SynapseReconciler) reconcileSynapseRoleBinding(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	objectMetaForSynapse := setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
+
+	if err := r.reconcileResource(
+		ctx,
+		r.roleBindingForSynapse,
+		synapse,
+		&rbacv1.RoleBinding{},
+		objectMetaForSynapse,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+	return reconc.ContinueReconciling()
 }
 
 // roleBindingForSynapse returns a synapse RoleBinding object

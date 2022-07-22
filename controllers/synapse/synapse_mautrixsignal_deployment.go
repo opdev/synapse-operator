@@ -17,6 +17,8 @@ limitations under the License.
 package synapse
 
 import (
+	"context"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,12 +26,32 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
 
 // labelsForMautrixSignal returns the labels for selecting the resources
 // belonging to the given synapse CR name.
 func labelsForMautrixSignal(name string) map[string]string {
 	return map[string]string{"app": "mautrix-signal", "synapse_cr": name}
+}
+
+// reconcileMautrixSignalDeployment is a function of type subreconcilerFuncs,
+// to be called in the main reconciliation loop.
+//
+// It reconciles the Deployment for mautrix-signal to its desired state.
+func (r *SynapseReconciler) reconcileMautrixSignalDeployment(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	objectMetaMautrixSignal := setObjectMeta(r.GetMautrixSignalResourceName(*synapse), synapse.Namespace, map[string]string{})
+	if err := r.reconcileResource(
+		ctx,
+		r.deploymentForMautrixSignal,
+		synapse,
+		&appsv1.Deployment{},
+		objectMetaMautrixSignal,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
 }
 
 // deploymentForMautrixSignal returns a Deployment object for the mautrix-signal bridge

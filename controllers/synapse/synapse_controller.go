@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
+	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -86,6 +86,13 @@ func (r *SynapseReconciler) GetHeisenbridgeServiceFQDN(synapse synapsev1alpha1.S
 func (r *SynapseReconciler) GetMautrixSignalServiceFQDN(synapse synapsev1alpha1.Synapse) string {
 	return strings.Join([]string{r.GetMautrixSignalResourceName(synapse), synapse.Namespace, "svc", "cluster", "local"}, ".")
 }
+
+// subreconcilerFuncs are functions that are called by Reconcile() functions
+// in an ordered fashion. Returning a ctrl.Result with a value of nil
+// indicates that the Reconcile() function should continue reconciling.
+// Any other returned ctrl.Result indicates to the Reconcile() function
+// that reconciliation should halt.
+type subreconcilerFuncs func(*synapsev1alpha1.Synapse, context.Context) (*ctrl.Result, error)
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -303,25 +310,18 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 		// Create Service for Heisenbridge
-		if err := r.reconcileResource(
-			ctx,
-			r.serviceForHeisenbridge,
-			&synapse,
-			&corev1.Service{},
-			objectMetaHeisenbridge,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
 
 		// Create Deployment for Heisenbridge
-		if err := r.reconcileResource(
-			ctx,
-			r.deploymentForHeisenbridge,
-			&synapse,
-			&appsv1.Deployment{},
-			objectMetaHeisenbridge,
-		); err != nil {
-			return ctrl.Result{}, err
+
+		subreconcilersForHeisenbridge := []subreconcilerFuncs{
+			r.reconcileHeisenbridgeService,
+			r.reconcileHeisenbridgeDeployment,
+		}
+
+		for _, f := range subreconcilersForHeisenbridge {
+			if r, err := f(&synapse, ctx); reconc.ShouldHaltOrRequeue(r, err) {
+				return reconc.Evaluate(r, err)
+			}
 		}
 
 		// Update the Synapse ConfigMap to enable Heisenbridge
@@ -342,7 +342,6 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// Resources associated to the mautrix-signal are append with "-mautrixsignal"
 		// In addition, a second deployment is needed to run signald. This is append with "-signald"
 		objectMetaMautrixSignal := setObjectMeta(r.GetMautrixSignalResourceName(synapse), synapse.Namespace, map[string]string{})
-		objectMetaSignald := setObjectMeta(r.GetSignaldResourceName(synapse), synapse.Namespace, map[string]string{})
 
 		// The ConfigMap for mautrix-signal, containing the config.yaml config
 		// file. It's either a copy of a user-provided ConfigMap, if defined in
@@ -423,81 +422,22 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 		}
 
-		// Create a PVC for signald
-		if err := r.reconcileResource(
-			ctx,
-			r.persistentVolumeClaimForSignald,
-			&synapse,
-			&corev1.PersistentVolumeClaim{},
-			objectMetaSignald,
-		); err != nil {
-			return ctrl.Result{}, err
+		// Reconcile signald resources: PVC and Deployment
+		// Reconcile mautrix-signal resources: Service, SA, RB, PVC and Deployment
+		subreconcilersForMautrixSignal := []subreconcilerFuncs{
+			r.reconcileSignaldPVC,
+			r.reconcileSignaldDeployment,
+			r.reconcileMautrixSignalService,
+			r.reconcileMautrixSignalServiceAccount,
+			r.reconcileMautrixSignalRoleBinding,
+			r.reconcileMautrixSignalPVC,
+			r.reconcileMautrixSignalDeployment,
 		}
 
-		// Create Deployment for signald
-		if err := r.reconcileResource(
-			ctx,
-			r.deploymentForSignald,
-			&synapse,
-			&appsv1.Deployment{},
-			objectMetaSignald,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Create the SA for mautrix-signal
-		if err := r.reconcileResource(
-			ctx,
-			r.serviceAccountForMautrixSignal,
-			&synapse,
-			&corev1.ServiceAccount{},
-			objectMetaMautrixSignal,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Create the RoleBinding for mautrix-signal
-		if err := r.reconcileResource(
-			ctx,
-			r.roleBindingForMautrixSignal,
-			&synapse,
-			&rbacv1.RoleBinding{},
-			objectMetaMautrixSignal,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Create a Service for mautrix-signal
-		if err := r.reconcileResource(
-			ctx,
-			r.serviceForMautrixSignal,
-			&synapse,
-			&corev1.Service{},
-			objectMetaMautrixSignal,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Create a PVC for mautrix-signal
-		if err := r.reconcileResource(
-			ctx,
-			r.persistentVolumeClaimForMautrixSignal,
-			&synapse,
-			&corev1.PersistentVolumeClaim{},
-			objectMetaMautrixSignal,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Create Deployment for mautrix-signal
-		if err := r.reconcileResource(
-			ctx,
-			r.deploymentForMautrixSignal,
-			&synapse,
-			&appsv1.Deployment{},
-			objectMetaMautrixSignal,
-		); err != nil {
-			return ctrl.Result{}, err
+		for _, f := range subreconcilersForMautrixSignal {
+			if r, err := f(&synapse, ctx); reconc.ShouldHaltOrRequeue(r, err) {
+				return reconc.Evaluate(r, err)
+			}
 		}
 
 		// Update the Synapse ConfigMap to enable mautrix-signal
@@ -512,57 +452,20 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	// Reconcile Synapse resources: PVC, Deployment and Service
-	if err := r.reconcileResource(
-		ctx,
-		r.serviceForSynapse,
-		&synapse,
-		&corev1.Service{},
-		objectMetaForSynapse,
-	); err != nil {
-		return ctrl.Result{}, err
+	// Reconcile Synapse resources: Service, SA, RB, PVC, Deployment
+	subreconcilersForSynapse := []subreconcilerFuncs{
+		r.reconcileSynapseService,
+		r.reconcileSynapseServiceAccount,
+		r.reconcileSynapseRoleBinding,
+		r.reconcileSynapsePVC,
+		r.reconcileSynapseDeployment,
 	}
 
-	if err := r.reconcileResource(
-		ctx,
-		r.serviceAccountForSynapse,
-		&synapse,
-		&corev1.ServiceAccount{},
-		objectMetaForSynapse,
-	); err != nil {
-		return ctrl.Result{}, err
+	for _, f := range subreconcilersForSynapse {
+		if r, err := f(&synapse, ctx); reconc.ShouldHaltOrRequeue(r, err) {
+			return reconc.Evaluate(r, err)
+		}
 	}
-
-	if err := r.reconcileResource(
-		ctx,
-		r.roleBindingForSynapse,
-		&synapse,
-		&rbacv1.RoleBinding{},
-		objectMetaForSynapse,
-	); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if err := r.reconcileResource(
-		ctx,
-		r.persistentVolumeClaimForSynapse,
-		&synapse,
-		&corev1.PersistentVolumeClaim{},
-		objectMetaForSynapse,
-	); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if err := r.reconcileResource(
-		ctx,
-		r.deploymentForSynapse,
-		&synapse,
-		&appsv1.Deployment{},
-		objectMetaForSynapse,
-	); err != nil {
-		return ctrl.Result{}, err
-	}
-	// TODO: If a deployment is found, check that its Spec are correct.
 
 	// Update the Synapse status if needed
 	if synapse.Status.State != "RUNNING" {
@@ -573,7 +476,8 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 	}
-	return ctrl.Result{}, nil
+
+	return reconc.Evaluate(reconc.DoNotRequeue())
 }
 
 // labelsForSynapse returns the labels for selecting the resources
