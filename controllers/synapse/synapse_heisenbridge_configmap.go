@@ -17,13 +17,39 @@ limitations under the License.
 package synapse
 
 import (
+	"context"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
+
+// reconcileHeisenbridgeConfigMap is a function of type subreconcilerFuncs, to
+// be called in the main reconciliation loop.
+//
+// It reconciles the heisenbridge ConfigMap to its desired state. It is called
+// only if the user hasn't provided its own ConfigMap for heisenbridge
+func (r *SynapseReconciler) reconcileHeisenbridgeConfigMap(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	objectMetaHeisenbridge := setObjectMeta(r.GetHeisenbridgeResourceName(*synapse), synapse.Namespace, map[string]string{})
+	if err := r.reconcileResource(
+		ctx,
+		r.configMapForHeisenbridge,
+		synapse,
+		&corev1.ConfigMap{},
+		objectMetaHeisenbridge,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
+}
 
 // configMapForSynapse returns a synapse ConfigMap object
 func (r *SynapseReconciler) configMapForHeisenbridge(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
@@ -55,6 +81,60 @@ namespaces:
 	return cm, nil
 }
 
+// copyInputHeisenbridgeConfigMap is a function of type subreconcilerFuncs, to
+// be called in the main reconciliation loop.
+//
+// It creates a copy of the user-provided ConfigMap for heisenbridge, defined
+// in synapse.Spec.Bridges.Heisenbridge.ConfigMap
+func (r *SynapseReconciler) copyInputHeisenbridgeConfigMap(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+
+	inputConfigMapName := synapse.Spec.Bridges.Heisenbridge.ConfigMap.Name
+	inputConfigMapNamespace := r.getConfigMapNamespace(
+		*synapse,
+		synapse.Spec.Bridges.Heisenbridge.ConfigMap.Namespace,
+	)
+	keyForConfigMap := types.NamespacedName{
+		Name:      inputConfigMapName,
+		Namespace: inputConfigMapNamespace,
+	}
+
+	// Get and check the input ConfigMap for Heisenbridge
+	if err := r.Get(ctx, keyForConfigMap, &corev1.ConfigMap{}); err != nil {
+		reason := "ConfigMap " + inputConfigMapName + " does not exist in namespace " + inputConfigMapNamespace
+		if err := r.setFailedState(ctx, synapse, reason); err != nil {
+			log.Error(err, "Error updating Synapse State")
+		}
+
+		log.Error(
+			err,
+			"Failed to get ConfigMap",
+			"ConfigMap.Namespace",
+			inputConfigMapNamespace,
+			"ConfigMap.Name",
+			inputConfigMapName,
+		)
+
+		return reconc.RequeueWithDelayAndError(time.Duration(30), err)
+	}
+
+	objectMetaHeisenbridge := setObjectMeta(r.GetHeisenbridgeResourceName(*synapse), synapse.Namespace, map[string]string{})
+
+	// Create a copy of the inputHeisenbridgeConfigMap defined in Spec.Bridges.Heisenbridge.ConfigMap
+	// Here we use the configMapForHeisenbridgeCopy function as createResourceFunc
+	if err := r.reconcileResource(
+		ctx,
+		r.configMapForHeisenbridgeCopy,
+		synapse,
+		&corev1.ConfigMap{},
+		objectMetaHeisenbridge,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
+}
+
 // configMapForHeisenbridgeCopy is a function of type createResourceFunc, to be
 // passed as an argument in a call to reconcileResouce.
 //
@@ -80,6 +160,40 @@ func (r *SynapseReconciler) configMapForHeisenbridgeCopy(
 	}
 
 	return copyConfigMap, nil
+}
+
+// configureHeisenbridgeConfigMap is a function of type subreconcilerFuncs, to
+// be called in the main reconciliation loop.
+//
+// Following the previous copy of the user-provided ConfigMap, it edits the
+// content of the copy to ensure that heisenbridge is correctly configured.
+func (r *SynapseReconciler) configureHeisenbridgeConfigMap(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	heisenbridgeConfigMap := &corev1.ConfigMap{}
+	keyForConfigMap := types.NamespacedName{
+		Name:      r.GetHeisenbridgeResourceName(*synapse),
+		Namespace: synapse.Namespace,
+	}
+
+	if err := r.Get(
+		ctx,
+		keyForConfigMap,
+		heisenbridgeConfigMap,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	// Configure correct URL in Heisenbridge ConfigMap
+	if err := r.updateConfigMap(
+		ctx,
+		heisenbridgeConfigMap,
+		*synapse,
+		r.updateHeisenbridgeWithURL,
+		"heisenbridge.yaml",
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
 }
 
 // updateHeisenbridgeWithURL is a function of type updateDataFunc function to
