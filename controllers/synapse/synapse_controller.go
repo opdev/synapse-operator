@@ -26,7 +26,6 @@ import (
 	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -73,6 +72,10 @@ func (r *SynapseReconciler) GetSignaldResourceName(synapse synapsev1alpha1.Synap
 
 func (r *SynapseReconciler) GetMautrixSignalResourceName(synapse synapsev1alpha1.Synapse) string {
 	return strings.Join([]string{synapse.Name, "mautrixsignal"}, "-")
+}
+
+func (r *SynapseReconciler) GetPostgresClusterResourceName(synapse synapsev1alpha1.Synapse) string {
+	return strings.Join([]string{synapse.Name, "pgsql"}, "-")
 }
 
 func (r *SynapseReconciler) GetSynapseServiceFQDN(synapse synapsev1alpha1.Synapse) string {
@@ -387,22 +390,41 @@ func (r *SynapseReconciler) createPostgresClusterForSynapse(
 	synapse synapsev1alpha1.Synapse,
 	cm corev1.ConfigMap,
 ) (ctrl.Result, error) {
-	var objectMeta metav1.ObjectMeta
 	createdPostgresCluster := pgov1beta1.PostgresCluster{}
+	postgresClusterObjectMeta := setObjectMeta(
+		r.GetPostgresClusterResourceName(synapse),
+		synapse.Namespace,
+		map[string]string{},
+	)
+	keyForPostgresCluster := types.NamespacedName{
+		Name:      r.GetPostgresClusterResourceName(synapse),
+		Namespace: synapse.Namespace,
+	}
 
 	// Create ConfigMap for PostgresCluster
-	objectMeta = setObjectMeta(synapse.Name+"-pgsql", synapse.Namespace, map[string]string{})
-	if err := r.reconcileResource(ctx, r.configMapForPostgresCluster, &synapse, &corev1.ConfigMap{}, objectMeta); err != nil {
+	if err := r.reconcileResource(
+		ctx,
+		r.configMapForPostgresCluster,
+		&synapse,
+		&corev1.ConfigMap{},
+		postgresClusterObjectMeta,
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Create PostgresCluster for Synapse
-	if err := r.reconcileResource(ctx, r.postgresClusterForSynapse, &synapse, &createdPostgresCluster, objectMeta); err != nil {
+	if err := r.reconcileResource(
+		ctx,
+		r.postgresClusterForSynapse,
+		&synapse,
+		&createdPostgresCluster,
+		postgresClusterObjectMeta,
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Wait for PostgresCluster to be up
-	if err := r.Get(ctx, types.NamespacedName{Name: createdPostgresCluster.Name, Namespace: createdPostgresCluster.Namespace}, &createdPostgresCluster); err != nil {
+	if err := r.Get(ctx, keyForPostgresCluster, &createdPostgresCluster); err != nil {
 		return ctrl.Result{}, err
 	}
 	if !r.isPostgresClusterReady(createdPostgresCluster) {
@@ -412,7 +434,7 @@ func (r *SynapseReconciler) createPostgresClusterForSynapse(
 	}
 
 	// Update Synapse Status with PostgreSQL DB information
-	if err := r.updateSynapseStatusWithPostgreSQLInfos(ctx, &synapse, createdPostgresCluster); err != nil {
+	if err := r.updateSynapseStatusWithPostgreSQLInfos(ctx, &synapse); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -468,19 +490,16 @@ func (r *SynapseReconciler) updateSynapseStatusDatabaseState(ctx context.Context
 func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(
 	ctx context.Context,
 	s *synapsev1alpha1.Synapse,
-	createdPostgresCluster pgov1beta1.PostgresCluster,
 ) error {
 	var postgresSecret corev1.Secret
 
+	keyForPostgresClusterSecret := types.NamespacedName{
+		Name:      r.GetPostgresClusterResourceName(*s) + "-pguser-synapse",
+		Namespace: s.Namespace,
+	}
+
 	// Get PostgreSQL secret related, containing information for the synapse user
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{
-			Name:      createdPostgresCluster.Name + "-pguser-synapse",
-			Namespace: createdPostgresCluster.Namespace,
-		},
-		&postgresSecret,
-	); err != nil {
+	if err := r.Get(ctx, keyForPostgresClusterSecret, &postgresSecret); err != nil {
 		return err
 	}
 
