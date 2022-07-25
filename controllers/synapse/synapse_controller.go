@@ -75,6 +75,18 @@ func (r *SynapseReconciler) GetMautrixSignalResourceName(synapse synapsev1alpha1
 	return strings.Join([]string{synapse.Name, "mautrixsignal"}, "-")
 }
 
+func (r *SynapseReconciler) GetSynapseServiceFQDN(synapse synapsev1alpha1.Synapse) string {
+	return strings.Join([]string{synapse.Name, synapse.Namespace, "svc", "cluster", "local"}, ".")
+}
+
+func (r *SynapseReconciler) GetHeisenbridgeServiceFQDN(synapse synapsev1alpha1.Synapse) string {
+	return strings.Join([]string{r.GetHeisenbridgeResourceName(synapse), synapse.Namespace, "svc", "cluster", "local"}, ".")
+}
+
+func (r *SynapseReconciler) GetMautrixSignalServiceFQDN(synapse synapsev1alpha1.Synapse) string {
+	return strings.Join([]string{r.GetMautrixSignalResourceName(synapse), synapse.Namespace, "svc", "cluster", "local"}, ".")
+}
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
@@ -205,59 +217,11 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	// We first need to create the Synapse Service as its IP address is potentially
-	// needed by the Bridges
-	synapseKey := types.NamespacedName{Name: synapse.Name, Namespace: synapse.Namespace}
-	createdService := &corev1.Service{}
-	if err := r.reconcileResource(
-		ctx,
-		r.serviceForSynapse,
-		&synapse,
-		createdService,
-		objectMetaForSynapse,
-	); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Fetch Synapse IP and update the resource status
-	synapseIP, err := r.getServiceIP(ctx, synapseKey, createdService)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	synapse.Status.IP = synapseIP
-	if err := r.updateSynapseStatus(ctx, &synapse); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	if synapse.Spec.Bridges.Heisenbridge.Enabled {
 		log.Info("Heisenbridge is enabled - deploying Heisenbridge")
 		// Heisenbridge is composed of a ConfigMap, a Service and a Deployment.
 		// Resources associated to the Heisenbridge are append with "-heisenbridge"
-		createdHeisenbridgeService := &corev1.Service{}
 		objectMetaHeisenbridge := setObjectMeta(r.GetHeisenbridgeResourceName(synapse), synapse.Namespace, map[string]string{})
-		heisenbridgeKey := types.NamespacedName{Name: r.GetHeisenbridgeResourceName(synapse), Namespace: synapse.Namespace}
-
-		// First create the service as we need its IP address for the
-		// heisenbridge.yaml configuration file
-		if err := r.reconcileResource(
-			ctx,
-			r.serviceForHeisenbridge,
-			&synapse,
-			createdHeisenbridgeService,
-			objectMetaHeisenbridge,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Get Service IP and update the Synapse status
-		heisenbridgeIP, err := r.getServiceIP(ctx, heisenbridgeKey, createdHeisenbridgeService)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		synapse.Status.BridgesConfiguration.Heisenbridge.IP = heisenbridgeIP
-		if err := r.updateSynapseStatus(ctx, &synapse); err != nil {
-			return ctrl.Result{}, err
-		}
 
 		// The ConfigMap for Heisenbridge, containing the heisenbridge.yaml
 		// config file. It's either a copy of a user-provided ConfigMap, if
@@ -338,6 +302,17 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 		}
 
+		// Create Service for Heisenbridge
+		if err := r.reconcileResource(
+			ctx,
+			r.serviceForHeisenbridge,
+			&synapse,
+			&corev1.Service{},
+			objectMetaHeisenbridge,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		// Create Deployment for Heisenbridge
 		if err := r.reconcileResource(
 			ctx,
@@ -366,32 +341,8 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// mautrix-signal is composed of a ConfigMap, a Service and 1 Deployment.
 		// Resources associated to the mautrix-signal are append with "-mautrixsignal"
 		// In addition, a second deployment is needed to run signald. This is append with "-signald"
-		createdMautrixSignalService := &corev1.Service{}
 		objectMetaMautrixSignal := setObjectMeta(r.GetMautrixSignalResourceName(synapse), synapse.Namespace, map[string]string{})
-		mautrixSignalKey := types.NamespacedName{Name: r.GetMautrixSignalResourceName(synapse), Namespace: synapse.Namespace}
 		objectMetaSignald := setObjectMeta(r.GetSignaldResourceName(synapse), synapse.Namespace, map[string]string{})
-
-		// First create the service as we need its IP address for the
-		// config.yaml configuration file
-		if err := r.reconcileResource(
-			ctx,
-			r.serviceForMautrixSignal,
-			&synapse,
-			createdMautrixSignalService,
-			objectMetaMautrixSignal,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Get Service IP and update the Synapse status
-		mautrixSignalIP, err := r.getServiceIP(ctx, mautrixSignalKey, createdMautrixSignalService)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		synapse.Status.BridgesConfiguration.MautrixSignal.IP = mautrixSignalIP
-		if err := r.updateSynapseStatus(ctx, &synapse); err != nil {
-			return ctrl.Result{}, err
-		}
 
 		// The ConfigMap for mautrix-signal, containing the config.yaml config
 		// file. It's either a copy of a user-provided ConfigMap, if defined in
@@ -516,6 +467,17 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 
+		// Create a Service for mautrix-signal
+		if err := r.reconcileResource(
+			ctx,
+			r.serviceForMautrixSignal,
+			&synapse,
+			&corev1.Service{},
+			objectMetaMautrixSignal,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		// Create a PVC for mautrix-signal
 		if err := r.reconcileResource(
 			ctx,
@@ -551,6 +513,16 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Reconcile Synapse resources: PVC, Deployment and Service
+	if err := r.reconcileResource(
+		ctx,
+		r.serviceForSynapse,
+		&synapse,
+		&corev1.Service{},
+		objectMetaForSynapse,
+	); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if err := r.reconcileResource(
 		ctx,
 		r.serviceAccountForSynapse,
@@ -815,24 +787,6 @@ func (r *SynapseReconciler) updateSynapseStatusDatabase(
 	s.Status.DatabaseConnectionInfo.State = "READY"
 
 	return nil
-}
-
-func (r *SynapseReconciler) getServiceIP(
-	ctx context.Context,
-	synapseKey types.NamespacedName,
-	service *corev1.Service,
-) (string, error) {
-	if err := r.Get(ctx, synapseKey, service); err != nil {
-		return "", err
-	}
-
-	serviceIP := service.Spec.ClusterIP
-	if serviceIP == "" {
-		err := errors.New("service IP not set")
-		return "", err
-	}
-
-	return serviceIP, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

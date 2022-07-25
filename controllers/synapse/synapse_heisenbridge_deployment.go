@@ -108,7 +108,7 @@ func (r *SynapseReconciler) craftHeisenbridgeCommad(s synapsev1alpha1.Synapse) [
 		"/data-heisenbridge/heisenbridge.yaml",
 		"-l",
 		"0.0.0.0",
-		"http://"+s.Status.IP+":8008",
+		"http://"+r.GetSynapseServiceFQDN(s)+":8008",
 	)
 
 	return command

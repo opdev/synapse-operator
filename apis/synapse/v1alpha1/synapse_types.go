@@ -160,41 +160,17 @@ type SynapseStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Configuration of deployed bridges
-	BridgesConfiguration SynapseStatusBridgesConfiguration `json:"bridgesConfiguration,omitempty"`
-
 	// Connection information to the external PostgreSQL Database
 	DatabaseConnectionInfo SynapseStatusDatabaseConnectionInfo `json:"databaseConnectionInfo,omitempty"`
 
 	// Holds configuration information for Synapse
 	HomeserverConfiguration SynapseStatusHomeserverConfiguration `json:"homeserverConfiguration,omitempty"`
 
-	// Synapse IP address (corresponding to the Synapse Service IP address)
-	IP string `json:"ip,omitempty"`
-
 	// State of the Synapse instance
 	State string `json:"state,omitempty"`
 
 	// Reason for the current Synapse State
 	Reason string `json:"reason,omitempty"`
-}
-
-type SynapseStatusBridgesConfiguration struct {
-	// Status of the Heisenbridge
-	Heisenbridge SynapseStatusHeisenbridge `json:"heisenbridge,omitempty"`
-
-	// Status of the mautrix-signal bridge
-	MautrixSignal SynapseStatusMautrixSignal `json:"mautrixSignal,omitempty"`
-}
-
-type SynapseStatusHeisenbridge struct {
-	// IP at which the Heisenbridge is available
-	IP string `json:"ip,omitempty"`
-}
-
-type SynapseStatusMautrixSignal struct {
-	// IP at which the mautrix-signal bridge is available
-	IP string `json:"ip,omitempty"`
 }
 
 type SynapseStatusDatabaseConnectionInfo struct {
