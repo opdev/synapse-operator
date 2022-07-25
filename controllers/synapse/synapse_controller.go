@@ -21,7 +21,6 @@ import (
 	"errors"
 	"reflect"
 	"strings"
-	"time"
 
 	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 	appsv1 "k8s.io/api/apps/v1"
@@ -176,23 +175,25 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				log.Error(err, "Error updating Synapse State")
 			}
 
-			err := errors.New("cannot create PostgreSQL instance for synapse. Potsres-operator is not installed")
-			log.Error(err, "Cannot create PostgreSQL instance for synapse. Potsres-operator is not installed.")
+			err := errors.New("cannot create PostgreSQL instance for synapse. Potsgres-operator is not installed")
+			log.Error(err, "Cannot create PostgreSQL instance for synapse. Potsgres-operator is not installed.")
 			return ctrl.Result{}, nil
 		}
 
-		// This will be moved to the PostgreSQL subreconciler in a later commit
-		var synapseConfigMap = &corev1.ConfigMap{}
-		if err := r.Get(
-			ctx,
-			types.NamespacedName{Name: synapse.Name, Namespace: synapse.Namespace},
-			synapseConfigMap,
-		); err != nil {
-			return ctrl.Result{}, err
+		// Reconcile the PostgresCluster CR and ConfigMap.
+		// Also update the Synapse Status and ConfigMap with database
+		// connection information.
+		subreconcilersForPostgresCluster := []subreconcilerFuncs{
+			r.reconcilePostgresClusterConfigMap,
+			r.reconcilePostgresClusterCR,
+			r.updateSynapseStatusWithPostgreSQLInfos,
+			r.updateSynapseConfigMapForPostgresCluster,
 		}
 
-		if result, err := r.createPostgresClusterForSynapse(ctx, synapse, *synapseConfigMap); err != nil {
-			return result, err
+		for _, f := range subreconcilersForPostgresCluster {
+			if r, err := f(&synapse, ctx); reconc.ShouldHaltOrRequeue(r, err) {
+				return reconc.Evaluate(r, err)
+			}
 		}
 	}
 
@@ -385,129 +386,40 @@ func (r *SynapseReconciler) isPostgresOperatorInstalled(ctx context.Context) boo
 	return err == nil
 }
 
-func (r *SynapseReconciler) createPostgresClusterForSynapse(
-	ctx context.Context,
-	synapse synapsev1alpha1.Synapse,
-	cm corev1.ConfigMap,
-) (ctrl.Result, error) {
-	createdPostgresCluster := pgov1beta1.PostgresCluster{}
-	postgresClusterObjectMeta := setObjectMeta(
-		r.GetPostgresClusterResourceName(synapse),
-		synapse.Namespace,
-		map[string]string{},
-	)
-	keyForPostgresCluster := types.NamespacedName{
-		Name:      r.GetPostgresClusterResourceName(synapse),
-		Namespace: synapse.Namespace,
-	}
-
-	// Create ConfigMap for PostgresCluster
-	if err := r.reconcileResource(
-		ctx,
-		r.configMapForPostgresCluster,
-		&synapse,
-		&corev1.ConfigMap{},
-		postgresClusterObjectMeta,
-	); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Create PostgresCluster for Synapse
-	if err := r.reconcileResource(
-		ctx,
-		r.postgresClusterForSynapse,
-		&synapse,
-		&createdPostgresCluster,
-		postgresClusterObjectMeta,
-	); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Wait for PostgresCluster to be up
-	if err := r.Get(ctx, keyForPostgresCluster, &createdPostgresCluster); err != nil {
-		return ctrl.Result{}, err
-	}
-	if !r.isPostgresClusterReady(createdPostgresCluster) {
-		r.updateSynapseStatusDatabaseState(ctx, &synapse, "NOT READY")
-		err := errors.New("postgreSQL Database not ready yet")
-		return ctrl.Result{RequeueAfter: time.Duration(5)}, err
-	}
-
-	// Update Synapse Status with PostgreSQL DB information
-	if err := r.updateSynapseStatusWithPostgreSQLInfos(ctx, &synapse); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Update configMap data with PostgreSQL DB information
-	if err := r.updateConfigMap(
-		ctx,
-		&cm,
-		synapse,
-		r.updateHomeserverWithPostgreSQLInfos,
-		"homeserver.yaml",
-	); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{}, nil
-}
-
-func (r *SynapseReconciler) isPostgresClusterReady(p pgov1beta1.PostgresCluster) bool {
-	var status_found bool
-
-	// Going through instance Specs
-	for _, instance_spec := range p.Spec.InstanceSets {
-		status_found = false
-		for _, instance_status := range p.Status.InstanceSets {
-			if instance_status.Name == instance_spec.Name {
-				desired_replicas := *instance_spec.Replicas
-				if instance_status.Replicas != desired_replicas ||
-					instance_status.ReadyReplicas != desired_replicas ||
-					instance_status.UpdatedReplicas != desired_replicas {
-					return false
-				}
-				// Found instance in Status, breaking out of for loop
-				status_found = true
-				break
-			}
-		}
-
-		// Instance found in spec, but not in status
-		if !status_found {
-			return false
-		}
-	}
-
-	// All instances have the correct number of replicas
-	return true
-}
-
 func (r *SynapseReconciler) updateSynapseStatusDatabaseState(ctx context.Context, synapse *synapsev1alpha1.Synapse, state string) error {
 	synapse.Status.DatabaseConnectionInfo.State = state
 	return r.updateSynapseStatus(ctx, synapse)
 }
 
-func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(
-	ctx context.Context,
-	s *synapsev1alpha1.Synapse,
-) error {
+// updateSynapseStatusWithPostgreSQLInfos is a function of type
+// subreconcilerFuncs, to be called in the main reconciliation loop.
+//
+// It parses the PostgresCluster Secret and updates the Synapse status with the
+// database connection information.
+func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
 	var postgresSecret corev1.Secret
 
 	keyForPostgresClusterSecret := types.NamespacedName{
-		Name:      r.GetPostgresClusterResourceName(*s) + "-pguser-synapse",
-		Namespace: s.Namespace,
+		Name:      r.GetPostgresClusterResourceName(*synapse) + "-pguser-synapse",
+		Namespace: synapse.Namespace,
 	}
 
-	// Get PostgreSQL secret related, containing information for the synapse user
+	// Get PostgresCluster Secret containing information for the synapse user
 	if err := r.Get(ctx, keyForPostgresClusterSecret, &postgresSecret); err != nil {
-		return err
+		return reconc.RequeueWithError(err)
 	}
 
-	if err := r.updateSynapseStatusDatabase(s, postgresSecret); err != nil {
-		return err
+	// Locally updates the Synapse Status
+	if err := r.updateSynapseStatusDatabase(synapse, postgresSecret); err != nil {
+		return reconc.RequeueWithError(err)
 	}
 
-	return r.updateSynapseStatus(ctx, s)
+	// Actually sends an API request to update the Status
+	if err := r.updateSynapseStatus(ctx, synapse); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
 }
 
 func (r *SynapseReconciler) updateSynapseStatusDatabase(

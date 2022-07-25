@@ -2853,6 +2853,36 @@ func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synaps
 	return nil
 }
 
+// updateSynapseConfigMapForPostgresCluster is a function of type
+// subreconcilerFuncs, to be called in the main reconciliation loop.
+//
+// It configures the 'database' section of homeserver.yaml to allow Synapse to
+// connect to the newly created PostgresCluster instance.
+func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	synapseConfigMap := &corev1.ConfigMap{}
+	keyForSynapse := types.NamespacedName{
+		Name:      synapse.Name,
+		Namespace: synapse.Namespace,
+	}
+
+	// Get the latest version of the synapse ConfigMap to update
+	if err := r.Get(ctx, keyForSynapse, synapseConfigMap); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	if err := r.updateConfigMap(
+		ctx,
+		synapseConfigMap,
+		*synapse,
+		r.updateHomeserverWithPostgreSQLInfos,
+		"homeserver.yaml",
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
+}
+
 func (r *SynapseReconciler) updateHomeserverWithPostgreSQLInfos(
 	s synapsev1alpha1.Synapse,
 	homeserver map[string]interface{},

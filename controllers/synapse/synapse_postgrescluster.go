@@ -17,19 +17,65 @@ limitations under the License.
 package synapse
 
 import (
+	"context"
 	b64 "encoding/base64"
+	"errors"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	pgov1beta1 "github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
 
-// postgresClusterForSynapse returns a synapse Deployment object
+// reconcilePostgresClusterCR is a function of type subreconcilerFuncs, to be
+// called in the main reconciliation loop.
+//
+// It reconciles the PostgresCluster CR to its desired state, and requeues
+// until the PostgreSQL cluster is up.
+func (r *SynapseReconciler) reconcilePostgresClusterCR(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	createdPostgresCluster := pgov1beta1.PostgresCluster{}
+	postgresClusterObjectMeta := setObjectMeta(
+		r.GetPostgresClusterResourceName(*synapse),
+		synapse.Namespace,
+		map[string]string{},
+	)
+	keyForPostgresCluster := types.NamespacedName{
+		Name:      r.GetPostgresClusterResourceName(*synapse),
+		Namespace: synapse.Namespace,
+	}
+
+	// Create PostgresCluster for Synapse
+	if err := r.reconcileResource(
+		ctx,
+		r.postgresClusterForSynapse,
+		synapse,
+		&createdPostgresCluster,
+		postgresClusterObjectMeta,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	// Wait for PostgresCluster to be up
+	if err := r.Get(ctx, keyForPostgresCluster, &createdPostgresCluster); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+	if !r.isPostgresClusterReady(createdPostgresCluster) {
+		r.updateSynapseStatusDatabaseState(ctx, synapse, "NOT READY")
+		err := errors.New("postgreSQL Database not ready yet")
+		return reconc.RequeueWithDelayAndError(time.Duration(5), err)
+	}
+
+	return reconc.ContinueReconciling()
+}
+
+// postgresClusterForSynapse returns a PostgresCluster object
 func (r *SynapseReconciler) postgresClusterForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	postgresCluster := &pgov1beta1.PostgresCluster{
 		ObjectMeta: objectMeta,
@@ -84,6 +130,62 @@ func (r *SynapseReconciler) postgresClusterForSynapse(s *synapsev1alpha1.Synapse
 	return postgresCluster, nil
 }
 
+func (r *SynapseReconciler) isPostgresClusterReady(p pgov1beta1.PostgresCluster) bool {
+	var status_found bool
+
+	// Going through instance Specs
+	for _, instance_spec := range p.Spec.InstanceSets {
+		status_found = false
+		for _, instance_status := range p.Status.InstanceSets {
+			if instance_status.Name == instance_spec.Name {
+				desired_replicas := *instance_spec.Replicas
+				if instance_status.Replicas != desired_replicas ||
+					instance_status.ReadyReplicas != desired_replicas ||
+					instance_status.UpdatedReplicas != desired_replicas {
+					return false
+				}
+				// Found instance in Status, breaking out of for loop
+				status_found = true
+				break
+			}
+		}
+
+		// Instance found in spec, but not in status
+		if !status_found {
+			return false
+		}
+	}
+
+	// All instances have the correct number of replicas
+	return true
+}
+
+// reconcilePostgresClusterConfigMap is a function of type subreconcilerFuncs,
+// to be called in the main reconciliation loop.
+//
+// It reconciles the PostgresCluster ConfigMap to its desired state.
+func (r *SynapseReconciler) reconcilePostgresClusterConfigMap(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	postgresClusterObjectMeta := setObjectMeta(
+		r.GetPostgresClusterResourceName(*synapse),
+		synapse.Namespace,
+		map[string]string{},
+	)
+
+	// Create ConfigMap for PostgresCluster
+	if err := r.reconcileResource(
+		ctx,
+		r.configMapForPostgresCluster,
+		synapse,
+		&corev1.ConfigMap{},
+		postgresClusterObjectMeta,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
+}
+
+// configMapForPostgresCluster returns a ConfigMap object
 func (r *SynapseReconciler) configMapForPostgresCluster(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: objectMeta,
