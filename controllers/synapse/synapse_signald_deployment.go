@@ -26,10 +26,10 @@ import (
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 )
 
-// labelsForSynapse returns the labels for selecting the resources
+// labelsForSignald returns the labels for selecting the resources
 // belonging to the given synapse CR name.
 func labelsForSignald(name string) map[string]string {
-	return map[string]string{"app": "heisenbridge", "synapse_cr": name}
+	return map[string]string{"app": "signald", "synapse_cr": name}
 }
 
 // deploymentForSynapse returns a synapse Deployment object
