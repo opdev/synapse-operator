@@ -31,7 +31,13 @@ func Requeue() (*reconcile.Result, error) { return &ctrl.Result{Requeue: true}, 
 // RequeueWithDelay returns a controller result pairing specifying to
 // requeue after a delay. This returns no error.
 func RequeueWithDelay(dur time.Duration) (*reconcile.Result, error) {
-	return &ctrl.Result{Requeue: true, RequeueAfter: dur}, nil
+	return RequeueWithDelayAndError(dur, nil)
+}
+
+// RequeueWithDelayAndError returns a controller result pairing specifying to
+// requeue after a delay with an error message
+func RequeueWithDelayAndError(dur time.Duration, e error) (*reconcile.Result, error) {
+	return &ctrl.Result{Requeue: true, RequeueAfter: dur}, e
 }
 
 // ShouldRequeue returns true if the reconciler result indicates
