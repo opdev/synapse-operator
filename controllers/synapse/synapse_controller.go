@@ -314,21 +314,12 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.reconcileSynapseRoleBinding,
 		r.reconcileSynapsePVC,
 		r.reconcileSynapseDeployment,
+		r.setSynapseStatusAsRunning,
 	)
 
 	for _, f := range subreconcilersForSynapse {
 		if r, err := f(&synapse, ctx); reconc.ShouldHaltOrRequeue(r, err) {
 			return reconc.Evaluate(r, err)
-		}
-	}
-
-	// Update the Synapse status if needed
-	if synapse.Status.State != "RUNNING" {
-		synapse.Status.State = "RUNNING"
-		synapse.Status.Reason = ""
-		if err := r.Status().Update(ctx, &synapse); err != nil {
-			log.Error(err, "Failed to update Synapse status")
-			return ctrl.Result{}, err
 		}
 	}
 
@@ -473,6 +464,26 @@ func (r *SynapseReconciler) updateSynapseStatusDatabase(
 	s.Status.DatabaseConnectionInfo.State = "READY"
 
 	return nil
+}
+
+// setSynapseStatusAsRunning is a function of type subreconcilerFuncs, to be
+// called in the main reconciliation loop.
+//
+// It set the Synapse Status 'State' field to 'RUNNING'.
+func (r *SynapseReconciler) setSynapseStatusAsRunning(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+
+	// Update the Synapse status if needed
+	if synapse.Status.State != "RUNNING" {
+		synapse.Status.State = "RUNNING"
+		synapse.Status.Reason = ""
+		if err := r.Status().Update(ctx, synapse); err != nil {
+			log.Error(err, "Failed to update Synapse status")
+			return reconc.RequeueWithError(err)
+		}
+	}
+
+	return reconc.ContinueReconciling()
 }
 
 // SetupWithManager sets up the controller with the Manager.
