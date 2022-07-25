@@ -226,97 +226,37 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if synapse.Spec.Bridges.Heisenbridge.Enabled {
 		log.Info("Heisenbridge is enabled - deploying Heisenbridge")
-		// Heisenbridge is composed of a ConfigMap, a Service and a Deployment.
-		// Resources associated to the Heisenbridge are append with "-heisenbridge"
-		objectMetaHeisenbridge := setObjectMeta(r.GetHeisenbridgeResourceName(synapse), synapse.Namespace, map[string]string{})
 
-		// The ConfigMap for Heisenbridge, containing the heisenbridge.yaml
-		// config file. It's either a copy of a user-provided ConfigMap, if
-		// defined in Spec.Bridges.Heisenbridge.ConfigMap, or a new ConfigMap
-		// containing a default heisenbridge.yaml.
-		createdHeisenbridgeConfigMap := &corev1.ConfigMap{}
+		// The list of subreconcilers for Heisenbridge will be built next.
+		// Heisenbridge is composed of a ConfigMap, a Service and a Deployment.
+		var subreconcilersForHeisenbridge []subreconcilerFuncs
 
 		// The user may specify a ConfigMap, containing the heisenbridge.yaml
 		// config file, under Spec.Bridges.Heisenbridge.ConfigMap
-		inputConfigMapName := synapse.Spec.Bridges.Heisenbridge.ConfigMap.Name
-		setConfigMapNamespace := synapse.Spec.Bridges.Heisenbridge.ConfigMap.Namespace
-		inputConfigMapNamespace := r.getConfigMapNamespace(synapse, setConfigMapNamespace)
-		if inputConfigMapName != "" {
+		if synapse.Spec.Bridges.Heisenbridge.ConfigMap.Name != "" {
 			// If the user provided a custom Heisenbridge configuration via a
 			// ConfigMap, we need to validate that the ConfigMap exists, and
-			// create a copy in createdHeisenbridgeConfigMap
-
-			// Get and check the input ConfigMap for Heisenbridge
-			var inputHeisenbridgeConfigMap = &corev1.ConfigMap{}
-			keyForConfigMap := types.NamespacedName{
-				Name:      inputConfigMapName,
-				Namespace: inputConfigMapNamespace,
-			}
-
-			if err := r.Get(ctx, keyForConfigMap, inputHeisenbridgeConfigMap); err != nil {
-				reason := "ConfigMap " + inputConfigMapName + " does not exist in namespace " + inputConfigMapNamespace
-				if err := r.setFailedState(ctx, &synapse, reason); err != nil {
-					log.Error(err, "Error updating Synapse State")
-				}
-
-				log.Error(
-					err,
-					"Failed to get ConfigMap",
-					"ConfigMap.Namespace",
-					inputConfigMapNamespace,
-					"ConfigMap.Name",
-					inputConfigMapName,
-				)
-				return ctrl.Result{RequeueAfter: time.Duration(30)}, err
-			}
-
-			// Create a copy of the inputHeisenbridgeConfigMap defined in Spec.Bridges.Heisenbridge.ConfigMap
-			// Here we use the configMapForHeisenbridgeCopy function as createResourceFunc
-			if err := r.reconcileResource(
-				ctx,
-				r.configMapForHeisenbridgeCopy,
-				&synapse,
-				createdHeisenbridgeConfigMap,
-				objectMetaHeisenbridge,
-			); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			// Configure correct URL in Heisenbridge ConfigMap
-			if err := r.updateConfigMap(
-				ctx,
-				createdHeisenbridgeConfigMap,
-				synapse,
-				r.updateHeisenbridgeWithURL,
-				"heisenbridge.yaml",
-			); err != nil {
-				return ctrl.Result{}, err
+			// create a copy. We also need to edit the heisenbridge
+			// configuration.
+			subreconcilersForHeisenbridge = []subreconcilerFuncs{
+				r.copyInputHeisenbridgeConfigMap,
+				r.configureHeisenbridgeConfigMap,
 			}
 		} else {
 			// If the user hasn't provided a ConfigMap with a custom
-			// config.yaml, we create a new ConfigMap with a default
-			// config.yaml.
-
-			// Here we use configMapForHeisenbridge as createResourceFunc
-			if err := r.reconcileResource(
-				ctx,
-				r.configMapForHeisenbridge,
-				&synapse,
-				&corev1.ConfigMap{},
-				objectMetaHeisenbridge,
-			); err != nil {
-				return ctrl.Result{}, err
+			// heisenbridge.yaml, we create a new ConfigMap with a default
+			// heisenbridge.yaml.
+			subreconcilersForHeisenbridge = []subreconcilerFuncs{
+				r.reconcileHeisenbridgeConfigMap,
 			}
 		}
 
-		// Create Service for Heisenbridge
-
-		// Create Deployment for Heisenbridge
-
-		subreconcilersForHeisenbridge := []subreconcilerFuncs{
+		// Reconcile Heisenbridge resources: Service and Deployment
+		subreconcilersForHeisenbridge = append(
+			subreconcilersForHeisenbridge,
 			r.reconcileHeisenbridgeService,
 			r.reconcileHeisenbridgeDeployment,
-		}
+		)
 
 		for _, f := range subreconcilersForHeisenbridge {
 			if r, err := f(&synapse, ctx); reconc.ShouldHaltOrRequeue(r, err) {
@@ -338,93 +278,38 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if synapse.Spec.Bridges.MautrixSignal.Enabled {
 		log.Info("mautrix-signal is enabled - deploying mautrix-signal")
-		// mautrix-signal is composed of a ConfigMap, a Service and 1 Deployment.
-		// Resources associated to the mautrix-signal are append with "-mautrixsignal"
-		// In addition, a second deployment is needed to run signald. This is append with "-signald"
-		objectMetaMautrixSignal := setObjectMeta(r.GetMautrixSignalResourceName(synapse), synapse.Namespace, map[string]string{})
 
-		// The ConfigMap for mautrix-signal, containing the config.yaml config
-		// file. It's either a copy of a user-provided ConfigMap, if defined in
-		// Spec.Bridges.MautrixSignal.ConfigMap, or a new ConfigMap containing
-		// a default config.yaml.
-		createdMautrixSignalConfigMap := &corev1.ConfigMap{}
+		// The list of subreconcilers for mautrix-signal will be built next.
+		// mautrix-signal is composed of a ConfigMap, a Service, a SA, a RB,
+		// a PVC and a Deployment.
+		// In addition, a Deployment and a PVC are needed for signald.
+		var subreconcilersForMautrixSignal []subreconcilerFuncs
 
 		// The user may specify a ConfigMap, containing the config.yaml config
 		// file, under Spec.Bridges.MautrixSignal.ConfigMap
-		inputConfigMapName := synapse.Spec.Bridges.MautrixSignal.ConfigMap.Name
-		setConfigMapNamespace := synapse.Spec.Bridges.MautrixSignal.ConfigMap.Namespace
-		inputConfigMapNamespace := r.getConfigMapNamespace(synapse, setConfigMapNamespace)
-		if inputConfigMapName != "" {
+		if synapse.Spec.Bridges.MautrixSignal.ConfigMap.Name != "" {
 			// If the user provided a custom mautrix-signal configuration via a
 			// ConfigMap, we need to validate that the ConfigMap exists, and
-			// create a copy in createdMautrixSignalConfigMap
-
-			// Get and check the input ConfigMap for mautrix-signal
-			var inputMautrixSignalConfigMap = &corev1.ConfigMap{}
-			keyForConfigMap := types.NamespacedName{
-				Name:      inputConfigMapName,
-				Namespace: inputConfigMapNamespace,
+			// create a copy. We also need to edit the mautrix-signal
+			// configuration.
+			subreconcilersForMautrixSignal = []subreconcilerFuncs{
+				r.copyInputMautrixSignalConfigMap,
+				r.configureMautrixSignalConfigMap,
 			}
 
-			if err := r.Get(ctx, keyForConfigMap, inputMautrixSignalConfigMap); err != nil {
-				reason := "ConfigMap " + inputConfigMapName + " does not exist in namespace " + inputConfigMapNamespace
-				if err := r.setFailedState(ctx, &synapse, reason); err != nil {
-					log.Error(err, "Error updating Synapse State")
-				}
-
-				log.Error(
-					err,
-					"Failed to get ConfigMap",
-					"ConfigMap.Namespace",
-					inputConfigMapNamespace,
-					"ConfigMap.Name",
-					inputConfigMapName,
-				)
-				return ctrl.Result{RequeueAfter: time.Duration(30)}, err
-			}
-
-			// Create a copy of the inputMautrixSignalConfigMap defined in Spec.Bridges.MautrixSignal.ConfigMap
-			// Here we use the createdMautrixSignalConfigMap function as createResourceFunc
-			if err := r.reconcileResource(
-				ctx,
-				r.configMapForMautrixSignalCopy,
-				&synapse,
-				createdMautrixSignalConfigMap,
-				objectMetaMautrixSignal,
-			); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			// Correct data in mautrix-signal ConfigMap
-			if err := r.updateConfigMap(
-				ctx,
-				createdMautrixSignalConfigMap,
-				synapse,
-				r.updateMautrixSignalData,
-				"config.yaml",
-			); err != nil {
-				return ctrl.Result{}, err
-			}
 		} else {
 			// If the user hasn't provided a ConfigMap with a custom
 			// config.yaml, we create a new ConfigMap with a default
 			// config.yaml.
-
-			// Here we use configMapForMautrixSignal as createResourceFunc
-			if err := r.reconcileResource(
-				ctx,
-				r.configMapForMautrixSignal,
-				&synapse,
-				&corev1.ConfigMap{},
-				objectMetaMautrixSignal,
-			); err != nil {
-				return ctrl.Result{}, err
+			subreconcilersForMautrixSignal = []subreconcilerFuncs{
+				r.reconcileMautrixSignalConfigMap,
 			}
 		}
 
 		// Reconcile signald resources: PVC and Deployment
 		// Reconcile mautrix-signal resources: Service, SA, RB, PVC and Deployment
-		subreconcilersForMautrixSignal := []subreconcilerFuncs{
+		subreconcilersForMautrixSignal = append(
+			subreconcilersForMautrixSignal,
 			r.reconcileSignaldPVC,
 			r.reconcileSignaldDeployment,
 			r.reconcileMautrixSignalService,
@@ -432,7 +317,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.reconcileMautrixSignalRoleBinding,
 			r.reconcileMautrixSignalPVC,
 			r.reconcileMautrixSignalDeployment,
-		}
+		)
 
 		for _, f := range subreconcilersForMautrixSignal {
 			if r, err := f(&synapse, ctx); reconc.ShouldHaltOrRequeue(r, err) {
