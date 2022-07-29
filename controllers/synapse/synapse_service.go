@@ -17,6 +17,8 @@ limitations under the License.
 package synapse
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -24,7 +26,26 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
+
+// reconcileSynapseService is a function of type subreconcilerFuncs, to be
+// called in the main reconciliation loop.
+//
+// It reconciles the Service for synapse to its desired state.
+func (r *SynapseReconciler) reconcileSynapseService(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	objectMetaForSynapse := setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
+	if err := r.reconcileResource(
+		ctx,
+		r.serviceForSynapse,
+		synapse,
+		&corev1.Service{},
+		objectMetaForSynapse,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+	return reconc.ContinueReconciling()
+}
 
 // serviceForSynapse returns a synapse Service object
 func (r *SynapseReconciler) serviceForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {

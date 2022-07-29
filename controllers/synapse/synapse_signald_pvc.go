@@ -17,6 +17,8 @@ limitations under the License.
 package synapse
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +26,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
+
+// reconcileSignaldPVC is a function of type subreconcilerFuncs, to be called
+// in the main reconciliation loop.
+//
+// It reconciles the PVC for signald to its desired state.
+func (r *SynapseReconciler) reconcileSignaldPVC(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	objectMetaSignald := setObjectMeta(r.GetSignaldResourceName(*synapse), synapse.Namespace, map[string]string{})
+	if err := r.reconcileResource(
+		ctx,
+		r.persistentVolumeClaimForSignald,
+		synapse,
+		&corev1.PersistentVolumeClaim{},
+		objectMetaSignald,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
+}
 
 // persistentVolumeClaimForSynapse returns a synapse PVC object
 func (r *SynapseReconciler) persistentVolumeClaimForSignald(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {

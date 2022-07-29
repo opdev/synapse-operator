@@ -17,15 +17,41 @@ limitations under the License.
 package synapse
 
 import (
+	"context"
 	"errors"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
+
+// reconcileMautrixSignalConfigMap is a function of type subreconcilerFuncs, to
+// be called in the main reconciliation loop.
+//
+// It reconciles the mautrix-signal ConfigMap to its desired state. It is
+// called only if the user hasn't provided its own ConfigMap for
+// mautrix-signal.
+func (r *SynapseReconciler) reconcileMautrixSignalConfigMap(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	objectMetaMautrixSignal := setObjectMeta(r.GetMautrixSignalResourceName(*synapse), synapse.Namespace, map[string]string{})
+	if err := r.reconcileResource(
+		ctx,
+		r.configMapForMautrixSignal,
+		synapse,
+		&corev1.ConfigMap{},
+		objectMetaMautrixSignal,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
+}
 
 // configMapForSynapse returns a synapse ConfigMap object
 func (r *SynapseReconciler) configMapForMautrixSignal(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (client.Object, error) {
@@ -350,6 +376,60 @@ logging:
 	return cm, nil
 }
 
+// copyInputMautrixSignalConfigMap is a function of type subreconcilerFuncs, to
+// be called in the main reconciliation loop.
+//
+// It creates a copy of the user-provided ConfigMap for mautrix-signal, defined
+// in synapse.Spec.Bridges.MautrixSignal.ConfigMap
+func (r *SynapseReconciler) copyInputMautrixSignalConfigMap(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+
+	inputConfigMapName := synapse.Spec.Bridges.MautrixSignal.ConfigMap.Name
+	inputConfigMapNamespace := r.getConfigMapNamespace(
+		*synapse,
+		synapse.Spec.Bridges.MautrixSignal.ConfigMap.Namespace,
+	)
+	keyForInputConfigMap := types.NamespacedName{
+		Name:      inputConfigMapName,
+		Namespace: inputConfigMapNamespace,
+	}
+
+	// Get and check the input ConfigMap for Heisenbridge
+	if err := r.Get(ctx, keyForInputConfigMap, &corev1.ConfigMap{}); err != nil {
+		reason := "ConfigMap " + inputConfigMapName + " does not exist in namespace " + inputConfigMapNamespace
+		if err := r.setFailedState(ctx, synapse, reason); err != nil {
+			log.Error(err, "Error updating Synapse State")
+		}
+
+		log.Error(
+			err,
+			"Failed to get ConfigMap",
+			"ConfigMap.Namespace",
+			inputConfigMapNamespace,
+			"ConfigMap.Name",
+			inputConfigMapName,
+		)
+
+		return reconc.RequeueWithDelayAndError(time.Duration(30), err)
+	}
+
+	objectMetaMautrixSignal := setObjectMeta(r.GetMautrixSignalResourceName(*synapse), synapse.Namespace, map[string]string{})
+
+	// Create a copy of the inputMautrixSignalConfigMap defined in Spec.Bridges.MautrixSignal.ConfigMap
+	// Here we use the createdMautrixSignalConfigMap function as createResourceFunc
+	if err := r.reconcileResource(
+		ctx,
+		r.configMapForMautrixSignalCopy,
+		synapse,
+		&corev1.ConfigMap{},
+		objectMetaMautrixSignal,
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
+}
+
 // configMapForMautrixSignalCopy is a function of type createResourceFunc, to be
 // passed as an argument in a call to reconcileResouce.
 //
@@ -375,6 +455,36 @@ func (r *SynapseReconciler) configMapForMautrixSignalCopy(
 	}
 
 	return copyConfigMap, nil
+}
+
+// configureMautrixSignalConfigMap is a function of type subreconcilerFuncs, to
+// be called in the main reconciliation loop.
+//
+// Following the previous copy of the user-provided ConfigMap, it edits the
+// content of the copy to ensure that mautrix-signal is correctly configured.
+func (r *SynapseReconciler) configureMautrixSignalConfigMap(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	mautrixSignalConfigMap := &corev1.ConfigMap{}
+	keyForConfigMap := types.NamespacedName{
+		Name:      r.GetMautrixSignalResourceName(*synapse),
+		Namespace: synapse.Namespace,
+	}
+
+	if err := r.Get(ctx, keyForConfigMap, mautrixSignalConfigMap); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	// Correct data in mautrix-signal ConfigMap
+	if err := r.updateConfigMap(
+		ctx,
+		mautrixSignalConfigMap,
+		*synapse,
+		r.updateMautrixSignalData,
+		"config.yaml",
+	); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
 }
 
 // updateMautrixSignalData is a function of type updateDataFunc function to

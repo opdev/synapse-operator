@@ -21,12 +21,10 @@ import (
 	"errors"
 	"reflect"
 	"strings"
-	"time"
 
+	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -75,6 +73,10 @@ func (r *SynapseReconciler) GetMautrixSignalResourceName(synapse synapsev1alpha1
 	return strings.Join([]string{synapse.Name, "mautrixsignal"}, "-")
 }
 
+func (r *SynapseReconciler) GetPostgresClusterResourceName(synapse synapsev1alpha1.Synapse) string {
+	return strings.Join([]string{synapse.Name, "pgsql"}, "-")
+}
+
 func (r *SynapseReconciler) GetSynapseServiceFQDN(synapse synapsev1alpha1.Synapse) string {
 	return strings.Join([]string{synapse.Name, synapse.Namespace, "svc", "cluster", "local"}, ".")
 }
@@ -86,6 +88,13 @@ func (r *SynapseReconciler) GetHeisenbridgeServiceFQDN(synapse synapsev1alpha1.S
 func (r *SynapseReconciler) GetMautrixSignalServiceFQDN(synapse synapsev1alpha1.Synapse) string {
 	return strings.Join([]string{r.GetMautrixSignalResourceName(synapse), synapse.Namespace, "svc", "cluster", "local"}, ".")
 }
+
+// subreconcilerFuncs are functions that are called by Reconcile() functions
+// in an ordered fashion. Returning a ctrl.Result with a value of nil
+// indicates that the Reconcile() function should continue reconciling.
+// Any other returned ctrl.Result indicates to the Reconcile() function
+// that reconciliation should halt.
+type subreconcilerFuncs func(*synapsev1alpha1.Synapse, context.Context) (*ctrl.Result, error)
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -120,60 +129,20 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	objectMetaForSynapse := setObjectMeta(synapse.Name, synapse.Namespace, map[string]string{})
-
-	// The ConfigMap for Synapse, containing the homeserver.yaml config file.
-	// It's either a copy of a user-provided ConfigMap, if defined in
-	// Spec.Homeserver.ConfigMap, or a new ConfigMap containing a default
-	// homeserver.yaml.
-	var createdConfigMap corev1.ConfigMap
+	// The list of subreconcilers to be run to reconciliate the Synapse
+	// ConfigMap. This is temporary, and will be merged with
+	// subreconcilersForSynapse in a later commit.
+	var subreconcilersForSynapseConfigMap []subreconcilerFuncs
 
 	// Synapse should either have a Spec.Homeserver.ConfigMap or Spec.Homeserver.Values
 	if synapse.Spec.Homeserver.ConfigMap != nil {
 		// If the user provided a ConfigMap for the Homeserver config file:
 		// * We ensure that it exists and is a valid yaml file
 		// * We populate the Status.HomeserverConfiguration with the values defined in the input ConfigMap
-		// * We create a copy of the user-provided ConfigMap in createdConfigMap.
-
-		var inputConfigMap corev1.ConfigMap // the user-provided ConfigMap. It should contain a valid homeserver.yaml
-		// Get and validate the inputConfigMap
-		ConfigMapName := synapse.Spec.Homeserver.ConfigMap.Name
-		ConfigMapNamespace := r.getConfigMapNamespace(synapse, synapse.Spec.Homeserver.ConfigMap.Namespace)
-		if err := r.Get(
-			ctx,
-			types.NamespacedName{Name: ConfigMapName, Namespace: ConfigMapNamespace},
-			&inputConfigMap,
-		); err != nil {
-			reason := "ConfigMap " + ConfigMapName + " does not exist in namespace " + ConfigMapNamespace
-			if err := r.setFailedState(ctx, &synapse, reason); err != nil {
-				log.Error(err, "Error updating Synapse State")
-			}
-
-			log.Error(
-				err,
-				"Failed to get ConfigMap",
-				"ConfigMap.Namespace",
-				ConfigMapNamespace,
-				"ConfigMap.Name",
-				ConfigMapName,
-			)
-			return ctrl.Result{RequeueAfter: time.Duration(30)}, err
-		}
-
-		if err := r.ParseHomeserverConfigMap(ctx, &synapse, inputConfigMap); err != nil {
-			return ctrl.Result{RequeueAfter: time.Duration(30)}, err
-		}
-
-		// Create a copy of the inputConfigMap defined in Spec.Homeserver.ConfigMap
-		// Here we use the configMapForSynapseCopy function as createResourceFunc
-		if err := r.reconcileResource(
-			ctx,
-			r.configMapForSynapseCopy,
-			&synapse,
-			&createdConfigMap,
-			objectMetaForSynapse,
-		); err != nil {
-			return ctrl.Result{}, nil
+		// * We create a copy of the user-provided ConfigMap.
+		subreconcilersForSynapseConfigMap = []subreconcilerFuncs{
+			r.parseInputSynapseConfigMap,
+			r.copyInputSynapseConfigMap,
 		}
 	} else {
 		// If the user hasn't provided a ConfigMap with a custom
@@ -183,16 +152,14 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		synapse.Status.HomeserverConfiguration.ServerName = synapse.Spec.Homeserver.Values.ServerName
 		synapse.Status.HomeserverConfiguration.ReportStats = synapse.Spec.Homeserver.Values.ReportStats
 
-		// Create a new ConfigMap for Synapse
-		// Here we use the configMapForSynapse function as createResourceFunc
-		if err := r.reconcileResource(
-			ctx,
-			r.configMapForSynapse,
-			&synapse,
-			&createdConfigMap,
-			objectMetaForSynapse,
-		); err != nil {
-			return ctrl.Result{}, nil
+		subreconcilersForSynapseConfigMap = []subreconcilerFuncs{
+			r.reconcileSynapseConfigMap,
+		}
+	}
+
+	for _, f := range subreconcilersForSynapseConfigMap {
+		if r, err := f(&synapse, ctx); reconc.ShouldHaltOrRequeue(r, err) {
+			return reconc.Evaluate(r, err)
 		}
 	}
 
@@ -208,383 +175,155 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				log.Error(err, "Error updating Synapse State")
 			}
 
-			err := errors.New("cannot create PostgreSQL instance for synapse. Potsres-operator is not installed")
-			log.Error(err, "Cannot create PostgreSQL instance for synapse. Potsres-operator is not installed.")
+			err := errors.New("cannot create PostgreSQL instance for synapse. Potsgres-operator is not installed")
+			log.Error(err, "Cannot create PostgreSQL instance for synapse. Potsgres-operator is not installed.")
 			return ctrl.Result{}, nil
 		}
-		if result, err := r.createPostgresClusterForSynapse(ctx, synapse, createdConfigMap); err != nil {
-			return result, err
+
+		// Reconcile the PostgresCluster CR and ConfigMap.
+		// Also update the Synapse Status and ConfigMap with database
+		// connection information.
+		subreconcilersForPostgresCluster := []subreconcilerFuncs{
+			r.reconcilePostgresClusterConfigMap,
+			r.reconcilePostgresClusterCR,
+			r.updateSynapseStatusWithPostgreSQLInfos,
+			r.updateSynapseConfigMapForPostgresCluster,
+		}
+
+		for _, f := range subreconcilersForPostgresCluster {
+			if r, err := f(&synapse, ctx); reconc.ShouldHaltOrRequeue(r, err) {
+				return reconc.Evaluate(r, err)
+			}
 		}
 	}
 
+	// The list of subreconcilers for Synapse. The list is populated depending
+	// on which bridges are enabled.
+	var subreconcilersForSynapse []subreconcilerFuncs
+
 	if synapse.Spec.Bridges.Heisenbridge.Enabled {
 		log.Info("Heisenbridge is enabled - deploying Heisenbridge")
-		// Heisenbridge is composed of a ConfigMap, a Service and a Deployment.
-		// Resources associated to the Heisenbridge are append with "-heisenbridge"
-		objectMetaHeisenbridge := setObjectMeta(r.GetHeisenbridgeResourceName(synapse), synapse.Namespace, map[string]string{})
 
-		// The ConfigMap for Heisenbridge, containing the heisenbridge.yaml
-		// config file. It's either a copy of a user-provided ConfigMap, if
-		// defined in Spec.Bridges.Heisenbridge.ConfigMap, or a new ConfigMap
-		// containing a default heisenbridge.yaml.
-		createdHeisenbridgeConfigMap := &corev1.ConfigMap{}
+		// The list of subreconcilers for Heisenbridge will be built next.
+		// Heisenbridge is composed of a ConfigMap, a Service and a Deployment.
+		var subreconcilersForHeisenbridge []subreconcilerFuncs
 
 		// The user may specify a ConfigMap, containing the heisenbridge.yaml
 		// config file, under Spec.Bridges.Heisenbridge.ConfigMap
-		inputConfigMapName := synapse.Spec.Bridges.Heisenbridge.ConfigMap.Name
-		setConfigMapNamespace := synapse.Spec.Bridges.Heisenbridge.ConfigMap.Namespace
-		inputConfigMapNamespace := r.getConfigMapNamespace(synapse, setConfigMapNamespace)
-		if inputConfigMapName != "" {
+		if synapse.Spec.Bridges.Heisenbridge.ConfigMap.Name != "" {
 			// If the user provided a custom Heisenbridge configuration via a
 			// ConfigMap, we need to validate that the ConfigMap exists, and
-			// create a copy in createdHeisenbridgeConfigMap
-
-			// Get and check the input ConfigMap for Heisenbridge
-			var inputHeisenbridgeConfigMap = &corev1.ConfigMap{}
-			keyForConfigMap := types.NamespacedName{
-				Name:      inputConfigMapName,
-				Namespace: inputConfigMapNamespace,
-			}
-
-			if err := r.Get(ctx, keyForConfigMap, inputHeisenbridgeConfigMap); err != nil {
-				reason := "ConfigMap " + inputConfigMapName + " does not exist in namespace " + inputConfigMapNamespace
-				if err := r.setFailedState(ctx, &synapse, reason); err != nil {
-					log.Error(err, "Error updating Synapse State")
-				}
-
-				log.Error(
-					err,
-					"Failed to get ConfigMap",
-					"ConfigMap.Namespace",
-					inputConfigMapNamespace,
-					"ConfigMap.Name",
-					inputConfigMapName,
-				)
-				return ctrl.Result{RequeueAfter: time.Duration(30)}, err
-			}
-
-			// Create a copy of the inputHeisenbridgeConfigMap defined in Spec.Bridges.Heisenbridge.ConfigMap
-			// Here we use the configMapForHeisenbridgeCopy function as createResourceFunc
-			if err := r.reconcileResource(
-				ctx,
-				r.configMapForHeisenbridgeCopy,
-				&synapse,
-				createdHeisenbridgeConfigMap,
-				objectMetaHeisenbridge,
-			); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			// Configure correct URL in Heisenbridge ConfigMap
-			if err := r.updateConfigMap(
-				ctx,
-				createdHeisenbridgeConfigMap,
-				synapse,
-				r.updateHeisenbridgeWithURL,
-				"heisenbridge.yaml",
-			); err != nil {
-				return ctrl.Result{}, err
+			// create a copy. We also need to edit the heisenbridge
+			// configuration.
+			subreconcilersForHeisenbridge = []subreconcilerFuncs{
+				r.copyInputHeisenbridgeConfigMap,
+				r.configureHeisenbridgeConfigMap,
 			}
 		} else {
 			// If the user hasn't provided a ConfigMap with a custom
-			// config.yaml, we create a new ConfigMap with a default
-			// config.yaml.
-
-			// Here we use configMapForHeisenbridge as createResourceFunc
-			if err := r.reconcileResource(
-				ctx,
-				r.configMapForHeisenbridge,
-				&synapse,
-				&corev1.ConfigMap{},
-				objectMetaHeisenbridge,
-			); err != nil {
-				return ctrl.Result{}, err
+			// heisenbridge.yaml, we create a new ConfigMap with a default
+			// heisenbridge.yaml.
+			subreconcilersForHeisenbridge = []subreconcilerFuncs{
+				r.reconcileHeisenbridgeConfigMap,
 			}
 		}
 
-		// Create Service for Heisenbridge
-		if err := r.reconcileResource(
-			ctx,
-			r.serviceForHeisenbridge,
-			&synapse,
-			&corev1.Service{},
-			objectMetaHeisenbridge,
-		); err != nil {
-			return ctrl.Result{}, err
+		// Reconcile Heisenbridge resources: Service and Deployment
+		subreconcilersForHeisenbridge = append(
+			subreconcilersForHeisenbridge,
+			r.reconcileHeisenbridgeService,
+			r.reconcileHeisenbridgeDeployment,
+		)
+
+		for _, f := range subreconcilersForHeisenbridge {
+			if r, err := f(&synapse, ctx); reconc.ShouldHaltOrRequeue(r, err) {
+				return reconc.Evaluate(r, err)
+			}
 		}
 
-		// Create Deployment for Heisenbridge
-		if err := r.reconcileResource(
-			ctx,
-			r.deploymentForHeisenbridge,
-			&synapse,
-			&appsv1.Deployment{},
-			objectMetaHeisenbridge,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Update the Synapse ConfigMap to enable Heisenbridge
-		if err := r.updateConfigMap(
-			ctx,
-			&createdConfigMap,
-			synapse,
-			r.updateHomeserverWithHeisenbridgeInfos,
-			"homeserver.yaml",
-		); err != nil {
-			return ctrl.Result{}, err
-		}
+		// Add the update of the Synapse ConfigMap to the Synapse
+		// subreconciler list. This is to prepare for future work. When using
+		// a multi API approach, we forsee this task to be performed by the
+		// Synapse controller (as opposed to the Heisenbridge controller,
+		// performing all task listed in subreconcilersForHeisenbridge).
+		subreconcilersForSynapse = append(subreconcilersForSynapse, r.updateSynapseConfigMapForHeisenbridge)
 	}
 
 	if synapse.Spec.Bridges.MautrixSignal.Enabled {
 		log.Info("mautrix-signal is enabled - deploying mautrix-signal")
-		// mautrix-signal is composed of a ConfigMap, a Service and 1 Deployment.
-		// Resources associated to the mautrix-signal are append with "-mautrixsignal"
-		// In addition, a second deployment is needed to run signald. This is append with "-signald"
-		objectMetaMautrixSignal := setObjectMeta(r.GetMautrixSignalResourceName(synapse), synapse.Namespace, map[string]string{})
-		objectMetaSignald := setObjectMeta(r.GetSignaldResourceName(synapse), synapse.Namespace, map[string]string{})
 
-		// The ConfigMap for mautrix-signal, containing the config.yaml config
-		// file. It's either a copy of a user-provided ConfigMap, if defined in
-		// Spec.Bridges.MautrixSignal.ConfigMap, or a new ConfigMap containing
-		// a default config.yaml.
-		createdMautrixSignalConfigMap := &corev1.ConfigMap{}
+		// The list of subreconcilers for mautrix-signal will be built next.
+		// mautrix-signal is composed of a ConfigMap, a Service, a SA, a RB,
+		// a PVC and a Deployment.
+		// In addition, a Deployment and a PVC are needed for signald.
+		var subreconcilersForMautrixSignal []subreconcilerFuncs
 
 		// The user may specify a ConfigMap, containing the config.yaml config
 		// file, under Spec.Bridges.MautrixSignal.ConfigMap
-		inputConfigMapName := synapse.Spec.Bridges.MautrixSignal.ConfigMap.Name
-		setConfigMapNamespace := synapse.Spec.Bridges.MautrixSignal.ConfigMap.Namespace
-		inputConfigMapNamespace := r.getConfigMapNamespace(synapse, setConfigMapNamespace)
-		if inputConfigMapName != "" {
+		if synapse.Spec.Bridges.MautrixSignal.ConfigMap.Name != "" {
 			// If the user provided a custom mautrix-signal configuration via a
 			// ConfigMap, we need to validate that the ConfigMap exists, and
-			// create a copy in createdMautrixSignalConfigMap
-
-			// Get and check the input ConfigMap for mautrix-signal
-			var inputMautrixSignalConfigMap = &corev1.ConfigMap{}
-			keyForConfigMap := types.NamespacedName{
-				Name:      inputConfigMapName,
-				Namespace: inputConfigMapNamespace,
+			// create a copy. We also need to edit the mautrix-signal
+			// configuration.
+			subreconcilersForMautrixSignal = []subreconcilerFuncs{
+				r.copyInputMautrixSignalConfigMap,
+				r.configureMautrixSignalConfigMap,
 			}
 
-			if err := r.Get(ctx, keyForConfigMap, inputMautrixSignalConfigMap); err != nil {
-				reason := "ConfigMap " + inputConfigMapName + " does not exist in namespace " + inputConfigMapNamespace
-				if err := r.setFailedState(ctx, &synapse, reason); err != nil {
-					log.Error(err, "Error updating Synapse State")
-				}
-
-				log.Error(
-					err,
-					"Failed to get ConfigMap",
-					"ConfigMap.Namespace",
-					inputConfigMapNamespace,
-					"ConfigMap.Name",
-					inputConfigMapName,
-				)
-				return ctrl.Result{RequeueAfter: time.Duration(30)}, err
-			}
-
-			// Create a copy of the inputMautrixSignalConfigMap defined in Spec.Bridges.MautrixSignal.ConfigMap
-			// Here we use the createdMautrixSignalConfigMap function as createResourceFunc
-			if err := r.reconcileResource(
-				ctx,
-				r.configMapForMautrixSignalCopy,
-				&synapse,
-				createdMautrixSignalConfigMap,
-				objectMetaMautrixSignal,
-			); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			// Correct data in mautrix-signal ConfigMap
-			if err := r.updateConfigMap(
-				ctx,
-				createdMautrixSignalConfigMap,
-				synapse,
-				r.updateMautrixSignalData,
-				"config.yaml",
-			); err != nil {
-				return ctrl.Result{}, err
-			}
 		} else {
 			// If the user hasn't provided a ConfigMap with a custom
 			// config.yaml, we create a new ConfigMap with a default
 			// config.yaml.
-
-			// Here we use configMapForMautrixSignal as createResourceFunc
-			if err := r.reconcileResource(
-				ctx,
-				r.configMapForMautrixSignal,
-				&synapse,
-				&corev1.ConfigMap{},
-				objectMetaMautrixSignal,
-			); err != nil {
-				return ctrl.Result{}, err
+			subreconcilersForMautrixSignal = []subreconcilerFuncs{
+				r.reconcileMautrixSignalConfigMap,
 			}
 		}
 
-		// Create a PVC for signald
-		if err := r.reconcileResource(
-			ctx,
-			r.persistentVolumeClaimForSignald,
-			&synapse,
-			&corev1.PersistentVolumeClaim{},
-			objectMetaSignald,
-		); err != nil {
-			return ctrl.Result{}, err
+		// Reconcile signald resources: PVC and Deployment
+		// Reconcile mautrix-signal resources: Service, SA, RB, PVC and Deployment
+		subreconcilersForMautrixSignal = append(
+			subreconcilersForMautrixSignal,
+			r.reconcileSignaldPVC,
+			r.reconcileSignaldDeployment,
+			r.reconcileMautrixSignalService,
+			r.reconcileMautrixSignalServiceAccount,
+			r.reconcileMautrixSignalRoleBinding,
+			r.reconcileMautrixSignalPVC,
+			r.reconcileMautrixSignalDeployment,
+		)
+
+		for _, f := range subreconcilersForMautrixSignal {
+			if r, err := f(&synapse, ctx); reconc.ShouldHaltOrRequeue(r, err) {
+				return reconc.Evaluate(r, err)
+			}
 		}
 
-		// Create Deployment for signald
-		if err := r.reconcileResource(
-			ctx,
-			r.deploymentForSignald,
-			&synapse,
-			&appsv1.Deployment{},
-			objectMetaSignald,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
+		// Add the update of the Synapse ConfigMap to the Synapse
+		// subreconciler list. This is to prepare for future work. When using
+		// a multi API approach, we forsee this task to be performed by the
+		// Synapse controller (as opposed to the mautrix-signal controller,
+		// performing all task listed in subreconcilersForMautrixSignal).
+		subreconcilersForSynapse = append(subreconcilersForSynapse, r.updateSynapseConfigMapForMautrixSignal)
+	}
 
-		// Create the SA for mautrix-signal
-		if err := r.reconcileResource(
-			ctx,
-			r.serviceAccountForMautrixSignal,
-			&synapse,
-			&corev1.ServiceAccount{},
-			objectMetaMautrixSignal,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
+	// Reconcile Synapse resources: Service, SA, RB, PVC, Deployment
+	subreconcilersForSynapse = append(
+		subreconcilersForSynapse,
+		r.reconcileSynapseService,
+		r.reconcileSynapseServiceAccount,
+		r.reconcileSynapseRoleBinding,
+		r.reconcileSynapsePVC,
+		r.reconcileSynapseDeployment,
+		r.setSynapseStatusAsRunning,
+	)
 
-		// Create the RoleBinding for mautrix-signal
-		if err := r.reconcileResource(
-			ctx,
-			r.roleBindingForMautrixSignal,
-			&synapse,
-			&rbacv1.RoleBinding{},
-			objectMetaMautrixSignal,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Create a Service for mautrix-signal
-		if err := r.reconcileResource(
-			ctx,
-			r.serviceForMautrixSignal,
-			&synapse,
-			&corev1.Service{},
-			objectMetaMautrixSignal,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Create a PVC for mautrix-signal
-		if err := r.reconcileResource(
-			ctx,
-			r.persistentVolumeClaimForMautrixSignal,
-			&synapse,
-			&corev1.PersistentVolumeClaim{},
-			objectMetaMautrixSignal,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Create Deployment for mautrix-signal
-		if err := r.reconcileResource(
-			ctx,
-			r.deploymentForMautrixSignal,
-			&synapse,
-			&appsv1.Deployment{},
-			objectMetaMautrixSignal,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Create Deployment for mautrix-signal
-		if err := r.reconcileResource(
-			ctx,
-			r.deploymentForSignald,
-			&synapse,
-			&appsv1.Deployment{},
-			objectMetaSignald,
-		); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Update the Synapse ConfigMap to enable mautrix-signal
-		if err := r.updateConfigMap(
-			ctx,
-			&createdConfigMap,
-			synapse,
-			r.updateHomeserverWithMautrixSignalInfos,
-			"homeserver.yaml",
-		); err != nil {
-			return ctrl.Result{}, err
+	for _, f := range subreconcilersForSynapse {
+		if r, err := f(&synapse, ctx); reconc.ShouldHaltOrRequeue(r, err) {
+			return reconc.Evaluate(r, err)
 		}
 	}
 
-	// Reconcile Synapse resources: PVC, Deployment and Service
-	if err := r.reconcileResource(
-		ctx,
-		r.serviceForSynapse,
-		&synapse,
-		&corev1.Service{},
-		objectMetaForSynapse,
-	); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if err := r.reconcileResource(
-		ctx,
-		r.serviceAccountForSynapse,
-		&synapse,
-		&corev1.ServiceAccount{},
-		objectMetaForSynapse,
-	); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if err := r.reconcileResource(
-		ctx,
-		r.roleBindingForSynapse,
-		&synapse,
-		&rbacv1.RoleBinding{},
-		objectMetaForSynapse,
-	); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if err := r.reconcileResource(
-		ctx,
-		r.persistentVolumeClaimForSynapse,
-		&synapse,
-		&corev1.PersistentVolumeClaim{},
-		objectMetaForSynapse,
-	); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if err := r.reconcileResource(
-		ctx,
-		r.deploymentForSynapse,
-		&synapse,
-		&appsv1.Deployment{},
-		objectMetaForSynapse,
-	); err != nil {
-		return ctrl.Result{}, err
-	}
-	// TODO: If a deployment is found, check that its Spec are correct.
-
-	// Update the Synapse status if needed
-	if synapse.Status.State != "RUNNING" {
-		synapse.Status.State = "RUNNING"
-		synapse.Status.Reason = ""
-		if err := r.Status().Update(ctx, &synapse); err != nil {
-			log.Error(err, "Failed to update Synapse status")
-			return ctrl.Result{}, err
-		}
-	}
-	return ctrl.Result{}, nil
+	return reconc.Evaluate(reconc.DoNotRequeue())
 }
 
 // labelsForSynapse returns the labels for selecting the resources
@@ -638,113 +377,40 @@ func (r *SynapseReconciler) isPostgresOperatorInstalled(ctx context.Context) boo
 	return err == nil
 }
 
-func (r *SynapseReconciler) createPostgresClusterForSynapse(
-	ctx context.Context,
-	synapse synapsev1alpha1.Synapse,
-	cm corev1.ConfigMap,
-) (ctrl.Result, error) {
-	var objectMeta metav1.ObjectMeta
-	createdPostgresCluster := pgov1beta1.PostgresCluster{}
-
-	// Create ConfigMap for PostgresCluster
-	objectMeta = setObjectMeta(synapse.Name+"-pgsql", synapse.Namespace, map[string]string{})
-	if err := r.reconcileResource(ctx, r.configMapForPostgresCluster, &synapse, &corev1.ConfigMap{}, objectMeta); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Create PostgresCluster for Synapse
-	if err := r.reconcileResource(ctx, r.postgresClusterForSynapse, &synapse, &createdPostgresCluster, objectMeta); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Wait for PostgresCluster to be up
-	if err := r.Get(ctx, types.NamespacedName{Name: createdPostgresCluster.Name, Namespace: createdPostgresCluster.Namespace}, &createdPostgresCluster); err != nil {
-		return ctrl.Result{}, err
-	}
-	if !r.isPostgresClusterReady(createdPostgresCluster) {
-		r.updateSynapseStatusDatabaseState(ctx, &synapse, "NOT READY")
-		err := errors.New("postgreSQL Database not ready yet")
-		return ctrl.Result{RequeueAfter: time.Duration(5)}, err
-	}
-
-	// Update Synapse Status with PostgreSQL DB information
-	if err := r.updateSynapseStatusWithPostgreSQLInfos(ctx, &synapse, createdPostgresCluster); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Update configMap data with PostgreSQL DB information
-	if err := r.updateConfigMap(
-		ctx,
-		&cm,
-		synapse,
-		r.updateHomeserverWithPostgreSQLInfos,
-		"homeserver.yaml",
-	); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{}, nil
-}
-
-func (r *SynapseReconciler) isPostgresClusterReady(p pgov1beta1.PostgresCluster) bool {
-	var status_found bool
-
-	// Going through instance Specs
-	for _, instance_spec := range p.Spec.InstanceSets {
-		status_found = false
-		for _, instance_status := range p.Status.InstanceSets {
-			if instance_status.Name == instance_spec.Name {
-				desired_replicas := *instance_spec.Replicas
-				if instance_status.Replicas != desired_replicas ||
-					instance_status.ReadyReplicas != desired_replicas ||
-					instance_status.UpdatedReplicas != desired_replicas {
-					return false
-				}
-				// Found instance in Status, breaking out of for loop
-				status_found = true
-				break
-			}
-		}
-
-		// Instance found in spec, but not in status
-		if !status_found {
-			return false
-		}
-	}
-
-	// All instances have the correct number of replicas
-	return true
-}
-
 func (r *SynapseReconciler) updateSynapseStatusDatabaseState(ctx context.Context, synapse *synapsev1alpha1.Synapse, state string) error {
 	synapse.Status.DatabaseConnectionInfo.State = state
 	return r.updateSynapseStatus(ctx, synapse)
 }
 
-func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(
-	ctx context.Context,
-	s *synapsev1alpha1.Synapse,
-	createdPostgresCluster pgov1beta1.PostgresCluster,
-) error {
+// updateSynapseStatusWithPostgreSQLInfos is a function of type
+// subreconcilerFuncs, to be called in the main reconciliation loop.
+//
+// It parses the PostgresCluster Secret and updates the Synapse status with the
+// database connection information.
+func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
 	var postgresSecret corev1.Secret
 
-	// Get PostgreSQL secret related, containing information for the synapse user
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{
-			Name:      createdPostgresCluster.Name + "-pguser-synapse",
-			Namespace: createdPostgresCluster.Namespace,
-		},
-		&postgresSecret,
-	); err != nil {
-		return err
+	keyForPostgresClusterSecret := types.NamespacedName{
+		Name:      r.GetPostgresClusterResourceName(*synapse) + "-pguser-synapse",
+		Namespace: synapse.Namespace,
 	}
 
-	if err := r.updateSynapseStatusDatabase(s, postgresSecret); err != nil {
-		return err
+	// Get PostgresCluster Secret containing information for the synapse user
+	if err := r.Get(ctx, keyForPostgresClusterSecret, &postgresSecret); err != nil {
+		return reconc.RequeueWithError(err)
 	}
 
-	return r.updateSynapseStatus(ctx, s)
+	// Locally updates the Synapse Status
+	if err := r.updateSynapseStatusDatabase(synapse, postgresSecret); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	// Actually sends an API request to update the Status
+	if err := r.updateSynapseStatus(ctx, synapse); err != nil {
+		return reconc.RequeueWithError(err)
+	}
+
+	return reconc.ContinueReconciling()
 }
 
 func (r *SynapseReconciler) updateSynapseStatusDatabase(
@@ -798,6 +464,26 @@ func (r *SynapseReconciler) updateSynapseStatusDatabase(
 	s.Status.DatabaseConnectionInfo.State = "READY"
 
 	return nil
+}
+
+// setSynapseStatusAsRunning is a function of type subreconcilerFuncs, to be
+// called in the main reconciliation loop.
+//
+// It set the Synapse Status 'State' field to 'RUNNING'.
+func (r *SynapseReconciler) setSynapseStatusAsRunning(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+
+	// Update the Synapse status if needed
+	if synapse.Status.State != "RUNNING" {
+		synapse.Status.State = "RUNNING"
+		synapse.Status.Reason = ""
+		if err := r.Status().Update(ctx, synapse); err != nil {
+			log.Error(err, "Failed to update Synapse status")
+			return reconc.RequeueWithError(err)
+		}
+	}
+
+	return reconc.ContinueReconciling()
 }
 
 // SetupWithManager sets up the controller with the Manager.
