@@ -73,7 +73,7 @@ func (r *SynapseReconciler) deploymentForSignald(s *synapsev1alpha1.Synapse, obj
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image: "docker.io/signald/signald:0.19.1",
+						Image: "docker.io/signald/signald:0.23.0",
 						Name:  "signald",
 						VolumeMounts: []corev1.VolumeMount{{
 							Name:      "signald",

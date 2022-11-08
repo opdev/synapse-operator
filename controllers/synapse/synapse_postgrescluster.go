@@ -80,7 +80,7 @@ func (r *SynapseReconciler) postgresClusterForSynapse(s *synapsev1alpha1.Synapse
 	postgresCluster := &pgov1beta1.PostgresCluster{
 		ObjectMeta: objectMeta,
 		Spec: pgov1beta1.PostgresClusterSpec{
-			Image:           "registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-14.3-0",
+			Image:           "registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-14.5-1",
 			PostgresVersion: 14,
 			InstanceSets: []pgov1beta1.PostgresInstanceSetSpec{{
 				Name: "instance1",
@@ -95,7 +95,7 @@ func (r *SynapseReconciler) postgresClusterForSynapse(s *synapsev1alpha1.Synapse
 			}},
 			Backups: pgov1beta1.Backups{
 				PGBackRest: pgov1beta1.PGBackRestArchive{
-					Image: "registry.developers.crunchydata.com/crunchydata/crunchy-pgbackrest:ubi8-2.38-1",
+					Image: "registry.developers.crunchydata.com/crunchydata/crunchy-pgbackrest:ubi8-2.40-1",
 					Repos: []pgov1beta1.PGBackRestRepo{{
 						Name: "repo1",
 						Volume: &pgov1beta1.RepoPVC{
