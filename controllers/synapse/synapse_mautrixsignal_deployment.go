@@ -89,7 +89,7 @@ func (r *SynapseReconciler) deploymentForMautrixSignal(s *synapsev1alpha1.Synaps
 					// mautrixsignal-data volume. The mautrixsignal process
 					// needs read & write access to the config.yaml file.
 					InitContainers: []corev1.Container{{
-						Image: "ubi8/ubi-minimal:8.6",
+						Image: "ubi8/ubi-minimal:8.7",
 						Name:  "initconfig",
 						VolumeMounts: []corev1.VolumeMount{{
 							Name:      "config",
@@ -102,7 +102,7 @@ func (r *SynapseReconciler) deploymentForMautrixSignal(s *synapsev1alpha1.Synaps
 						Args:    []string{"if [ ! -f /data/config.yaml ]; then cp /input/config.yaml /data/config.yaml; fi"},
 					}},
 					Containers: []corev1.Container{{
-						Image: "dock.mau.dev/mautrix/signal:v0.3.0",
+						Image: "dock.mau.dev/mautrix/signal:v0.4.1",
 						Name:  "mautrix-signal",
 						VolumeMounts: []corev1.VolumeMount{{
 							Name:      "signald",
