@@ -89,7 +89,7 @@ func (r *SynapseReconciler) deploymentForMautrixSignal(s *synapsev1alpha1.Synaps
 					// mautrixsignal-data volume. The mautrixsignal process
 					// needs read & write access to the config.yaml file.
 					InitContainers: []corev1.Container{{
-						Image: "ubi8/ubi-minimal:8.7",
+						Image: "registry.access.redhat.com/ubi8/ubi-minimal:8.7",
 						Name:  "initconfig",
 						VolumeMounts: []corev1.VolumeMount{{
 							Name:      "config",
