@@ -168,24 +168,15 @@ func (r *SynapseReconciler) configMapForHeisenbridgeCopy(
 // Following the previous copy of the user-provided ConfigMap, it edits the
 // content of the copy to ensure that heisenbridge is correctly configured.
 func (r *SynapseReconciler) configureHeisenbridgeConfigMap(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
-	heisenbridgeConfigMap := &corev1.ConfigMap{}
 	keyForConfigMap := types.NamespacedName{
 		Name:      r.GetHeisenbridgeResourceName(*synapse),
 		Namespace: synapse.Namespace,
 	}
 
-	if err := r.Get(
-		ctx,
-		keyForConfigMap,
-		heisenbridgeConfigMap,
-	); err != nil {
-		return reconc.RequeueWithError(err)
-	}
-
 	// Configure correct URL in Heisenbridge ConfigMap
 	if err := r.updateConfigMap(
 		ctx,
-		heisenbridgeConfigMap,
+		keyForConfigMap,
 		*synapse,
 		r.updateHeisenbridgeWithURL,
 		"heisenbridge.yaml",
