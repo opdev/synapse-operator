@@ -96,7 +96,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			ctx, cancel = context.WithCancel(context.TODO())
 
 			By("Getting latest version of the PostgresCluster CRD")
-			postgresOperatorVersion := "5.0.4"
+			postgresOperatorVersion := "5.2.0"
 			postgresClusterURL := "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-prod/main/operators/postgresql/" +
 				postgresOperatorVersion +
 				"/manifests/postgresclusters.postgres-operator.crunchydata.com.crd.yaml"
