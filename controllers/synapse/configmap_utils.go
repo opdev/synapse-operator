@@ -34,23 +34,21 @@ type updateDataFunc func(s synapsev1alpha1.Synapse, data map[string]interface{})
 
 // A generic function to update an existing ConfigMap. It takes as arguments:
 // * The context
-// * The name of the ConfigMap to update
+// * The key (name and namespace) of the ConfigMap to update
 // * The Synapse object being reconciled
 // * The function to be called to actually update the ConfigMap's content
 // * The name of the file to update in the ConfigMap
 func (r *SynapseReconciler) updateConfigMap(
 	ctx context.Context,
-	cm *corev1.ConfigMap,
+	key types.NamespacedName,
 	s synapsev1alpha1.Synapse,
 	updateData updateDataFunc,
 	filename string,
 ) error {
+	cm := &corev1.ConfigMap{}
+
 	// Get latest ConfigMap version
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace},
-		cm,
-	); err != nil {
+	if err := r.Get(ctx, key, cm); err != nil {
 		return err
 	}
 

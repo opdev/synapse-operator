@@ -463,20 +463,15 @@ func (r *SynapseReconciler) configMapForMautrixSignalCopy(
 // Following the previous copy of the user-provided ConfigMap, it edits the
 // content of the copy to ensure that mautrix-signal is correctly configured.
 func (r *SynapseReconciler) configureMautrixSignalConfigMap(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
-	mautrixSignalConfigMap := &corev1.ConfigMap{}
 	keyForConfigMap := types.NamespacedName{
 		Name:      r.GetMautrixSignalResourceName(*synapse),
 		Namespace: synapse.Namespace,
 	}
 
-	if err := r.Get(ctx, keyForConfigMap, mautrixSignalConfigMap); err != nil {
-		return reconc.RequeueWithError(err)
-	}
-
 	// Correct data in mautrix-signal ConfigMap
 	if err := r.updateConfigMap(
 		ctx,
-		mautrixSignalConfigMap,
+		keyForConfigMap,
 		*synapse,
 		r.updateMautrixSignalData,
 		"config.yaml",

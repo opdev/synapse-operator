@@ -2859,20 +2859,14 @@ func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synaps
 // It configures the 'database' section of homeserver.yaml to allow Synapse to
 // connect to the newly created PostgresCluster instance.
 func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
-	synapseConfigMap := &corev1.ConfigMap{}
 	keyForSynapse := types.NamespacedName{
 		Name:      synapse.Name,
 		Namespace: synapse.Namespace,
 	}
 
-	// Get the latest version of the synapse ConfigMap to update
-	if err := r.Get(ctx, keyForSynapse, synapseConfigMap); err != nil {
-		return reconc.RequeueWithError(err)
-	}
-
 	if err := r.updateConfigMap(
 		ctx,
-		synapseConfigMap,
+		keyForSynapse,
 		*synapse,
 		r.updateHomeserverWithPostgreSQLInfos,
 		"homeserver.yaml",
@@ -2961,21 +2955,15 @@ func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1
 // It registers the heisenbridge as an application service in the
 // homeserver.yaml config file.
 func (r *SynapseReconciler) updateSynapseConfigMapForHeisenbridge(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
-	synapseConfigMap := &corev1.ConfigMap{}
 	keyForSynapse := types.NamespacedName{
 		Name:      synapse.Name,
 		Namespace: synapse.Namespace,
 	}
 
-	// Get the latest version of the synapse ConfigMap to update
-	if err := r.Get(ctx, keyForSynapse, synapseConfigMap); err != nil {
-		return reconc.RequeueWithError(err)
-	}
-
 	// Update the Synapse ConfigMap to enable heisenbridge
 	if err := r.updateConfigMap(
 		ctx,
-		synapseConfigMap,
+		keyForSynapse,
 		*synapse,
 		r.updateHomeserverWithHeisenbridgeInfos,
 		"homeserver.yaml",
@@ -3005,21 +2993,15 @@ func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
 // It registers the mautrix-signal bridge as an application service in the
 // homeserver.yaml config file.
 func (r *SynapseReconciler) updateSynapseConfigMapForMautrixSignal(synapse *synapsev1alpha1.Synapse, ctx context.Context) (*ctrl.Result, error) {
-	synapseConfigMap := &corev1.ConfigMap{}
 	keyForSynapse := types.NamespacedName{
 		Name:      synapse.Name,
 		Namespace: synapse.Namespace,
 	}
 
-	// Get the latest version of the synapse ConfigMap to update
-	if err := r.Get(ctx, keyForSynapse, synapseConfigMap); err != nil {
-		return reconc.RequeueWithError(err)
-	}
-
 	// Update the Synapse ConfigMap to enable mautrix-signal
 	if err := r.updateConfigMap(
 		ctx,
-		synapseConfigMap,
+		keyForSynapse,
 		*synapse,
 		r.updateHomeserverWithMautrixSignalInfos,
 		"homeserver.yaml",
