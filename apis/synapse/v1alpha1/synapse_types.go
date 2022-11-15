@@ -36,9 +36,6 @@ type SynapseSpec struct {
 	// the creation of a configuration file from scratch.
 	Homeserver SynapseHomeserver `json:"homeserver"`
 
-	// Configuration options for optional matrix bridges
-	Bridges SynapseBridges `json:"bridges,omitempty"`
-
 	// +kubebuilder:default:=false
 
 	// Set to true to create a new PostreSQL instance. The homeserver.yaml
@@ -80,81 +77,6 @@ type SynapseHomeserverValues struct {
 	ReportStats bool `json:"reportStats"`
 }
 
-type SynapseBridges struct {
-	// Configuration options for the IRC bridge Heisenbridge. The user can
-	// either:
-	// * disable the deployment of the bridge.
-	// * enable the bridge, without specifying additional configuration
-	//   options. The bridge will be deployed with a default configuration.
-	// * enable the bridge and specify an existing ConfigMap by its Name and
-	//   Namespace containing a heisenbridge.yaml.
-	Heisenbridge SynapseHeisenbridge `json:"heisenbridge,omitempty"`
-
-	// Configuration options for the mautrix-signal bridge. The user can
-	// either:
-	// * disable the deployment of the bridge.
-	// * enable the bridge, without specifying additional configuration
-	//   options. The bridge will be deployed with a default configuration.
-	// * enable the bridge and specify an existing ConfigMap by its Name and
-	//   Namespace containing a config.yaml file.
-	MautrixSignal SynapseMautrixSignal `json:"mautrixSignal,omitempty"`
-}
-
-type SynapseHeisenbridge struct {
-	// +kubebuilder:default:=false
-
-	// Whether to deploy Heisenbridge or not
-	Enabled bool `json:"enabled,omitempty"`
-
-	// Holds information about the ConfigMap containing the heisenbridge.yaml
-	// configuration file to be used as input for the configuration of the
-	// Heisenbridge IRC Bridge.
-	ConfigMap SynapseHeisenbridgeConfigMap `json:"configMap,omitempty"`
-
-	// +kubebuilder:default:=0
-
-	// Controls the verbosity of the Heisenbrige:
-	// * 0 corresponds to normal level of logs
-	// * 1 corresponds to "-v"
-	// * 2 corresponds to "-vv"
-	// * 3 corresponds to "-vvv"
-	VerboseLevel int `json:"verboseLevel,omitempty"`
-}
-
-type SynapseHeisenbridgeConfigMap struct {
-	// +kubebuilder:validation:Required
-
-	// Name of the ConfigMap in the given Namespace.
-	Name string `json:"name"`
-
-	// Namespace in which the ConfigMap is living. If left empty, the Synapse
-	// namespace is used.
-	Namespace string `json:"namespace,omitempty"`
-}
-
-type SynapseMautrixSignal struct {
-	// +kubebuilder:default:=false
-
-	// Whether to deploy mautrix-signal or not
-	Enabled bool `json:"enabled,omitempty"`
-
-	// Holds information about the ConfigMap containing the config.yaml
-	// configuration file to be used as input for the configuration of the
-	// mautrix-signal Bridge.
-	ConfigMap SynapseMautrixSignalConfigMap `json:"configMap,omitempty"`
-}
-
-type SynapseMautrixSignalConfigMap struct {
-	// +kubebuilder:validation:Required
-
-	// Name of the ConfigMap in the given Namespace.
-	Name string `json:"name"`
-
-	// Namespace in which the ConfigMap is living. If left empty, the Synapse
-	// namespace is used.
-	Namespace string `json:"namespace,omitempty"`
-}
-
 // SynapseStatus defines the observed state of Synapse
 type SynapseStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
@@ -166,11 +88,43 @@ type SynapseStatus struct {
 	// Holds configuration information for Synapse
 	HomeserverConfiguration SynapseStatusHomeserverConfiguration `json:"homeserverConfiguration,omitempty"`
 
+	// Information on the bridges deployed alongside Synapse
+	Bridges SynapseStatusBridges `json:"bridges,omitempty"`
+
 	// State of the Synapse instance
 	State string `json:"state,omitempty"`
 
 	// Reason for the current Synapse State
 	Reason string `json:"reason,omitempty"`
+
+	// +kubebuilder:default:=false
+	NeedsReconcile bool `json:"needsReconcile,omitempty"`
+}
+
+type SynapseStatusBridges struct {
+	// Information on the Heisenbridge (IRC Bridge).
+	Heisenbridge SynapseStatusBridgesHeisenbridge `json:"heisenbridge,omitempty"`
+
+	// Information on the mautrix-signal bridge.
+	MautrixSignal SynapseStatusBridgesMautrixSignal `json:"mautrixsignal,omitempty"`
+}
+
+type SynapseStatusBridgesHeisenbridge struct {
+	// +kubebuilder:default:=false
+
+	// Whether a Heisenbridge has been deployed for this Synapse instance
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Name of the Heisenbridge object
+	Name string `json:"name,omitempty"`
+}
+
+type SynapseStatusBridgesMautrixSignal struct {
+	// Whether a mautrix-signal has been deployed for this Synapse instance
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Name of the mautrix-signal bridge object
+	Name string `json:"name,omitempty"`
 }
 
 type SynapseStatusDatabaseConnectionInfo struct {

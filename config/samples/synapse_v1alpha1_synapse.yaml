@@ -6,5 +6,5 @@ spec:
   createNewPostgreSQL: false
   homeserver:
     values:
-      serverName: example.com
+      serverName: my.matrix.host
       reportStats: true

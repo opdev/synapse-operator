@@ -32,8 +32,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	pgov1beta1 "github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
-	synapsecontrollers "github.com/opdev/synapse-operator/controllers/synapse"
+	heisenbridgecontroller "github.com/opdev/synapse-operator/controllers/synapse/heisenbridge"
+	mautrixsignalcontroller "github.com/opdev/synapse-operator/controllers/synapse/mautrixsignal"
+	synapsecontroller "github.com/opdev/synapse-operator/controllers/synapse/synapse"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -80,11 +83,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&synapsecontrollers.SynapseReconciler{
+	if err = (&synapsecontroller.SynapseReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Synapse")
+		os.Exit(1)
+	}
+	if err = (&mautrixsignalcontroller.MautrixSignalReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "MautrixSignal")
+		os.Exit(1)
+	}
+	if err = (&heisenbridgecontroller.HeisenbridgeReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Heisenbridge")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

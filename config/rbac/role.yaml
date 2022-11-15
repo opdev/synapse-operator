@@ -8,6 +8,58 @@ rules:
 - apiGroups:
   - synapse.opdev.io
   resources:
+  - heisenbridges
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - synapse.opdev.io
+  resources:
+  - heisenbridges/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - synapse.opdev.io
+  resources:
+  - heisenbridges/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - synapse.opdev.io
+  resources:
+  - mautrixsignals
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - synapse.opdev.io
+  resources:
+  - mautrixsignals/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - synapse.opdev.io
+  resources:
+  - mautrixsignals/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - synapse.opdev.io
+  resources:
   - synapses
   verbs:
   - create

@@ -1,8 +1,8 @@
-// //
-// //This file contains unit tests for the Synapse package
-// //
+//
+//This file contains unit tests for the Synapse package
+//
 
-package synapse
+package mautrixsignal
 
 // import (
 // 	"context"
@@ -13,6 +13,7 @@ package synapse
 
 // 	pgov1beta1 "github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 // 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+// 	"github.com/opdev/synapse-operator/helpers/utils"
 // 	corev1 "k8s.io/api/core/v1"
 // )
 
@@ -259,9 +260,6 @@ package synapse
 // 		var r SynapseReconciler
 // 		var s synapsev1alpha1.Synapse
 // 		var synapseDatabaseInfo synapsev1alpha1.SynapseStatusDatabaseConnectionInfo
-// 		// var cm corev1.ConfigMap
-// 		// var homeserver_in map[interface{}]interface{}
-// 		// var homeserver_out map[interface{}]interface{}
 // 		var postgresSecret corev1.Secret
 // 		var postgresSecretData map[string][]byte
 
@@ -347,7 +345,7 @@ package synapse
 // 		// Re-usable test for checking different happy paths
 // 		check_happy_path := func() {
 // 			By("Updating the ConfigMap Data")
-// 			Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).Should(Succeed())
+// 			Expect(utils.UpdateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).Should(Succeed())
 
 // 			By("Parsing the ConfigMap Data and checking Database information are correct")
 // 			configMapData, ok := cm.Data["homeserver.yaml"]
@@ -363,7 +361,6 @@ package synapse
 
 // 			GinkgoWriter.Println("homeserver_out[database]: ", homeserver_out["database"])
 
-// 			//var marschalledHomeserverOutDatabase []byte
 // 			marschalledHomeserverOutDatabase, err := yaml.Marshal(homeserver_out["database"])
 // 			Expect(err).NotTo(HaveOccurred())
 
@@ -489,7 +486,7 @@ package synapse
 // 			})
 
 // 			It("Should fail to update the ConfigMap data", func() {
-// 				Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
+// 				Expect(utils.UpdateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
 // 			})
 // 		})
 
@@ -499,7 +496,7 @@ package synapse
 // 			})
 
 // 			It("Should fail to update the ConfigMap data", func() {
-// 				Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
+// 				Expect(utils.UpdateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
 // 			})
 // 		})
 
@@ -509,7 +506,7 @@ package synapse
 // 			})
 
 // 			It("Should fail to update the ConfigMap data", func() {
-// 				Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
+// 				Expect(utils.UpdateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
 // 			})
 // 		})
 
@@ -519,7 +516,7 @@ package synapse
 // 			})
 
 // 			It("Should fail to update the ConfigMap data", func() {
-// 				Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
+// 				Expect(utils.UpdateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
 // 			})
 // 		})
 
@@ -529,7 +526,7 @@ package synapse
 // 			})
 
 // 			It("Should fail to update the ConfigMap data", func() {
-// 				Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
+// 				Expect(utils.UpdateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
 // 			})
 // 		})
 
@@ -539,7 +536,7 @@ package synapse
 // 			})
 
 // 			It("Should fail to update the ConfigMap data", func() {
-// 				Expect(r.updateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
+// 				Expect(utils.UpdateConfigMapData(&cm, s, r.updateHomeserverWithPostgreSQLInfos, "homeserver.yaml")).ShouldNot(Succeed())
 // 			})
 // 		})
 // 	})
