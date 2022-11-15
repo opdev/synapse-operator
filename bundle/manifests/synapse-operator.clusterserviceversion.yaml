@@ -6,6 +6,44 @@ metadata:
       [
         {
           "apiVersion": "synapse.opdev.io/v1alpha1",
+          "kind": "Heisenbridge",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/created-by": "synapse-operator",
+              "app.kubernetes.io/instance": "heisenbridge-sample",
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "heisenbridge",
+              "app.kubernetes.io/part-of": "synapse-operator"
+            },
+            "name": "heisenbridge-sample"
+          },
+          "spec": {
+            "synapse": {
+              "name": "synapse-sample"
+            }
+          }
+        },
+        {
+          "apiVersion": "synapse.opdev.io/v1alpha1",
+          "kind": "MautrixSignal",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/created-by": "synapse-operator",
+              "app.kubernetes.io/instance": "mautrixsignal-sample",
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "mautrixsignal",
+              "app.kubernetes.io/part-of": "synapse-operator"
+            },
+            "name": "mautrixsignal-sample"
+          },
+          "spec": {
+            "synapse": {
+              "name": "synapse-sample"
+            }
+          }
+        },
+        {
+          "apiVersion": "synapse.opdev.io/v1alpha1",
           "kind": "Synapse",
           "metadata": {
             "name": "synapse-sample"
@@ -15,21 +53,31 @@ metadata:
             "homeserver": {
               "values": {
                 "reportStats": true,
-                "serverName": "example.com"
+                "serverName": "my.matrix.host"
               }
             }
           }
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.14.0+git
+    operators.operatorframework.io/builder: operator-sdk-v1.25.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-  name: synapse-operator.v0.1.0
+  name: synapse-operator.v0.2.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: Heisenbridge is the Schema for the heisenbridges API
+      displayName: Heisenbridge
+      kind: Heisenbridge
+      name: heisenbridges.synapse.opdev.io
+      version: v1alpha1
+    - description: MautrixSignal is the Schema for the mautrixsignals API
+      displayName: Mautrix Signal
+      kind: MautrixSignal
+      name: mautrixsignals.synapse.opdev.io
+      version: v1alpha1
     - description: Synapse is the Schema for the synapses API
       displayName: Synapse
       kind: Synapse
@@ -46,6 +94,58 @@ spec:
     spec:
       clusterPermissions:
       - rules:
+        - apiGroups:
+          - synapse.opdev.io
+          resources:
+          - heisenbridges
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - synapse.opdev.io
+          resources:
+          - heisenbridges/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - synapse.opdev.io
+          resources:
+          - heisenbridges/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - synapse.opdev.io
+          resources:
+          - mautrixsignals
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - synapse.opdev.io
+          resources:
+          - mautrixsignals/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - synapse.opdev.io
+          resources:
+          - mautrixsignals/status
+          verbs:
+          - get
+          - patch
+          - update
         - apiGroups:
           - synapse.opdev.io
           resources:
@@ -86,7 +186,9 @@ spec:
           - create
         serviceAccountName: synapse-operator-controller-manager
       deployments:
-      - name: synapse-operator-controller-manager
+      - label:
+          control-plane: controller-manager
+        name: synapse-operator-controller-manager
         spec:
           replicas: 1
           selector:
@@ -117,7 +219,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/opdev/synapse-operator:v0.1.0
+                image: quay.io/opdev/synapse-operator:v0.2.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -200,4 +302,4 @@ spec:
   maturity: alpha
   provider:
     name: Opdev
-  version: 0.1.0
+  version: 0.2.0
