@@ -699,20 +699,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					BeforeAll(func() {
 						initSynapseVariables()
 
-						By("Creating the MautrixSignal object")
-						heisenbridge = &synapsev1alpha1.Heisenbridge{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      heisenbridgeName,
-								Namespace: heisenbridgeNamespace,
-							},
-							Spec: synapsev1alpha1.HeisenbridgeSpec{
-								Synapse: synapsev1alpha1.HeisenbridgeSynapseSpec{
-									Name: SynapseName,
-								},
-							},
-						}
-						Expect(k8sClient.Create(ctx, heisenbridge)).Should(Succeed())
-
 						inputConfigmapData = map[string]string{
 							"homeserver.yaml": "server_name: " + ServerName + "\n" +
 								"report_stats: " + strconv.FormatBool(ReportStats),
@@ -734,12 +720,44 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					AfterAll(func() {
 						cleanupSynapseResources()
 						cleanupSynapseConfigMap()
+					})
 
-						By("Deleting the Heisenbridge object")
-						Expect(k8sClient.Delete(ctx, heisenbridge)).Should(Succeed())
+					It("Should update the Synapse Status", func() {
+						expectedStatus := synapsev1alpha1.SynapseStatus{
+							State:  "RUNNING",
+							Reason: "",
+							HomeserverConfiguration: synapsev1alpha1.SynapseStatusHomeserverConfiguration{
+								ServerName:  ServerName,
+								ReportStats: ReportStats,
+							},
+						}
+						// Status may need some time to be updated
+						Eventually(func() synapsev1alpha1.SynapseStatus {
+							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
+							return synapse.Status
+						}, timeout, interval).Should(Equal(expectedStatus))
 					})
 
 					It("Should register the presence of the bridge in the Synapse status", func() {
+						By("Creating the Heisenbridge object")
+						heisenbridge = &synapsev1alpha1.Heisenbridge{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      heisenbridgeName,
+								Namespace: heisenbridgeNamespace,
+							},
+							Spec: synapsev1alpha1.HeisenbridgeSpec{
+								Synapse: synapsev1alpha1.HeisenbridgeSynapseSpec{
+									Name: SynapseName,
+								},
+							},
+						}
+						Expect(k8sClient.Create(ctx, heisenbridge)).Should(Succeed())
+
+						By("Triggering the Synapse reconciliation")
+						synapse.Status.NeedsReconcile = true
+						Expect(k8sClient.Status().Update(ctx, synapse)).Should(Succeed())
+
+						By("Checking the Synapse Status")
 						expectedStatusBridgesHeisenbridge := synapsev1alpha1.SynapseStatusBridgesHeisenbridge{
 							Enabled: true,
 							Name:    heisenbridgeName,
@@ -798,6 +816,24 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						Expect(createdDeployment.Spec.Template.Spec.Volumes).
 							Should(ContainElement(heisenbridgeVolume))
 					})
+
+					It("Should unregister Heisenbridge when deleted", func() {
+						By("Deleting the Heisenbridge object")
+						Expect(k8sClient.Delete(ctx, heisenbridge)).Should(Succeed())
+
+						By("Triggering the Synapse reconciliation")
+						synapse.Status.NeedsReconcile = true
+						Expect(k8sClient.Status().Update(ctx, synapse)).Should(Succeed())
+
+						By("Checking the Synapse Status")
+						expectedStatusBridgesHeisenbridge := synapsev1alpha1.SynapseStatusBridgesHeisenbridge{
+							Enabled: false,
+						}
+						Eventually(func(g Gomega) synapsev1alpha1.SynapseStatusBridgesHeisenbridge {
+							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
+							return synapse.Status.Bridges.Heisenbridge
+						}, timeout, interval).Should(Equal(expectedStatusBridgesHeisenbridge))
+					})
 				})
 
 				When("A Mautrix-Signal bridge refers this Synapse instance", func() {
@@ -810,20 +846,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 					BeforeAll(func() {
 						initSynapseVariables()
-
-						By("Creating the MautrixSignal object")
-						mautrixsignal = &synapsev1alpha1.MautrixSignal{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      mautrixSignalName,
-								Namespace: mautrixSignalNamespace,
-							},
-							Spec: synapsev1alpha1.MautrixSignalSpec{
-								Synapse: synapsev1alpha1.MautrixSignalSynapseSpec{
-									Name: SynapseName,
-								},
-							},
-						}
-						Expect(k8sClient.Create(ctx, mautrixsignal)).Should(Succeed())
 
 						inputConfigmapData = map[string]string{
 							"homeserver.yaml": "server_name: " + ServerName + "\n" +
@@ -846,12 +868,43 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					AfterAll(func() {
 						cleanupSynapseResources()
 						cleanupSynapseConfigMap()
+					})
 
-						By("Deleting the MautrixSignal object")
-						Expect(k8sClient.Delete(ctx, mautrixsignal)).Should(Succeed())
+					It("Should update the Synapse Status", func() {
+						expectedStatus := synapsev1alpha1.SynapseStatus{
+							State:  "RUNNING",
+							Reason: "",
+							HomeserverConfiguration: synapsev1alpha1.SynapseStatusHomeserverConfiguration{
+								ServerName:  ServerName,
+								ReportStats: ReportStats,
+							},
+						}
+						// Status may need some time to be updated
+						Eventually(func() synapsev1alpha1.SynapseStatus {
+							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
+							return synapse.Status
+						}, timeout, interval).Should(Equal(expectedStatus))
 					})
 
 					It("Should register the presence of the bridge in the Synapse status", func() {
+						By("Creating the MautrixSignal object")
+						mautrixsignal = &synapsev1alpha1.MautrixSignal{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      mautrixSignalName,
+								Namespace: mautrixSignalNamespace,
+							},
+							Spec: synapsev1alpha1.MautrixSignalSpec{
+								Synapse: synapsev1alpha1.MautrixSignalSynapseSpec{
+									Name: SynapseName,
+								},
+							},
+						}
+						Expect(k8sClient.Create(ctx, mautrixsignal)).Should(Succeed())
+
+						By("Triggering the Synapse reconciliation")
+						synapse.Status.NeedsReconcile = true
+						Expect(k8sClient.Status().Update(ctx, synapse)).Should(Succeed())
+
 						expectedStatusBridgesMautrixSignal := synapsev1alpha1.SynapseStatusBridgesMautrixSignal{
 							Enabled: true,
 							Name:    mautrixSignalName,
@@ -906,6 +959,24 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						}
 						Expect(createdDeployment.Spec.Template.Spec.Volumes).
 							Should(ContainElement(mautrixsignalVolume))
+					})
+
+					It("Should unregister MautrixSignal when deleted", func() {
+						By("Deleting the MautrixSignal object")
+						Expect(k8sClient.Delete(ctx, mautrixsignal)).Should(Succeed())
+
+						By("Triggering the Synapse reconciliation")
+						synapse.Status.NeedsReconcile = true
+						Expect(k8sClient.Status().Update(ctx, synapse)).Should(Succeed())
+
+						By("Checking the Synapse Status")
+						expectedStatusBridgesMautrixSignal := synapsev1alpha1.SynapseStatusBridgesMautrixSignal{
+							Enabled: false,
+						}
+						Eventually(func(g Gomega) synapsev1alpha1.SynapseStatusBridgesMautrixSignal {
+							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
+							return synapse.Status.Bridges.MautrixSignal
+						}, timeout, interval).Should(Equal(expectedStatusBridgesMautrixSignal))
 					})
 				})
 			})

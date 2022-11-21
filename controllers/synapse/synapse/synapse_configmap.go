@@ -2928,6 +2928,27 @@ func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1
 	return databaseDataMap, nil
 }
 
+func (r *SynapseReconciler) updateSynapseConfigMapForBridges(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	s := &synapsev1alpha1.Synapse{}
+	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
+	}
+
+	if s.Status.Bridges.Heisenbridge.Enabled {
+		if r, err := r.updateSynapseConfigMapForHeisenbridge(ctx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
+			return r, err
+		}
+	}
+
+	if s.Status.Bridges.MautrixSignal.Enabled {
+		if r, err := r.updateSynapseConfigMapForMautrixSignal(ctx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
+			return r, err
+		}
+	}
+
+	return subreconciler.ContinueReconciling()
+}
+
 // updateSynapseConfigMapForHeisenbridge is a function of type
 // FnWithRequest, to be called in the main reconciliation loop.
 //

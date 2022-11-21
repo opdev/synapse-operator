@@ -109,6 +109,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	subreconcilersForSynapse = append(
 		subreconcilersForSynapse,
 		r.updateSynapseStatusBridges,
+		r.updateSynapseConfigMapForBridges,
 	)
 
 	if synapse.Spec.CreateNewPostgreSQL {
@@ -131,24 +132,6 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			r.updateSynapseStatusWithPostgreSQLInfos,
 			r.updateSynapseConfigMapForPostgresCluster,
 		)
-	}
-
-	if synapse.Status.Bridges.Heisenbridge.Enabled {
-		// Add the update of the Synapse ConfigMap to the Synapse
-		// subreconciler list. This is to prepare for future work. When using
-		// a multi API approach, we forsee this task to be performed by the
-		// Synapse controller (as opposed to the Heisenbridge controller,
-		// performing all task listed in subreconcilersForHeisenbridge).
-		subreconcilersForSynapse = append(subreconcilersForSynapse, r.updateSynapseConfigMapForHeisenbridge)
-	}
-
-	if synapse.Status.Bridges.MautrixSignal.Enabled {
-		// Add the update of the Synapse ConfigMap to the Synapse
-		// subreconciler list. This is to prepare for future work. When using
-		// a multi API approach, we forsee this task to be performed by the
-		// Synapse controller (as opposed to the mautrix-signal controller,
-		// performing all task listed in subreconcilersForMautrixSignal).
-		subreconcilersForSynapse = append(subreconcilersForSynapse, r.updateSynapseConfigMapForMautrixSignal)
 	}
 
 	// SA and RB are only necessary if we're running on OpenShift
@@ -336,22 +319,27 @@ func (r *SynapseReconciler) updateSynapseStatusBridges(ctx context.Context, req 
 		return r, err
 	}
 
-	hList := &synapsev1alpha1.HeisenbridgeList{}
+	// Set to default
+	s.Status.Bridges.Heisenbridge = synapsev1alpha1.SynapseStatusBridgesHeisenbridge{}
+	s.Status.Bridges.MautrixSignal = synapsev1alpha1.SynapseStatusBridgesMautrixSignal{}
 
+	hList := &synapsev1alpha1.HeisenbridgeList{}
 	r.Client.List(ctx, hList)
 	for _, h := range hList.Items {
-		if h.Spec.Synapse.Name == s.Name {
+		if h.Spec.Synapse.Name == s.Name && h.GetDeletionTimestamp() == nil {
 			s.Status.Bridges.Heisenbridge.Enabled = true
 			s.Status.Bridges.Heisenbridge.Name = h.Name
+			break
 		}
 	}
 
 	msList := &synapsev1alpha1.MautrixSignalList{}
 	r.Client.List(ctx, msList)
 	for _, ms := range msList.Items {
-		if ms.Spec.Synapse.Name == s.Name {
+		if ms.Spec.Synapse.Name == s.Name && ms.GetDeletionTimestamp() == nil {
 			s.Status.Bridges.MautrixSignal.Enabled = true
 			s.Status.Bridges.MautrixSignal.Name = ms.Name
+			break
 		}
 	}
 
