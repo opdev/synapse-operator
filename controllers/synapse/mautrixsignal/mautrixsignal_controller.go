@@ -69,6 +69,8 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// We need to trigger a Synapse reconciliation so that it becomes aware of
 	// the MautrixSignal. We also need to complete the MautrixSignal Status.
 	subreconcilersForMautrixSignal = []subreconciler.FnWithRequest{
+		utils.HandleDelete(r.Client, &synapsev1alpha1.MautrixSignal{}),
+		utils.AddFinalizer(r.Client, &synapsev1alpha1.MautrixSignal{}),
 		utils.TriggerSynapseReconciliation(r.Client, &synapsev1alpha1.MautrixSignal{}),
 		r.buildMautrixSignalStatus,
 	}

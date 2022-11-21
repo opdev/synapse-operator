@@ -312,10 +312,7 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 				expectedOwnerReference.UID = heisenbridge.GetUID()
 			}
 
-			var cleanupHeisenbridgeResources = func() {
-				By("Cleaning up Heisenbridge CR")
-				Expect(k8sClient.Delete(ctx, heisenbridge)).Should(Succeed())
-
+			var cleanupHeisenbridgeChildResources = func() {
 				// Child resources must be manually deleted as the controllers responsible of
 				// their lifecycle are not running.
 				By("Cleaning up Heisenbridge ConfigMap")
@@ -326,6 +323,13 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 
 				By("Cleaning up Heisenbridge Service")
 				deleteResource(createdService, heisenbridgeLookupKey, false)
+			}
+
+			var cleanupHeisenbridgeResources = func() {
+				By("Cleaning up Heisenbridge CR")
+				Expect(k8sClient.Delete(ctx, heisenbridge)).Should(Succeed())
+
+				cleanupHeisenbridgeChildResources()
 			}
 
 			When("No Heisenbridge ConfigMap is provided", func() {
@@ -520,6 +524,89 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 						createdDeployment,
 						createdService,
 					)
+				})
+			})
+
+			When("Creating and deleting Heisenbridge resources", func() {
+				const bridgeFinalizer = "synapse.opdev.io/finalizer"
+
+				BeforeAll(func() {
+					initHeisenbridgeVariables()
+
+					heisenbridgeSpec = synapsev1alpha1.HeisenbridgeSpec{
+						Synapse: synapsev1alpha1.HeisenbridgeSynapseSpec{
+							Name:      SynapseName,
+							Namespace: SynapseNamespace,
+						},
+					}
+
+					createSynapseInstanceForHeisenbridge()
+				})
+
+				AfterAll(func() {
+					cleanupHeisenbridgeChildResources()
+					cleanupSynapseCR()
+				})
+
+				When("Creating Heisenbridge", func() {
+					BeforeAll(func() {
+						createHeisenbridgeInstance()
+					})
+
+					It("Should add a Finalizer", func() {
+						Eventually(func() []string {
+							_ = k8sClient.Get(ctx, heisenbridgeLookupKey, heisenbridge)
+							return heisenbridge.Finalizers
+						}, timeout, interval).Should(ContainElement(bridgeFinalizer))
+					})
+
+					It("Should trigger the reconciliation of Synapse", func() {
+						Eventually(func() bool {
+							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
+							return synapse.Status.NeedsReconcile
+						}, timeout, interval).Should(BeTrue())
+
+						// Set needsReconcile back to False, as the Synapse Controller
+						// would do if it would be running
+						synapse.Status.NeedsReconcile = false
+						Expect(k8sClient.Status().Update(ctx, synapse)).Should(Succeed())
+
+						time.Sleep(time.Second)
+					})
+				})
+
+				When("Deleting Heisenbridge", func() {
+					BeforeAll(func() {
+						By("Sending delete request")
+						Expect(k8sClient.Delete(ctx, heisenbridge)).Should(Succeed())
+					})
+
+					// Heisenbridge controller is too fast and complete cleanup
+					// tasks (trigger Synapse reconciliation) and effectively
+					// deletes the Heisenbridge instance before we have time to
+					// check that the finalizer was removed.
+					// Instead, we check that the Heisenbridge instance is
+					// indeed absent.
+					PIt("Should remove the Finalizer", func() {
+						Eventually(func() []string {
+							_ = k8sClient.Get(ctx, heisenbridgeLookupKey, heisenbridge)
+							return heisenbridge.Finalizers
+						}, timeout, interval).ShouldNot(ContainElement(bridgeFinalizer))
+					})
+
+					It("Should effectively remove the Heisenbridge instance", func() {
+						Eventually(func() bool {
+							err := k8sClient.Get(ctx, heisenbridgeLookupKey, heisenbridge)
+							return err == nil
+						}, timeout, interval).Should(BeFalse())
+					})
+
+					It("Should trigger the reconciliation of Synapse", func() {
+						Eventually(func() bool {
+							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
+							return synapse.Status.NeedsReconcile
+						}, timeout, interval).Should(BeTrue())
+					})
 				})
 			})
 		})

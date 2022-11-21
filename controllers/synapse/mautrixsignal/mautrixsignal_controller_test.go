@@ -338,10 +338,7 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 				expectedOwnerReference.UID = mautrixsignal.GetUID()
 			}
 
-			var cleanupMautrixSignalResources = func() {
-				By("Cleaning up MautrixSignal CR")
-				Expect(k8sClient.Delete(ctx, mautrixsignal)).Should(Succeed())
-
+			var cleanupMautrixSignalChildResources = func() {
 				// Child resources must be manually deleted as the controllers responsible of
 				// their lifecycle are not running.
 				By("Cleaning up MautrixSignal ConfigMap")
@@ -367,6 +364,13 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 
 				By("Cleaning up Signald Deployment")
 				deleteResource(createdSignaldDeployment, signaldLookupKey, false)
+			}
+
+			var cleanupMautrixSignalResources = func() {
+				By("Cleaning up MautrixSignal CR")
+				Expect(k8sClient.Delete(ctx, mautrixsignal)).Should(Succeed())
+
+				cleanupMautrixSignalChildResources()
 			}
 
 			When("No MautrixSignal ConfigMap is provided", func() {
@@ -663,6 +667,89 @@ logging:
 						createdSignaldPVC,
 						createdSignaldDeployment,
 					)
+				})
+			})
+
+			When("Creating and deleting MautrixSignal resources", func() {
+				const bridgeFinalizer = "synapse.opdev.io/finalizer"
+
+				BeforeAll(func() {
+					initMautrixSignalVariables()
+
+					mautrixsignalSpec = synapsev1alpha1.MautrixSignalSpec{
+						Synapse: synapsev1alpha1.MautrixSignalSynapseSpec{
+							Name:      SynapseName,
+							Namespace: SynapseNamespace,
+						},
+					}
+
+					createSynapseInstanceForMautrixSignal()
+				})
+
+				AfterAll(func() {
+					cleanupMautrixSignalChildResources()
+					cleanupSynapseCR()
+				})
+
+				When("Creating MautrixSignal", func() {
+					BeforeAll(func() {
+						createMautrixSignalInstance()
+					})
+
+					It("Should add a Finalizer", func() {
+						Eventually(func() []string {
+							_ = k8sClient.Get(ctx, mautrixsignalLookupKey, mautrixsignal)
+							return mautrixsignal.Finalizers
+						}, timeout, interval).Should(ContainElement(bridgeFinalizer))
+					})
+
+					It("Should trigger the reconciliation of Synapse", func() {
+						Eventually(func() bool {
+							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
+							return synapse.Status.NeedsReconcile
+						}, timeout, interval).Should(BeTrue())
+
+						// Set needsReconcile back to False, as the Synapse Controller
+						// would do if it would be running
+						synapse.Status.NeedsReconcile = false
+						Expect(k8sClient.Status().Update(ctx, synapse)).Should(Succeed())
+
+						time.Sleep(time.Second)
+					})
+				})
+
+				When("Deleting MautrixSignal", func() {
+					BeforeAll(func() {
+						By("Sending delete request")
+						Expect(k8sClient.Delete(ctx, mautrixsignal)).Should(Succeed())
+					})
+
+					// MautrixSignal controller is too fast and complete cleanup
+					// tasks (trigger Synapse reconciliation) and effectively
+					// deletes the MautrixSignal instance before we have time to
+					// check that the finalizer was removed.
+					// Instead, we check that the MautrixSignal instance is
+					// indeed absent.
+					PIt("Should remove the Finalizer", func() {
+						Eventually(func() []string {
+							_ = k8sClient.Get(ctx, mautrixsignalLookupKey, mautrixsignal)
+							return mautrixsignal.Finalizers
+						}, timeout, interval).ShouldNot(ContainElement(bridgeFinalizer))
+					})
+
+					It("Should effectively remove the MautrixSignal instance", func() {
+						Eventually(func() bool {
+							err := k8sClient.Get(ctx, mautrixsignalLookupKey, mautrixsignal)
+							return err == nil
+						}, timeout, interval).Should(BeFalse())
+					})
+
+					It("Should trigger the reconciliation of Synapse", func() {
+						Eventually(func() bool {
+							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
+							return synapse.Status.NeedsReconcile
+						}, timeout, interval).Should(BeTrue())
+					})
 				})
 			})
 		})

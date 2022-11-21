@@ -27,8 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+const synapseBridgeFinalizer = "synapse.opdev.io/finalizer"
 
 func ComputeFQDN(name string, namespace string) string {
 	return strings.Join([]string{name, namespace, "svc", "cluster", "local"}, ".")
@@ -78,7 +81,7 @@ func FetchSynapseInstance(
 	// Validate Synapse instance exists
 	keyForSynapse := types.NamespacedName{
 		Name:      resource.GetSynapseName(),
-		Namespace: ComputeNamespace(resource.GetName(), resource.GetSynapseNamespace()),
+		Namespace: ComputeNamespace(resource.GetNamespace(), resource.GetSynapseNamespace()),
 	}
 	return kubeClient.Get(ctx, keyForSynapse, s)
 }
@@ -104,6 +107,79 @@ func TriggerSynapseReconciliation(kubeClient client.Client, resource Bridge) fun
 
 		if err := UpdateSynapseStatus(ctx, kubeClient, &s); err != nil {
 			return subreconciler.RequeueWithError(err)
+		}
+
+		return subreconciler.ContinueReconciling()
+	}
+}
+
+// HandleDelete returns a function of type subreconciler.FnWithRequest
+//
+// Bridges need to trigger the reconciliation of their associated Synapse homeserver
+// so that Synapse can remove the bridge from the list of application services in its configuration.
+func HandleDelete(kubeClient client.Client, resource Bridge) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
+	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+		log := ctrllog.FromContext(ctx)
+
+		if r, err := GetResource(ctx, kubeClient, req, resource); subreconciler.ShouldHaltOrRequeue(r, err) {
+			return r, err
+		}
+
+		// Check if resource is marked to be deleted
+		if resource.GetDeletionTimestamp() != nil {
+			if controllerutil.ContainsFinalizer(resource, synapseBridgeFinalizer) {
+				// Trigger the reconciliation of the associated Synapse instance
+				s := synapsev1alpha1.Synapse{}
+				if err := FetchSynapseInstance(ctx, kubeClient, resource, &s); err != nil {
+					log.Error(err, "Error getting Synapse instance. Continuing clean-up without triggering reconciliation")
+				} else {
+					s.Status.NeedsReconcile = true
+
+					if err := UpdateSynapseStatus(ctx, kubeClient, &s); err != nil {
+						log.Error(err, "Error updating Synapse Status")
+						return subreconciler.RequeueWithError(err)
+					}
+				}
+
+				// Remove finalizer
+				if ok := controllerutil.RemoveFinalizer(resource, synapseBridgeFinalizer); !ok {
+					err := errors.New("error removing finalizer")
+					log.Error(err, "Error removing finalizer")
+					return subreconciler.RequeueWithError(err)
+				}
+
+				if err := kubeClient.Update(ctx, resource); err != nil {
+					log.Error(err, "error updating Status")
+					return subreconciler.RequeueWithError(err)
+				}
+			}
+			return subreconciler.DoNotRequeue()
+		}
+		return subreconciler.ContinueReconciling()
+	}
+}
+
+// AddFinalizer returns a function of type subreconciler.FnWithRequest
+func AddFinalizer(kubeClient client.Client, resource Bridge) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
+	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+		log := ctrllog.FromContext(ctx)
+
+		if r, err := GetResource(ctx, kubeClient, req, resource); subreconciler.ShouldHaltOrRequeue(r, err) {
+			return r, err
+		}
+
+		if !controllerutil.ContainsFinalizer(resource, synapseBridgeFinalizer) {
+			log.Info("Adding Finalizer for Memcached")
+			if ok := controllerutil.AddFinalizer(resource, synapseBridgeFinalizer); !ok {
+				err := errors.New("error adding finalizer")
+				log.Error(err, "Failed to add finalizer into the custom resource")
+				return subreconciler.RequeueWithError(err)
+			}
+
+			if err := kubeClient.Update(ctx, resource); err != nil {
+				log.Error(err, "Failed to update custom resource to add finalizer")
+				return subreconciler.RequeueWithError(err)
+			}
 		}
 
 		return subreconciler.ContinueReconciling()

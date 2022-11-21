@@ -64,6 +64,8 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// We need to trigger a Synapse reconciliation so that it becomes aware of
 	// the Heisenbridge.
 	subreconcilersForHeisenbridge = []subreconciler.FnWithRequest{
+		utils.HandleDelete(r.Client, &synapsev1alpha1.Heisenbridge{}),
+		utils.AddFinalizer(r.Client, &synapsev1alpha1.Heisenbridge{}),
 		utils.TriggerSynapseReconciliation(r.Client, &synapsev1alpha1.Heisenbridge{}),
 	}
 
