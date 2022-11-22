@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	pgov1beta1 "github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	"github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/utils"
 )
@@ -51,8 +52,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 	var cancel context.CancelFunc
 
 	var deleteResource func(client.Object, types.NamespacedName, bool)
-	var checkSubresourceAbsence func(string)
+	var checkSubresourceAbsence func(types.NamespacedName, ...client.Object)
 	var checkResourcePresence func(client.Object, types.NamespacedName, metav1.OwnerReference)
+	var checkStatus func(string, string, types.NamespacedName, client.Object)
 
 	// Common function to start envTest
 	var startenvTest = func() {
@@ -70,7 +72,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 		Expect(k8sClient).NotTo(BeNil())
 
 		k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-			Scheme: scheme.Scheme,
+			Scheme:             scheme.Scheme,
+			MetricsBindAddress: "0",
 		})
 		Expect(err).ToNot(HaveOccurred())
 
@@ -81,8 +84,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 		Expect(err).ToNot(HaveOccurred())
 
 		deleteResource = utils.DeleteResourceFunc(k8sClient, ctx, timeout, interval)
-		checkSubresourceAbsence = utils.CheckSubresourceAbsenceFunc(SynapseName, SynapseNamespace, k8sClient, ctx, timeout, interval)
+		checkSubresourceAbsence = utils.CheckSubresourceAbsenceFunc(k8sClient, ctx, timeout, interval)
 		checkResourcePresence = utils.CheckResourcePresenceFunc(k8sClient, ctx, timeout, interval)
+		checkStatus = utils.CheckStatusFunc(k8sClient, ctx, timeout, interval)
 
 		go func() {
 			defer GinkgoRecover()
@@ -133,6 +137,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			testEnv = &envtest.Environment{
 				CRDDirectoryPaths: []string{
 					filepath.Join("..", "..", "..", "bundle", "manifests", "synapse.opdev.io_synapses.yaml"),
+					filepath.Join("..", "..", "..", "bundle", "manifests", "synapse.opdev.io_heisenbridges.yaml"),
+					filepath.Join("..", "..", "..", "bundle", "manifests", "synapse.opdev.io_mautrixsignals.yaml"),
 				},
 				CRDs:                  []*v1.CustomResourceDefinition{&PostgresClusterCRD},
 				ErrorIfCRDPathMissing: true,
@@ -311,7 +317,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				createdServiceAccount = &corev1.ServiceAccount{}
 				createdRoleBinding = &rbacv1.RoleBinding{}
 				// The OwnerReference UID must be set after the Synapse instance has been
-				// created. See the JustBeforeEach node.
+				// created.
 				expectedOwnerReference = metav1.OwnerReference{
 					Kind:               "Synapse",
 					APIVersion:         "synapse.opdev.io/v1alpha1",
@@ -647,11 +653,11 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 								createdConfigMap,
 							)).Should(Succeed())
 
-							cm_data, ok := createdConfigMap.Data["homeserver.yaml"]
+							ConfigMapData, ok := createdConfigMap.Data["homeserver.yaml"]
 							g.Expect(ok).Should(BeTrue())
 
 							homeserver := make(map[string]interface{})
-							g.Expect(yaml.Unmarshal([]byte(cm_data), homeserver)).Should(Succeed())
+							g.Expect(yaml.Unmarshal([]byte(ConfigMapData), homeserver)).Should(Succeed())
 
 							_, ok = homeserver["database"]
 							g.Expect(ok).Should(BeTrue())
@@ -681,521 +687,248 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					})
 				})
 
-				// When("Enabling the Heisenbridge", func() {
-				// 	const (
-				// 		heisenbridgePort = 9898
-				// 	)
-
-				// 	var createdHeisenbridgeDeployment *appsv1.Deployment
-				// 	var createdHeisenbridgeService *corev1.Service
-				// 	var createdHeisenbridgeConfigMap *corev1.ConfigMap
-				// 	var heisenbridgeLookupKey types.NamespacedName
-
-				// 	var initHeisenbridgeVariables = func() {
-				// 		// Init vars
-				// 		createdHeisenbridgeDeployment = &appsv1.Deployment{}
-				// 		createdHeisenbridgeService = &corev1.Service{}
-				// 		createdHeisenbridgeConfigMap = &corev1.ConfigMap{}
-
-				// 		heisenbridgeLookupKey = types.NamespacedName{Name: SynapseName + "-heisenbridge", Namespace: SynapseNamespace}
-				// 	}
-
-				// 	var cleanupHeisenbridgeResources = func() {
-				// 		By("Cleaning up the Heisenbridge Deployment")
-				// 		deleteResource(createdHeisenbridgeDeployment, heisenbridgeLookupKey, false)
-
-				// 		By("Cleaning up the Heisenbridge Service")
-				// 		deleteResource(createdHeisenbridgeService, heisenbridgeLookupKey, false)
-
-				// 		By("Cleaning up the Heisenbridge ConfigMap")
-				// 		deleteResource(createdHeisenbridgeConfigMap, heisenbridgeLookupKey, false)
-				// 	}
-
-				// 	When("Using the default configuration", func() {
-				// 		BeforeAll(func() {
-				// 			initSynapseVariables()
-				// 			initHeisenbridgeVariables()
-
-				// 			inputConfigmapData = map[string]string{
-				// 				"homeserver.yaml": "server_name: " + ServerName + "\n" +
-				// 					"report_stats: " + strconv.FormatBool(ReportStats),
-				// 			}
-
-				// 			synapseSpec = synapsev1alpha1.SynapseSpec{
-				// 				Homeserver: synapsev1alpha1.SynapseHomeserver{
-				// 					ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
-				// 						Name: InputConfigMapName,
-				// 					},
-				// 				},
-				// 				Bridges: synapsev1alpha1.SynapseBridges{
-				// 					Heisenbridge: synapsev1alpha1.SynapseHeisenbridge{
-				// 						Enabled: true,
-				// 					},
-				// 				},
-				// 			}
-
-				// 			createSynapseConfigMap()
-				// 			createSynapseInstance()
-				// 		})
-
-				// 		AfterAll(func() {
-				// 			// Cleanup Heisenbridge resources
-				// 			cleanupSynapseResources()
-				// 			cleanupSynapseConfigMap()
-				// 			cleanupHeisenbridgeResources()
-				// 		})
-
-				// 		It("Should create a ConfigMap for Heisenbridge", func() {
-				// 			checkResourcePresence(createdHeisenbridgeConfigMap, heisenbridgeLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a Deployment for Heisenbridge", func() {
-				// 			checkResourcePresence(createdHeisenbridgeDeployment, heisenbridgeLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a Service for Heisenbridge", func() {
-				// 			checkResourcePresence(createdHeisenbridgeService, heisenbridgeLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should update the Synapse homeserver.yaml", func() {
-				// 			Eventually(func(g Gomega) {
-				// 				g.Expect(k8sClient.Get(ctx,
-				// 					types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace},
-				// 					createdConfigMap,
-				// 				)).Should(Succeed())
-
-				// 				cm_data, ok := createdConfigMap.Data["homeserver.yaml"]
-				// 				g.Expect(ok).Should(BeTrue())
-
-				// 				homeserver := make(map[string]interface{})
-				// 				g.Expect(yaml.Unmarshal([]byte(cm_data), homeserver)).Should(Succeed())
-
-				// 				_, ok = homeserver["app_service_config_files"]
-				// 				g.Expect(ok).Should(BeTrue())
-
-				// 				g.Expect(homeserver["app_service_config_files"]).Should(ContainElement("/data-heisenbridge/heisenbridge.yaml"))
-				// 			}, timeout, interval).Should(Succeed())
-				// 		})
-				// 	})
-
-				// 	When("The user provides an input ConfigMap", func() {
-				// 		var inputHeisenbridgeConfigMap *corev1.ConfigMap
-				// 		var inputHeisenbridgeConfigMapData map[string]string
-
-				// 		const InputHeisenbridgeConfigMapName = "heisenbridge-input"
-				// 		const heisenbridgeFQDN = SynapseName + "-heisenbridge." + SynapseNamespace + ".svc.cluster.local"
-
-				// 		BeforeAll(func() {
-				// 			initSynapseVariables()
-				// 			initHeisenbridgeVariables()
-
-				// 			inputConfigmapData = map[string]string{
-				// 				"homeserver.yaml": "server_name: " + ServerName + "\n" +
-				// 					"report_stats: " + strconv.FormatBool(ReportStats),
-				// 			}
-
-				// 			synapseSpec = synapsev1alpha1.SynapseSpec{
-				// 				Homeserver: synapsev1alpha1.SynapseHomeserver{
-				// 					ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
-				// 						Name: InputConfigMapName,
-				// 					},
-				// 				},
-				// 				Bridges: synapsev1alpha1.SynapseBridges{
-				// 					Heisenbridge: synapsev1alpha1.SynapseHeisenbridge{
-				// 						Enabled: true,
-				// 						ConfigMap: synapsev1alpha1.SynapseHeisenbridgeConfigMap{
-				// 							Name: InputHeisenbridgeConfigMapName,
-				// 						},
-				// 					},
-				// 				},
-				// 			}
-
-				// 			By("Creating a ConfigMap containing a basic heisenbridge.yaml")
-				// 			// Incomplete heisenbridge.yaml, containing only the
-				// 			// required data for our tests. In particular, we
-				// 			// will test if the URL has been correctly updated
-				// 			inputHeisenbridgeConfigMapData = map[string]string{
-				// 				"heisenbridge.yaml": "url: http://10.217.5.134:" + strconv.Itoa(heisenbridgePort),
-				// 			}
-
-				// 			inputHeisenbridgeConfigMap = &corev1.ConfigMap{
-				// 				ObjectMeta: metav1.ObjectMeta{
-				// 					Name:      InputHeisenbridgeConfigMapName,
-				// 					Namespace: SynapseNamespace,
-				// 				},
-				// 				Data: inputHeisenbridgeConfigMapData,
-				// 			}
-				// 			Expect(k8sClient.Create(ctx, inputHeisenbridgeConfigMap)).Should(Succeed())
-
-				// 			createSynapseConfigMap()
-				// 			createSynapseInstance()
-				// 		})
-
-				// 		AfterAll(func() {
-				// 			// Cleanup Heisenbridge resources
-				// 			By("Cleaning up the Heisenbridge ConfigMap")
-				// 			heisenbridgeConfigMapLookupKey := types.NamespacedName{
-				// 				Name:      InputHeisenbridgeConfigMapName,
-				// 				Namespace: SynapseNamespace,
-				// 			}
-
-				// 			deleteResource(inputHeisenbridgeConfigMap, heisenbridgeConfigMapLookupKey, false)
-
-				// 			cleanupSynapseResources()
-				// 			cleanupSynapseConfigMap()
-				// 			cleanupHeisenbridgeResources()
-				// 		})
-
-				// 		It("Should create a ConfigMap for Heisenbridge", func() {
-				// 			checkResourcePresence(createdHeisenbridgeConfigMap, heisenbridgeLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a Deployment for Heisenbridge", func() {
-				// 			checkResourcePresence(createdHeisenbridgeDeployment, heisenbridgeLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a Service for Heisenbridge", func() {
-				// 			checkResourcePresence(createdHeisenbridgeService, heisenbridgeLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should add url value to the created Heisenbridge ConfigMap", func() {
-				// 			Eventually(func(g Gomega) {
-				// 				g.Expect(k8sClient.Get(ctx, heisenbridgeLookupKey, inputHeisenbridgeConfigMap)).Should(Succeed())
-
-				// 				cm_data, ok := inputHeisenbridgeConfigMap.Data["heisenbridge.yaml"]
-				// 				g.Expect(ok).Should(BeTrue())
-
-				// 				heisenbridge := make(map[string]interface{})
-				// 				g.Expect(yaml.Unmarshal([]byte(cm_data), heisenbridge)).Should(Succeed())
-
-				// 				_, ok = heisenbridge["url"]
-				// 				g.Expect(ok).Should(BeTrue())
-
-				// 				g.Expect(heisenbridge["url"]).To(Equal("http://" + heisenbridgeFQDN + ":" + strconv.Itoa(heisenbridgePort)))
-				// 			}, timeout, interval).Should(Succeed())
-				// 		})
-				// 	})
-				// })
-
-				// When("Enabling the mautrix-signal", func() {
-				// 	const (
-				// 		mautrixSignalPort = 29328
-				// 	)
-
-				// 	var createdSignaldDeployment *appsv1.Deployment
-				// 	var createdSignaldPVC *corev1.PersistentVolumeClaim
-				// 	var createdMautrixSignalServiceAccount *corev1.ServiceAccount
-				// 	var createdMautrixSignalRoleBinding *rbacv1.RoleBinding
-				// 	var createdMautrixSignalDeployment *appsv1.Deployment
-				// 	var createdMautrixSignalPVC *corev1.PersistentVolumeClaim
-				// 	var createdMautrixSignalService *corev1.Service
-				// 	var createdMautrixSignalConfigMap *corev1.ConfigMap
-				// 	var mautrixSignalLookupKey types.NamespacedName
-				// 	var signaldLookupKey types.NamespacedName
-
-				// 	var initMautrixSignalVariables = func() {
-				// 		// Init vars
-				// 		createdSignaldDeployment = &appsv1.Deployment{}
-				// 		createdSignaldPVC = &corev1.PersistentVolumeClaim{}
-				// 		createdMautrixSignalServiceAccount = &corev1.ServiceAccount{}
-				// 		createdMautrixSignalRoleBinding = &rbacv1.RoleBinding{}
-				// 		createdMautrixSignalDeployment = &appsv1.Deployment{}
-				// 		createdMautrixSignalPVC = &corev1.PersistentVolumeClaim{}
-				// 		createdMautrixSignalService = &corev1.Service{}
-				// 		createdMautrixSignalConfigMap = &corev1.ConfigMap{}
-
-				// 		signaldLookupKey = types.NamespacedName{Name: SynapseName + "-signald", Namespace: SynapseNamespace}
-				// 		mautrixSignalLookupKey = types.NamespacedName{Name: SynapseName + "-mautrixsignal", Namespace: SynapseNamespace}
-				// 	}
-
-				// 	var cleanupMautrixSignalResources = func() {
-				// 		By("Cleaning up the signald Deployment")
-				// 		deleteResource(createdSignaldDeployment, signaldLookupKey, false)
-
-				// 		By("Cleaning up the mautrix-signal Deployment")
-				// 		deleteResource(createdMautrixSignalDeployment, mautrixSignalLookupKey, false)
-
-				// 		By("Cleaning up the signald PVC")
-				// 		deleteResource(createdSignaldPVC, signaldLookupKey, true)
-
-				// 		By("Cleaning up the mautrix-signal PVC")
-				// 		deleteResource(createdMautrixSignalPVC, mautrixSignalLookupKey, true)
-
-				// 		By("Cleaning up the mautrix-signal Service")
-				// 		deleteResource(createdMautrixSignalService, mautrixSignalLookupKey, false)
-
-				// 		By("Cleaning up the mautrix-signal ConfigMap")
-				// 		deleteResource(createdMautrixSignalConfigMap, mautrixSignalLookupKey, false)
-
-				// 		By("Cleaning up mautrix-signal RoleBinding")
-				// 		deleteResource(createdMautrixSignalRoleBinding, mautrixSignalLookupKey, false)
-
-				// 		By("Cleaning up mautrix-signal ServiceAccount")
-				// 		deleteResource(createdMautrixSignalServiceAccount, mautrixSignalLookupKey, false)
-				// 	}
-
-				// 	When("Using the default configuration", func() {
-				// 		BeforeAll(func() {
-				// 			initSynapseVariables()
-				// 			initMautrixSignalVariables()
-
-				// 			inputConfigmapData = map[string]string{
-				// 				"homeserver.yaml": "server_name: " + ServerName + "\n" +
-				// 					"report_stats: " + strconv.FormatBool(ReportStats),
-				// 			}
-
-				// 			synapseSpec = synapsev1alpha1.SynapseSpec{
-				// 				Homeserver: synapsev1alpha1.SynapseHomeserver{
-				// 					ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
-				// 						Name: InputConfigMapName,
-				// 					},
-				// 				},
-				// 				Bridges: synapsev1alpha1.SynapseBridges{
-				// 					MautrixSignal: synapsev1alpha1.SynapseMautrixSignal{
-				// 						Enabled: true,
-				// 					},
-				// 				},
-				// 			}
-
-				// 			createSynapseConfigMap()
-				// 			createSynapseInstance()
-				// 		})
-
-				// 		AfterAll(func() {
-				// 			// Cleanup mautrix-signal resources
-				// 			cleanupSynapseResources()
-				// 			cleanupSynapseConfigMap()
-				// 			cleanupMautrixSignalResources()
-				// 		})
-
-				// 		It("Should create a Deployment for signald", func() {
-				// 			checkResourcePresence(createdSignaldDeployment, signaldLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a PVC for signald", func() {
-				// 			checkResourcePresence(createdSignaldPVC, signaldLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a ConfigMap for mautrix-signal", func() {
-				// 			checkResourcePresence(createdMautrixSignalConfigMap, mautrixSignalLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a Role Binding for mautrix-signal", func() {
-				// 			checkResourcePresence(createdMautrixSignalRoleBinding, mautrixSignalLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a Service Account for mautrix-signal", func() {
-				// 			checkResourcePresence(createdMautrixSignalServiceAccount, mautrixSignalLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a Deployment for mautrix-signal", func() {
-				// 			checkResourcePresence(createdMautrixSignalDeployment, mautrixSignalLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a PVC for mautrix-signal", func() {
-				// 			checkResourcePresence(createdMautrixSignalPVC, mautrixSignalLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a Service for mautrix-signal", func() {
-				// 			checkResourcePresence(createdMautrixSignalService, mautrixSignalLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should update the Synapse homeserver.yaml", func() {
-				// 			Eventually(func(g Gomega) {
-				// 				g.Expect(k8sClient.Get(ctx,
-				// 					types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace},
-				// 					createdConfigMap,
-				// 				)).Should(Succeed())
-
-				// 				cm_data, ok := createdConfigMap.Data["homeserver.yaml"]
-				// 				g.Expect(ok).Should(BeTrue())
-
-				// 				homeserver := make(map[string]interface{})
-				// 				g.Expect(yaml.Unmarshal([]byte(cm_data), homeserver)).Should(Succeed())
-
-				// 				_, ok = homeserver["app_service_config_files"]
-				// 				g.Expect(ok).Should(BeTrue())
-
-				// 				g.Expect(homeserver["app_service_config_files"]).Should(ContainElement("/data-mautrixsignal/registration.yaml"))
-				// 			}, timeout, interval).Should(Succeed())
-				// 		})
-				// 	})
-
-				// 	When("The user provides an input ConfigMap", func() {
-				// 		var inputMautrixSignalConfigMap *corev1.ConfigMap
-				// 		var inputMautrixSignalConfigMapData map[string]string
-
-				// 		const InputMautrixSignalConfigMapName = "mautrix-signal-input"
-				// 		const mautrixSignalFQDN = SynapseName + "-mautrixsignal." + SynapseNamespace + ".svc.cluster.local"
-				// 		const synapseFQDN = SynapseName + "." + SynapseNamespace + ".svc.cluster.local"
-
-				// 		BeforeAll(func() {
-				// 			initSynapseVariables()
-				// 			initMautrixSignalVariables()
-
-				// 			inputConfigmapData = map[string]string{
-				// 				"homeserver.yaml": "server_name: " + ServerName + "\n" +
-				// 					"report_stats: " + strconv.FormatBool(ReportStats),
-				// 			}
-
-				// 			synapseSpec = synapsev1alpha1.SynapseSpec{
-				// 				Homeserver: synapsev1alpha1.SynapseHomeserver{
-				// 					ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
-				// 						Name: InputConfigMapName,
-				// 					},
-				// 				},
-				// 				Bridges: synapsev1alpha1.SynapseBridges{
-				// 					MautrixSignal: synapsev1alpha1.SynapseMautrixSignal{
-				// 						Enabled: true,
-				// 						ConfigMap: synapsev1alpha1.SynapseMautrixSignalConfigMap{
-				// 							Name: InputMautrixSignalConfigMapName,
-				// 						},
-				// 					},
-				// 				},
-				// 			}
-
-				// 			By("Creating a ConfigMap containing a basic config.yaml")
-				// 			// Incomplete config.yaml, containing only the
-				// 			// required data for our tests. We test that those
-				// 			// values are correctly updated
-				// 			configYaml := `
-				//             homeserver:
-				//                 address: http://localhost:8008
-				//                 domain: mydomain.com
-				//             appservice:
-				//                 address: http://localhost:29328
-				//             signal:
-				//                 socket_path: /var/run/signald/signald.sock
-				//             bridge:
-				//                 permissions:
-				//                     "*": "relay"
-				//                     "mydomain.com": "user"
-				//                     "@admin:mydomain.com": "admin"
-				//             logging:
-				//                 handlers:
-				//                     file:
-				//                         filename: ./mautrix-signal.log`
-
-				// 			inputMautrixSignalConfigMapData = map[string]string{
-				// 				"config.yaml": configYaml,
-				// 			}
-
-				// 			inputMautrixSignalConfigMap = &corev1.ConfigMap{
-				// 				ObjectMeta: metav1.ObjectMeta{
-				// 					Name:      InputMautrixSignalConfigMapName,
-				// 					Namespace: SynapseNamespace,
-				// 				},
-				// 				Data: inputMautrixSignalConfigMapData,
-				// 			}
-				// 			Expect(k8sClient.Create(ctx, inputMautrixSignalConfigMap)).Should(Succeed())
-
-				// 			createSynapseConfigMap()
-				// 			createSynapseInstance()
-				// 		})
-
-				// 		AfterAll(func() {
-				// 			// Cleanup mautrix-signal resources
-				// 			By("Cleaning up the mautrix-signal ConfigMap")
-				// 			mautrixSignalConfigMapLookupKey := types.NamespacedName{
-				// 				Name:      InputMautrixSignalConfigMapName,
-				// 				Namespace: SynapseNamespace,
-				// 			}
-
-				// 			deleteResource(inputMautrixSignalConfigMap, mautrixSignalConfigMapLookupKey, false)
-
-				// 			cleanupSynapseResources()
-				// 			cleanupSynapseConfigMap()
-				// 			cleanupMautrixSignalResources()
-				// 		})
-
-				// 		It("Should create a Deployment for signald", func() {
-				// 			checkResourcePresence(createdMautrixSignalDeployment, signaldLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a PVC for signald", func() {
-				// 			checkResourcePresence(createdSignaldPVC, signaldLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a ConfigMap for mautrix-signal", func() {
-				// 			checkResourcePresence(createdMautrixSignalConfigMap, mautrixSignalLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a Role Binding for mautrix-signal", func() {
-				// 			checkResourcePresence(createdMautrixSignalRoleBinding, mautrixSignalLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a Service Account for mautrix-signal", func() {
-				// 			checkResourcePresence(createdMautrixSignalServiceAccount, mautrixSignalLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a Deployment for mautrix-signal", func() {
-				// 			checkResourcePresence(createdMautrixSignalDeployment, mautrixSignalLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a PVC for mautrix-signal", func() {
-				// 			checkResourcePresence(createdMautrixSignalPVC, mautrixSignalLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should create a Service for mautrix-signal", func() {
-				// 			checkResourcePresence(createdMautrixSignalService, mautrixSignalLookupKey, expectedOwnerReference)
-				// 		})
-
-				// 		It("Should overwrite necessary values in the created mautrix-signal ConfigMap", func() {
-				// 			Eventually(func(g Gomega) {
-				// 				By("Verifying that the mautrixsignal ConfigMap exists")
-				// 				g.Expect(k8sClient.Get(ctx, mautrixSignalLookupKey, inputMautrixSignalConfigMap)).Should(Succeed())
-
-				// 				cm_data, ok := inputMautrixSignalConfigMap.Data["config.yaml"]
-				// 				g.Expect(ok).Should(BeTrue())
-
-				// 				config := make(map[string]interface{})
-				// 				g.Expect(yaml.Unmarshal([]byte(cm_data), config)).Should(Succeed())
-
-				// 				By("Verifying that the homeserver configuration has been updated")
-				// 				configHomeserver, ok := config["homeserver"].(map[interface{}]interface{})
-				// 				g.Expect(ok).Should(BeTrue())
-				// 				g.Expect(configHomeserver["address"]).To(Equal("http://" + synapseFQDN + ":8008"))
-				// 				g.Expect(configHomeserver["domain"]).To(Equal(ServerName))
-
-				// 				By("Verifying that the appservice configuration has been updated")
-				// 				configAppservice, ok := config["appservice"].(map[interface{}]interface{})
-				// 				g.Expect(ok).Should(BeTrue())
-				// 				g.Expect(configAppservice["address"]).To(Equal("http://" + mautrixSignalFQDN + ":" + strconv.Itoa(mautrixSignalPort)))
-
-				// 				By("Verifying that the signal configuration has been updated")
-				// 				configSignal, ok := config["signal"].(map[interface{}]interface{})
-				// 				g.Expect(ok).Should(BeTrue())
-				// 				g.Expect(configSignal["socket_path"]).To(Equal("/signald/signald.sock"))
-
-				// 				By("Verifying that the permissions have been updated")
-				// 				configBridge, ok := config["bridge"].(map[interface{}]interface{})
-				// 				g.Expect(ok).Should(BeTrue())
-				// 				configBridgePermissions, ok := configBridge["permissions"].(map[interface{}]interface{})
-				// 				g.Expect(ok).Should(BeTrue())
-				// 				g.Expect(configBridgePermissions).Should(HaveKeyWithValue("*", "relay"))
-				// 				g.Expect(configBridgePermissions).Should(HaveKeyWithValue(ServerName, "user"))
-				// 				g.Expect(configBridgePermissions).Should(HaveKeyWithValue("@admin:"+ServerName, "admin"))
-
-				// 				By("Verifying that the log configuration file path have been updated")
-				// 				configLogging, ok := config["logging"].(map[interface{}]interface{})
-				// 				g.Expect(ok).Should(BeTrue())
-				// 				configLoggingHandlers, ok := configLogging["handlers"].(map[interface{}]interface{})
-				// 				g.Expect(ok).Should(BeTrue())
-				// 				configLoggingHandlersFile, ok := configLoggingHandlers["file"].(map[interface{}]interface{})
-				// 				g.Expect(ok).Should(BeTrue())
-				// 				g.Expect(configLoggingHandlersFile["filename"]).To(Equal("/data/mautrix-signal.log"))
-				// 			}, timeout, interval).Should(Succeed())
-				// 		})
-				// 	})
-				// })
-
+				When("Enabling the Heisenbridge", func() {
+					const (
+						heisenbridgeName      = "test-heisenbridge"
+						heisenbridgeNamespace = "default"
+					)
+					var heisenbridge *v1alpha1.Heisenbridge
+
+					BeforeAll(func() {
+						initSynapseVariables()
+
+						By("Creating the MautrixSignal object")
+						heisenbridge = &v1alpha1.Heisenbridge{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      heisenbridgeName,
+								Namespace: heisenbridgeNamespace,
+							},
+							Spec: v1alpha1.HeisenbridgeSpec{
+								Synapse: v1alpha1.HeisenbridgeSynapseSpec{
+									Name: SynapseName,
+								},
+							},
+						}
+						Expect(k8sClient.Create(ctx, heisenbridge)).Should(Succeed())
+
+						inputConfigmapData = map[string]string{
+							"homeserver.yaml": "server_name: " + ServerName + "\n" +
+								"report_stats: " + strconv.FormatBool(ReportStats),
+						}
+
+						synapseSpec = synapsev1alpha1.SynapseSpec{
+							Homeserver: synapsev1alpha1.SynapseHomeserver{
+								ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
+									Name: InputConfigMapName,
+								},
+							},
+						}
+
+						createSynapseConfigMap()
+						createSynapseInstance()
+					})
+
+					AfterAll(func() {
+						cleanupSynapseResources()
+						cleanupSynapseConfigMap()
+
+						By("Deleting the Heisenbridge object")
+						Expect(k8sClient.Delete(ctx, heisenbridge)).Should(Succeed())
+					})
+
+					It("Should register the presence of the bridge in the Synapse status", func() {
+						expectedStatusBridgesHeisenbridge := v1alpha1.SynapseStatusBridgesHeisenbridge{
+							Enabled: true,
+							Name:    heisenbridgeName,
+						}
+						Eventually(func(g Gomega) v1alpha1.SynapseStatusBridgesHeisenbridge {
+							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
+							return synapse.Status.Bridges.Heisenbridge
+						}, timeout, interval).Should(Equal(expectedStatusBridgesHeisenbridge))
+					})
+
+					It("Should update the Synapse homeserver.yaml", func() {
+						Eventually(func(g Gomega) {
+							g.Expect(k8sClient.Get(ctx,
+								types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace},
+								createdConfigMap,
+							)).Should(Succeed())
+
+							ConfigMapData, ok := createdConfigMap.Data["homeserver.yaml"]
+							g.Expect(ok).Should(BeTrue())
+
+							homeserver := make(map[string]interface{})
+							g.Expect(yaml.Unmarshal([]byte(ConfigMapData), homeserver)).Should(Succeed())
+
+							_, ok = homeserver["app_service_config_files"]
+							g.Expect(ok).Should(BeTrue())
+
+							g.Expect(homeserver["app_service_config_files"]).Should(ContainElement("/data-heisenbridge/heisenbridge.yaml"))
+						}, timeout, interval).Should(Succeed())
+					})
+
+					It("Should mount the Heisenbridge ConfigMap in the Synapse Deployment", func() {
+						By("Checking that a Synapse Deployment exists and is correctly configured")
+						checkResourcePresence(createdDeployment, synapseLookupKey, expectedOwnerReference)
+
+						By("Checking that the VolumeMount for the Heisenbridge Volume is present")
+						heisenbridgeVolumeMount := corev1.VolumeMount{
+							Name:      "data-heisenbridge",
+							MountPath: "/data-heisenbridge",
+						}
+						Expect(createdDeployment.Spec.Template.Spec.Containers[0].VolumeMounts).
+							Should(ContainElement(heisenbridgeVolumeMount))
+
+						By("Checking that the Volume for the Heisenbridge ConfigMap is present")
+						var defaultMode int32 = 420
+						heisenbridgeVolume := corev1.Volume{
+							Name: "data-heisenbridge",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: heisenbridgeName,
+									},
+									DefaultMode: &defaultMode,
+								},
+							},
+						}
+						Expect(createdDeployment.Spec.Template.Spec.Volumes).
+							Should(ContainElement(heisenbridgeVolume))
+					})
+				})
+
+				When("A Mautrix-Signal bridge refers this Synapse instance", func() {
+					const (
+						mautrixSignalName      = "test-mautrixsignal"
+						mautrixSignalNamespace = "default"
+					)
+
+					var mautrixsignal *v1alpha1.MautrixSignal
+
+					BeforeAll(func() {
+						initSynapseVariables()
+
+						By("Creating the MautrixSignal object")
+						mautrixsignal = &v1alpha1.MautrixSignal{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      mautrixSignalName,
+								Namespace: mautrixSignalNamespace,
+							},
+							Spec: v1alpha1.MautrixSignalSpec{
+								Synapse: v1alpha1.MautrixSignalSynapseSpec{
+									Name: SynapseName,
+								},
+							},
+						}
+						Expect(k8sClient.Create(ctx, mautrixsignal)).Should(Succeed())
+
+						inputConfigmapData = map[string]string{
+							"homeserver.yaml": "server_name: " + ServerName + "\n" +
+								"report_stats: " + strconv.FormatBool(ReportStats),
+						}
+
+						synapseSpec = synapsev1alpha1.SynapseSpec{
+							Homeserver: synapsev1alpha1.SynapseHomeserver{
+								ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
+									Name: InputConfigMapName,
+								},
+							},
+						}
+
+						createSynapseConfigMap()
+						createSynapseInstance()
+					})
+
+					AfterAll(func() {
+						cleanupSynapseResources()
+						cleanupSynapseConfigMap()
+
+						By("Deleting the MautrixSignal object")
+						Expect(k8sClient.Delete(ctx, mautrixsignal)).Should(Succeed())
+					})
+
+					It("Should register the presence of the bridge in the Synapse status", func() {
+						expectedStatusBridgesMautrixSignal := v1alpha1.SynapseStatusBridgesMautrixSignal{
+							Enabled: true,
+							Name:    mautrixSignalName,
+						}
+						Eventually(func(g Gomega) v1alpha1.SynapseStatusBridgesMautrixSignal {
+							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
+							return synapse.Status.Bridges.MautrixSignal
+						}, timeout, interval).Should(Equal(expectedStatusBridgesMautrixSignal))
+					})
+
+					It("Should update the Synapse homeserver.yaml", func() {
+						Eventually(func(g Gomega) {
+							g.Expect(k8sClient.Get(
+								ctx,
+								types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace},
+								createdConfigMap,
+							)).Should(Succeed())
+
+							ConfigMapData, ok := createdConfigMap.Data["homeserver.yaml"]
+							g.Expect(ok).Should(BeTrue())
+
+							homeserver := make(map[string]interface{})
+							g.Expect(yaml.Unmarshal([]byte(ConfigMapData), homeserver)).Should(Succeed())
+
+							_, ok = homeserver["app_service_config_files"]
+							g.Expect(ok).Should(BeTrue())
+
+							g.Expect(homeserver["app_service_config_files"]).Should(ContainElement("/data-mautrixsignal/registration.yaml"))
+						}, timeout, interval).Should(Succeed())
+					})
+
+					It("Should mount the MautrixSignal PVC in the Synapse Deployment", func() {
+						By("Checking that a Synapse Deployment exists and is correctly configured")
+						checkResourcePresence(createdDeployment, synapseLookupKey, expectedOwnerReference)
+
+						By("Checking that the VolumeMount for the Mautrix-Signal Volume is present")
+						mautrixsignalVolumeMount := corev1.VolumeMount{
+							Name:      "data-mautrixsignal",
+							MountPath: "/data-mautrixsignal",
+						}
+						Expect(createdDeployment.Spec.Template.Spec.Containers[0].VolumeMounts).
+							Should(ContainElement(mautrixsignalVolumeMount))
+
+						By("Checking that the Volume for the Mautrix-Signal PVC is present")
+						mautrixsignalVolume := corev1.Volume{
+							Name: "data-mautrixsignal",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: mautrixSignalName,
+								},
+							},
+						}
+						Expect(createdDeployment.Spec.Template.Spec.Volumes).
+							Should(ContainElement(mautrixsignalVolume))
+					})
+				})
 			})
 		})
 
 		Context("When creating an incorrect Synapse instance", func() {
 			var synapse *synapsev1alpha1.Synapse
+			var createdPVC *corev1.PersistentVolumeClaim
+			var createdDeployment *appsv1.Deployment
+			var createdService *corev1.Service
+			var createdServiceAccount *corev1.ServiceAccount
+			var createdRoleBinding *rbacv1.RoleBinding
+			var synapseLookupKey types.NamespacedName
+
+			var initSynapseVariables = func() {
+				// Init variables
+				synapseLookupKey = types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace}
+				createdPVC = &corev1.PersistentVolumeClaim{}
+				createdDeployment = &appsv1.Deployment{}
+				createdService = &corev1.Service{}
+				createdServiceAccount = &corev1.ServiceAccount{}
+				createdRoleBinding = &rbacv1.RoleBinding{}
+			}
 
 			BeforeEach(func() {
+				initSynapseVariables()
+
 				By("Creating a Synapse instance which refers an absent ConfigMap")
 				synapse = &synapsev1alpha1.Synapse{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1220,7 +953,15 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 			It("Should get in a failed state and not create child objects", func() {
 				reason := "ConfigMap " + InputConfigMapName + " does not exist in namespace " + SynapseNamespace
-				checkSubresourceAbsence(reason)
+				checkStatus("FAILED", reason, synapseLookupKey, synapse)
+				checkSubresourceAbsence(
+					synapseLookupKey,
+					createdPVC,
+					createdDeployment,
+					createdService,
+					createdServiceAccount,
+					createdRoleBinding,
+				)
 			})
 		})
 	})
@@ -1253,7 +994,36 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			var synapse *synapsev1alpha1.Synapse
 			var configMap *corev1.ConfigMap
 
+			var createdPVC *corev1.PersistentVolumeClaim
+			var createdDeployment *appsv1.Deployment
+			var createdService *corev1.Service
+			var createdServiceAccount *corev1.ServiceAccount
+			var createdRoleBinding *rbacv1.RoleBinding
+			var synapseLookupKey types.NamespacedName
+
+			var createdPostgresCluster *pgov1beta1.PostgresCluster
+			var postgresLookupKeys types.NamespacedName
+
+			var initSynapseVariables = func() {
+				// Init variables
+				synapseLookupKey = types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace}
+				createdPVC = &corev1.PersistentVolumeClaim{}
+				createdDeployment = &appsv1.Deployment{}
+				createdService = &corev1.Service{}
+				createdServiceAccount = &corev1.ServiceAccount{}
+				createdRoleBinding = &rbacv1.RoleBinding{}
+			}
+
 			BeforeAll(func() {
+				initSynapseVariables()
+
+				postgresLookupKeys = types.NamespacedName{
+					Name:      synapseLookupKey.Name + "-pgsql",
+					Namespace: synapseLookupKey.Namespace,
+				}
+
+				createdPostgresCluster = &pgov1beta1.PostgresCluster{}
+
 				configMap = &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      InputConfigMapName,
@@ -1294,7 +1064,19 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 			It("Should not create Synapse sub-resources", func() {
 				reason := "Cannot create PostgreSQL instance for synapse. Postgres-operator is not installed."
-				checkSubresourceAbsence(reason)
+				checkStatus("FAILED", reason, synapseLookupKey, synapse)
+				checkSubresourceAbsence(
+					synapseLookupKey,
+					createdPVC,
+					createdDeployment,
+					createdService,
+					createdServiceAccount,
+					createdRoleBinding,
+				)
+				checkSubresourceAbsence(
+					postgresLookupKeys,
+					createdPostgresCluster,
+				)
 			})
 		})
 	})

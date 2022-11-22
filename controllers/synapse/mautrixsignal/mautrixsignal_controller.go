@@ -101,7 +101,7 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		} else {
 			log.Error(
 				err,
-				"Error getting Synapse server name",
+				"Error fetching Synapse instance",
 				"Synapse Name", ms.Spec.Synapse.Name,
 				"Synapse Namespace", utils.ComputeNamespace(ms.Namespace, ms.Spec.Synapse.Namespace),
 			)
@@ -131,6 +131,7 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			"Synapse Name", ms.Spec.Synapse.Name,
 			"Synapse Namespace", utils.ComputeNamespace(ms.Namespace, ms.Spec.Synapse.Namespace),
 		)
+		return ctrl.Result{}, err
 	}
 
 	if r, err := r.triggerSynapseReconciliation(&s, ctx); reconc.ShouldHaltOrRequeue(r, err) {

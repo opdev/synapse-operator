@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package synapse
+package heisenbridge
 
 import (
 	"context"
@@ -97,7 +97,7 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		} else {
 			log.Error(
 				err,
-				"Error getting Synapse server name",
+				"Error fetching Synapse instance",
 				"Synapse Name", h.Spec.Synapse.Name,
 				"Synapse Namespace", utils.ComputeNamespace(h.Namespace, h.Spec.Synapse.Namespace),
 			)
