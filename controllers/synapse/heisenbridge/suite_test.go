@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mautrixsignal
+package heisenbridge
 
 import (
 	"testing"
@@ -30,5 +30,5 @@ import (
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "MautrixSignal Controller Suite")
+	RunSpecs(t, "Heisenbridge Controller Suite")
 }

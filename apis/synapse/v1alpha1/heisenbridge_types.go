@@ -48,8 +48,10 @@ type HeisenbridgeSpec struct {
 }
 
 type HeisenbridgeSynapseSpec struct {
+	// +kubebuilder:validation:Required
+
 	// Name of the Synapse instance
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 
 	// Namespace of the Synapse instance
 	// TODO: Complete
@@ -84,7 +86,8 @@ type Heisenbridge struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   HeisenbridgeSpec   `json:"spec,omitempty"`
+	// +kubebuilder:validation:Required
+	Spec   HeisenbridgeSpec   `json:"spec"`
 	Status HeisenbridgeStatus `json:"status,omitempty"`
 }
 

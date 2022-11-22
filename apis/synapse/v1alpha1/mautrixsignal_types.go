@@ -84,7 +84,8 @@ type MautrixSignal struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MautrixSignalSpec   `json:"spec,omitempty"`
+	// +kubebuilder:validation:Required
+	Spec   MautrixSignalSpec   `json:"spec"`
 	Status MautrixSignalStatus `json:"status,omitempty"`
 }
 

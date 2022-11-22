@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package synapse
+package heisenbridge
 
 import (
 	"context"
@@ -157,7 +157,7 @@ func (r *HeisenbridgeReconciler) configMapForHeisenbridgeCopy(
 ) (*corev1.ConfigMap, error) {
 	var copyConfigMap *corev1.ConfigMap
 
-	sourceConfigMapName := h.Name
+	sourceConfigMapName := h.Spec.ConfigMap.Name
 	sourceConfigMapNamespace := utils.ComputeNamespace(h.Namespace, h.Spec.ConfigMap.Namespace)
 
 	copyConfigMap, err := utils.GetConfigMapCopy(
@@ -215,8 +215,8 @@ func (r *HeisenbridgeReconciler) updateHeisenbridgeWithURL(
 	i interface{},
 	heisenbridge map[string]interface{},
 ) error {
-	h := i.(synapsev1alpha1.Heisenbridge)
+	h := i.(*synapsev1alpha1.Heisenbridge)
 
-	heisenbridge["url"] = "http://" + GetHeisenbridgeServiceFQDN(h) + ":9898"
+	heisenbridge["url"] = "http://" + GetHeisenbridgeServiceFQDN(*h) + ":9898"
 	return nil
 }
