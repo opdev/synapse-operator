@@ -1,7 +1,7 @@
 # Examples
 
-Here is a collection of examples of `Synapse` resources that illustrate the
-main features of the Synapse operator.
+Here is a collection of example resources that illustrates the main features of
+the Synapse operator.
 
 ## Pre-requisites
 
@@ -70,13 +70,13 @@ kind: Synapse
 metadata:
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"synapse.opdev.io/v1alpha1","kind":"Synapse","metadata":{"annotations":{},"name":"my-first-synapse-deployment","namespace":"test-synapse-operator"},"spec":{"homeserver":{"values":{"reportStats":true,"serverName":"example.com"}}}}
-  creationTimestamp: "2022-03-25T11:23:31Z"
+      {"apiVersion":"synapse.opdev.io/v1alpha1","kind":"Synapse","metadata":{"annotations":{},"name":"your-first-synapse-deployment","namespace":"default"},"spec":{"homeserver":{"values":{"reportStats":true,"serverName":"example.com"}}}}
+  creationTimestamp: "2022-11-29T14:27:21Z"
   generation: 1
-  name: my-first-synapse-deployment
-  namespace: test-synapse-operator
-  resourceVersion: "1808066"
-  uid: 862c4adc-3e2e-452b-a355-545010722dca
+  name: your-first-synapse-deployment
+  namespace: default
+  resourceVersion: "98298"
+  uid: 086652b1-9ba9-40ed-9223-1336db12681d
 spec:
   createNewPostgreSQL: false
   homeserver:
@@ -84,14 +84,10 @@ spec:
       reportStats: true
       serverName: example.com
 status:
-  bridgesConfiguration:
-    heisenbridge: {}
-  databaseConnectionInfo: {}
-  homeserverConfigMapName: my-first-synapse-deployment
   homeserverConfiguration:
     reportStats: true
     serverName: example.com
-  ip: 10.217.4.72
+  needsReconcile: false
   state: RUNNING
 ```
 
@@ -102,7 +98,7 @@ To delete the Synapse resources:
 
 ```shell
 $ kubectl delete synapse my-first-synapse-deployment
-synapse.synapse.opdev.io "my-first-synapse-deployment" deleted
+synapse.synapse.opdevio "my-first-synapse-deployment" deleted
 ```
 
 ## Using an existing `homeserver.yaml`
@@ -122,6 +118,14 @@ $ kubectl apply -f examples/02-using-existing-configmap/synapse.yaml
 synapse.synapse.opdev.io/using-existing-configmap created
 ```
 
+To delete the resources:
+```shell
+$ kubectl delete synapse using-existing-configmap
+synapse.synapse..opdevio "using-existing-configmap" deleted
+$ oc delete configmap my-custom-homeserver
+configmap "my-custom-homeserver" deleted
+```
+
 ## Deploying a PostgreSQL instance for Synapse
 
 > *Pre-requisite:* The deployment of a PostgreSQL instance relies on the
@@ -131,7 +135,6 @@ synapse.synapse.opdev.io/using-existing-configmap created
 
 The `03-deploying-postgresql` directory provides an example of a `Synapse`
 resource requesting for a new PostgreSQL instance to be deployed:
-
 
 ```shell
 $ kubectl apply -f examples/03-deploying-postgresql/synapse.yaml
@@ -186,6 +189,10 @@ The synapse Operator supports the deployment of:
 The bridges don't have any dependency to one another. You can choose to deploy
 one, several, or none of them.
 
+Bridges are deployed by creating a coresponding Kubernetes resource:
+* The `Heisenbridge` resource is used to deploy and manage Heisenbridge.
+* The `MautrixSignal` resource is used to deploy and manage the mautrix-signal bridge.
+
 For both bridges, you can choose between using the default configuration file
 and providing your custom configuration file.
 
@@ -193,35 +200,47 @@ and providing your custom configuration file.
 
 In this case, the Synapse operator provides default configuration values.
 
-An example of a `Synapse` resource using the default Heisenbridge configuration
-is available under the `04-deploying-heisenbridge/A-default-configuration`
-directory:
+An example of a `Heisenbridge` resource using the default Heisenbridge
+configuration is available under the
+`04-deploying-heisenbridge/A-default-configuration` directory:
+
+First create the Synapse resource:
 
 ```shell
 $ kubectl apply -f examples/04-deploying-heisenbridge/A-default-configuration/synapse.yaml
 synapse.synapse.opdev.io/synapse-with-heisenbridge created
-$ kubectl get pods,replicaset,deployment,pods,service,configmap
-NAME                                                          READY   STATUS    RESTARTS      AGE
-pod/synapse-with-heisenbridge-5474cc57db-k8vlb                1/1     Running   0             21s
-pod/synapse-with-heisenbridge-heisenbridge-865d759bff-w4wg4   1/1     Running   1 (15s ago)   22s
+```
 
-NAME                                                                DESIRED   CURRENT   READY   AGE
-replicaset.apps/synapse-with-heisenbridge-5474cc57db                1         1         1       22s
-replicaset.apps/synapse-with-heisenbridge-heisenbridge-865d759bff   1         1         1       22s
+Then create the Heisenbridge resource:
 
-NAME                                                     READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/synapse-with-heisenbridge                1/1     1            1           22s
-deployment.apps/synapse-with-heisenbridge-heisenbridge   1/1     1            1           22s
+```shell
+$ kubectl apply -f examples/04-deploying-heisenbridge/A-default-configuration/heisenbridge.yaml
+heisenbridge.synapse.opdev.io/heisenbridge-for-synapse created
+$ $ kubectl get pods,replicaset,deployment,pods,service,configmap
+NAME                                             READY   STATUS    RESTARTS      AGE
+pod/heisenbridge-for-synapse-7b47fc66f4-t8vz7    1/1     Running   2 (48s ago)   54s
+pod/synapse-with-heisenbridge-685c97478f-zltsc   1/1     Running   0             54s
 
-NAME                                             TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
-service/synapse-with-heisenbridge                ClusterIP   10.217.5.178   <none>        8008/TCP   22s
-service/synapse-with-heisenbridge-heisenbridge   ClusterIP   10.217.5.121   <none>        9898/TCP   22s
+NAME                                                   DESIRED   CURRENT   READY   AGE
+replicaset.apps/heisenbridge-for-synapse-7b47fc66f4    1         1         1       54s
+replicaset.apps/synapse-with-heisenbridge-6445b859d7   0         0         0       85s
+replicaset.apps/synapse-with-heisenbridge-685c97478f   1         1         1       54s
 
-NAME                                               DATA   AGE
-configmap/kube-root-ca.crt                         1      6d19h
-configmap/openshift-service-ca.crt                 1      6d19h
-configmap/synapse-with-heisenbridge                1      22s
-configmap/synapse-with-heisenbridge-heisenbridge   1      22s
+NAME                                        READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/heisenbridge-for-synapse    1/1     1            1           54s
+deployment.apps/synapse-with-heisenbridge   1/1     1            1           85s
+
+NAME                                TYPE           CLUSTER-IP     EXTERNAL-IP                            PORT(S)    AGE
+service/heisenbridge-for-synapse    ClusterIP      10.217.5.7     <none>                                 9898/TCP   54s
+service/kubernetes                  ClusterIP      10.217.4.1     <none>                                 443/TCP    57d
+service/openshift                   ExternalName   <none>         kubernetes.default.svc.cluster.local   <none>     57d
+service/synapse-with-heisenbridge   ClusterIP      10.217.5.127   <none>                                 8008/TCP   85s
+
+NAME                                  DATA   AGE
+configmap/heisenbridge-for-synapse    1      54s
+configmap/kube-root-ca.crt            1      57d
+configmap/openshift-service-ca.crt    1      57d
+configmap/synapse-with-heisenbridge   1      86s
 ```
 
 A similar example for mautrix-signal is available under the
@@ -232,39 +251,46 @@ A similar example for mautrix-signal is available under the
 If the default configuration file doesn't answer your needs, you can use a
 custom configuration file. You first have to add your custom config file
 (for instance `heisenbridge.yaml`) to a `ConfigMap` and configure the
-corresponding section of the `Synapse` resource (for instance
-`Heisenbridge.ConfigMap`) to reference the `ConfigMap`.
+corresponding section of the Bridge resource (for instance
+`Heisenbridge.Spec.ConfigMap`) to reference the `ConfigMap`.
 
 For heisenbridge, this is illustrated in the
 `04-deploying-heisenbridge/B-using-existing-configmap` directory:
 
 ```shell
-$ kubectl create configmap my-custom-heisenbridge --from-file=examples/04-deploying-heisenbridge/B-using-existing-configmap/heisenbridge.yaml 
-configmap/my-custom-heisenbridge created
-$ kubectl apply -f examples/04-deploying-heisenbridge/B-using-existing-configmap/synapse.yaml 
+$ kubectl apply -f examples/04-deploying-heisenbridge/B-using-existing-configmap/synapse.yaml
 synapse.synapse.opdev.io/synapse-with-heisenbridge created
+$ kubectl create configmap my-custom-heisenbridge --from-file=heisenbridge.yaml=examples/04-deploying-heisenbridge/B-using-existing-configmap/heisenbridge_config.yaml 
+configmap/my-custom-heisenbridge created
+$ oc apply -f examples/04-deploying-heisenbridge/B-using-existing-configmap/heisenbridge.yaml
+heisenbridge.synapse.opdev.io/heisenbridge-for-synapse created
+
 $ kubectl get pods,replicaset,deployment,pods,service,configmap
-NAME                                                          READY   STATUS    RESTARTS      AGE
-pod/synapse-with-heisenbridge-6546c96f48-f5hv8                1/1     Running   0             78s
-pod/synapse-with-heisenbridge-heisenbridge-7b5df49cfd-jqpkk   1/1     Running   1 (70s ago)   78s
+NAME                                             READY   STATUS    RESTARTS      AGE
+pod/heisenbridge-for-synapse-7b47fc66f4-8jq6z    1/1     Running   2 (52s ago)   57s
+pod/synapse-with-heisenbridge-685c97478f-bhjsg   1/1     Running   0             57s
 
-NAME                                                                DESIRED   CURRENT   READY   AGE
-replicaset.apps/synapse-with-heisenbridge-6546c96f48                1         1         1       78s
-replicaset.apps/synapse-with-heisenbridge-heisenbridge-7b5df49cfd   1         1         1       78s
+NAME                                                   DESIRED   CURRENT   READY   AGE
+replicaset.apps/heisenbridge-for-synapse-7b47fc66f4    1         1         1       57s
+replicaset.apps/synapse-with-heisenbridge-6445b859d7   0         0         0       81s
+replicaset.apps/synapse-with-heisenbridge-685c97478f   1         1         1       57s
 
-NAME                                                     READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/synapse-with-heisenbridge                1/1     1            1           78s
-deployment.apps/synapse-with-heisenbridge-heisenbridge   1/1     1            1           78s
+NAME                                        READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/heisenbridge-for-synapse    1/1     1            1           57s
+deployment.apps/synapse-with-heisenbridge   1/1     1            1           81s
 
-NAME                                             TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
-service/synapse-with-heisenbridge                ClusterIP   10.217.4.127   <none>        8008/TCP   78s
-service/synapse-with-heisenbridge-heisenbridge   ClusterIP   10.217.4.124   <none>        9898/TCP   78s
+NAME                                TYPE           CLUSTER-IP     EXTERNAL-IP                            PORT(S)    AGE
+service/heisenbridge-for-synapse    ClusterIP      10.217.4.208   <none>                                 9898/TCP   57s
+service/kubernetes                  ClusterIP      10.217.4.1     <none>                                 443/TCP    57d
+service/openshift                   ExternalName   <none>         kubernetes.default.svc.cluster.local   <none>     57d
+service/synapse-with-heisenbridge   ClusterIP      10.217.5.252   <none>                                 8008/TCP   81s
 
 NAME                                  DATA   AGE
-configmap/kube-root-ca.crt            1      32d
-configmap/my-custom-heisenbridge      1      92s
-configmap/openshift-service-ca.crt    1      32d
-configmap/synapse-with-heisenbridge   1      78s
+configmap/heisenbridge-for-synapse    1      57s
+configmap/kube-root-ca.crt            1      57d
+configmap/my-custom-heisenbridge      1      67s
+configmap/openshift-service-ca.crt    1      57d
+configmap/synapse-with-heisenbridge   1      81s
 ```
 
 A similar example for mautrix-signal is available under the

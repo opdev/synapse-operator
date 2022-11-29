@@ -1,0 +1,12 @@
+id: heisenbridge
+url: http://10.217.5.134:9898
+as_token: EUFqSPQusV4mXkPKbwdHyIhthELQ1Xf9S5lSEzTrrlb0uz0ZJRHhwEljT71ByObe
+hs_token: If6r2GGlsNN4MnoW3djToADNdq0JuIJ1WNM4rKHO73WuG5QvVubj1Q4JHrmQBcS6
+rate_limited: false
+sender_localpart: heisenbridge
+namespaces:
+    users:
+    - regex: '@irc_.*'
+      exclusive: true
+    aliases: []
+    rooms: []

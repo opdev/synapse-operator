@@ -7,8 +7,3 @@ spec:
     values:
       serverName: example.com
       reportStats: true
-  bridges:
-    heisenbridge:
-      enabled: true
-      configMap:
-        name: my-custom-heisenbridge
