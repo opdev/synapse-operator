@@ -5,10 +5,5 @@ metadata:
 spec:
   homeserver:
     values:
-      serverName: example2.com
+      serverName: my.matrix.host
       reportStats: true
-  bridges:
-    mautrixSignal:
-      enabled: true
-      configMap:
-        name: my-custom-mautrixsignal-config

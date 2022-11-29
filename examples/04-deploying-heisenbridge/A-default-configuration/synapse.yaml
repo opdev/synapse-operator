@@ -7,6 +7,3 @@ spec:
     values:
       serverName: example.com
       reportStats: true
-  bridges:
-    heisenbridge:
-      enabled: true
