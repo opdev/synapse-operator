@@ -77,6 +77,10 @@ spec:
                     - serverName
                     type: object
                 type: object
+              isOpenshift:
+                default: false
+                description: Set to true if deploying on OpenShift
+                type: boolean
             required:
             - homeserver
             type: object

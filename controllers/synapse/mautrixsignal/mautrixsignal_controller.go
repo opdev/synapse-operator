@@ -133,6 +133,7 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		)
 		return ctrl.Result{}, err
 	}
+	ms.Status.IsOpenshift = s.Spec.IsOpenshift
 
 	if r, err := r.triggerSynapseReconciliation(&s, ctx); reconc.ShouldHaltOrRequeue(r, err) {
 		return reconc.Evaluate(r, err)
@@ -170,15 +171,22 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
+	// SA and RB are only necessary if we're running on OpenShift
+	if ms.Status.IsOpenshift {
+		subreconcilersForMautrixSignal = append(
+			subreconcilersForMautrixSignal,
+			r.reconcileMautrixSignalServiceAccount,
+			r.reconcileMautrixSignalRoleBinding,
+		)
+	}
+
 	// Reconcile signald resources: PVC and Deployment
-	// Reconcile mautrix-signal resources: Service, SA, RB, PVC and Deployment
+	// Reconcile mautrix-signal resources: Service, PVC and Deployment
 	subreconcilersForMautrixSignal = append(
 		subreconcilersForMautrixSignal,
 		r.reconcileSignaldPVC,
 		r.reconcileSignaldDeployment,
 		r.reconcileMautrixSignalService,
-		r.reconcileMautrixSignalServiceAccount,
-		r.reconcileMautrixSignalRoleBinding,
 		r.reconcileMautrixSignalPVC,
 		r.reconcileMautrixSignalDeployment,
 	)

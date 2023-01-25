@@ -41,6 +41,11 @@ type SynapseSpec struct {
 	// Set to true to create a new PostreSQL instance. The homeserver.yaml
 	// 'database' section will be overwritten.
 	CreateNewPostgreSQL bool `json:"createNewPostgreSQL,omitempty"`
+
+	// +kubebuilder:default:=false
+
+	// Set to true if deploying on OpenShift
+	IsOpenshift bool `json:"isOpenshift,omitempty"`
 }
 
 type SynapseHomeserver struct {

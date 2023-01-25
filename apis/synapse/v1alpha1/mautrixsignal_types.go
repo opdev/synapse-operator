@@ -70,6 +70,11 @@ type MautrixSignalStatus struct {
 
 	// Information related to the Synapse instance associated with this bridge
 	Synapse MautrixSignalStatusSynapse `json:"synapse,omitempty"`
+
+	// +kubebuilder:default:=false
+
+	// Values is set to true if deploying on OpenShift
+	IsOpenshift bool `json:"isOpenshift,omitempty"`
 }
 
 type MautrixSignalStatusSynapse struct {
