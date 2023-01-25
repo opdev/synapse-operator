@@ -72,6 +72,10 @@ spec:
           status:
             description: MautrixSignalStatus defines the observed state of MautrixSignal
             properties:
+              isOpenshift:
+                default: false
+                description: Values is set to true if deploying on OpenShift
+                type: boolean
               reason:
                 description: Reason for the current MautrixSignal State
                 type: string

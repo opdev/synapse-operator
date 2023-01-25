@@ -87,10 +87,6 @@ func (r *MautrixSignalReconciler) deploymentForMautrixSignal(ms *synapsev1alpha1
 					Labels: ls,
 				},
 				Spec: corev1.PodSpec{
-					// mautrix-signal must run with user 1337.
-					// We must run the workload with a Service Account
-					// associated to the 'anyuid' SCC.
-					ServiceAccountName: mautrixSignalServiceAccountName,
 					// The init container is responsible of copying the
 					// config.yaml from the read-only ConfigMap to the
 					// mautrixsignal-data volume. The mautrixsignal process
@@ -147,6 +143,14 @@ func (r *MautrixSignalReconciler) deploymentForMautrixSignal(ms *synapsev1alpha1
 			},
 		},
 	}
+
+	if ms.Status.IsOpenshift {
+		// mautrix-signal must run with user 1337.
+		// If deploying on Openshift, we must run the workload with a Service
+		// Account associated to the 'anyuid' SCC.
+		dep.Spec.Template.Spec.ServiceAccountName = mautrixSignalServiceAccountName
+	}
+
 	// Set Synapse instance as the owner and controller
 	if err := ctrl.SetControllerReference(ms, dep, r.Scheme); err != nil {
 		return &appsv1.Deployment{}, err

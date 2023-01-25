@@ -197,12 +197,19 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		subreconcilersForSynapse = append(subreconcilersForSynapse, r.updateSynapseConfigMapForMautrixSignal)
 	}
 
-	// Reconcile Synapse resources: Service, SA, RB, PVC, Deployment
+	// SA and RB are only necessary if we're running on OpenShift
+	if synapse.Spec.IsOpenshift {
+		subreconcilersForSynapse = append(
+			subreconcilersForSynapse,
+			r.reconcileSynapseServiceAccount,
+			r.reconcileSynapseRoleBinding,
+		)
+	}
+
+	// Reconcile Synapse resources: Service, PVC, Deployment
 	subreconcilersForSynapse = append(
 		subreconcilersForSynapse,
 		r.reconcileSynapseService,
-		r.reconcileSynapseServiceAccount,
-		r.reconcileSynapseRoleBinding,
 		r.reconcileSynapsePVC,
 		r.reconcileSynapseDeployment,
 		r.setSynapseStatusAsRunning,
