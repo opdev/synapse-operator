@@ -60,6 +60,10 @@ type HomeserverPgsqlDatabase struct {
 //+kubebuilder:rbac:groups=synapse.opdev.io,resources=synapses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=synapse.opdev.io,resources=synapses/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=synapse.opdev.io,resources=synapses/finalizers,verbs=update
+//+kubebuilder:rbac:groups=core,resources=services;persistentvolumeclaims;configmaps;serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=postgres-operator.crunchydata.com,resources=postgresclusters,verbs=get;list;watch;create;update;patch;delete
 
 func GetPostgresClusterResourceName(synapse synapsev1alpha1.Synapse) string {
 	return strings.Join([]string{synapse.Name, "pgsql"}, "-")
