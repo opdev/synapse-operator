@@ -30,7 +30,7 @@ import (
 
 // Defines a function type. Functions of the updateDataFunc type implements the
 // logic to update the data of a configmap, defined by the 'data' argument.
-type updateDataFunc func(i interface{}, data map[string]interface{}) error
+type updateDataFunc func(obj client.Object, data map[string]interface{}) error
 
 // A generic function to update an existing ConfigMap. It takes as arguments:
 // * The context
@@ -42,7 +42,7 @@ func UpdateConfigMap(
 	ctx context.Context,
 	client client.Client,
 	key types.NamespacedName,
-	i interface{},
+	obj client.Object,
 	updateData updateDataFunc,
 	filename string,
 ) error {
@@ -53,7 +53,7 @@ func UpdateConfigMap(
 		return err
 	}
 
-	if err := UpdateConfigMapData(cm, i, updateData, filename); err != nil {
+	if err := UpdateConfigMapData(cm, obj, updateData, filename); err != nil {
 		return err
 	}
 
@@ -67,7 +67,7 @@ func UpdateConfigMap(
 
 func UpdateConfigMapData(
 	cm *corev1.ConfigMap,
-	i interface{},
+	obj client.Object,
 	updateData updateDataFunc,
 	filename string,
 ) error {
@@ -78,7 +78,7 @@ func UpdateConfigMapData(
 	}
 
 	// Update the content of the file
-	if err := updateData(i, data); err != nil {
+	if err := updateData(obj, data); err != nil {
 		return err
 	}
 

@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
@@ -39,8 +40,8 @@ import (
 // It reconciles the mautrix-signal ConfigMap to its desired state. It is
 // called only if the user hasn't provided its own ConfigMap for
 // mautrix-signal.
-func (r *MautrixSignalReconciler) reconcileMautrixSignalConfigMap(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	ms := i.(*synapsev1alpha1.MautrixSignal)
+func (r *MautrixSignalReconciler) reconcileMautrixSignalConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	ms := obj.(*synapsev1alpha1.MautrixSignal)
 
 	objectMetaMautrixSignal := reconcile.SetObjectMeta(ms.Name, ms.Namespace, map[string]string{})
 
@@ -391,8 +392,8 @@ logging:
 //
 // It creates a copy of the user-provided ConfigMap for mautrix-signal, defined
 // in synapse.Spec.Bridges.MautrixSignal.ConfigMap
-func (r *MautrixSignalReconciler) copyInputMautrixSignalConfigMap(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	ms := i.(*synapsev1alpha1.MautrixSignal)
+func (r *MautrixSignalReconciler) copyInputMautrixSignalConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	ms := obj.(*synapsev1alpha1.MautrixSignal)
 
 	log := ctrllog.FromContext(ctx)
 
@@ -480,8 +481,8 @@ func (r *MautrixSignalReconciler) configMapForMautrixSignalCopy(
 //
 // Following the previous copy of the user-provided ConfigMap, it edits the
 // content of the copy to ensure that mautrix-signal is correctly configured.
-func (r *MautrixSignalReconciler) configureMautrixSignalConfigMap(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	ms := i.(*synapsev1alpha1.MautrixSignal)
+func (r *MautrixSignalReconciler) configureMautrixSignalConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	ms := obj.(*synapsev1alpha1.MautrixSignal)
 
 	keyForConfigMap := types.NamespacedName{
 		Name:      ms.Name,
@@ -493,7 +494,7 @@ func (r *MautrixSignalReconciler) configureMautrixSignalConfigMap(i interface{},
 		ctx,
 		r.Client,
 		keyForConfigMap,
-		*ms,
+		ms,
 		r.updateMautrixSignalData,
 		"config.yaml",
 	); err != nil {
@@ -510,10 +511,10 @@ func (r *MautrixSignalReconciler) configureMautrixSignalConfigMap(i interface{},
 // other things, it ensures that the bridge can reach the Synapse homeserver
 // and knows the correct path to the signald socket.
 func (r *MautrixSignalReconciler) updateMautrixSignalData(
-	i interface{},
+	obj client.Object,
 	config map[string]interface{},
 ) error {
-	ms := i.(synapsev1alpha1.MautrixSignal)
+	ms := obj.(*synapsev1alpha1.MautrixSignal)
 
 	synapseName := ms.Spec.Synapse.Name
 	synapseNamespace := utils.ComputeNamespace(ms.Namespace, ms.Spec.Synapse.Namespace)

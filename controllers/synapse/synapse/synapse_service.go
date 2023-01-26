@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
@@ -33,8 +34,8 @@ import (
 // called in the main reconciliation loop.
 //
 // It reconciles the Service for synapse to its desired state.
-func (r *SynapseReconciler) reconcileSynapseService(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) reconcileSynapseService(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
 

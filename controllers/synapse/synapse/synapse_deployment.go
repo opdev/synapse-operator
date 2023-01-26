@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
@@ -34,8 +35,8 @@ import (
 // called in the main reconciliation loop.
 //
 // It reconciles the Deployment for Synapse to its desired state.
-func (r *SynapseReconciler) reconcileSynapseDeployment(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) reconcileSynapseDeployment(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
 	depl, err := r.deploymentForSynapse(s, objectMetaForSynapse)
 	if err != nil {

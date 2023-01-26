@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
@@ -40,8 +41,8 @@ func labelsForHeisenbridge(name string) map[string]string {
 // be called in the main reconciliation loop.
 //
 // It reconciles the Deployment for Heisenbridge to its desired state.
-func (r *HeisenbridgeReconciler) reconcileHeisenbridgeDeployment(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	h := i.(*synapsev1alpha1.Heisenbridge)
+func (r *HeisenbridgeReconciler) reconcileHeisenbridgeDeployment(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	h := obj.(*synapsev1alpha1.Heisenbridge)
 
 	objectMetaHeisenbridge := reconcile.SetObjectMeta(h.Name, h.Namespace, map[string]string{})
 

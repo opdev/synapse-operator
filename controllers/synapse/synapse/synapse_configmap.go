@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
@@ -40,8 +41,8 @@ import (
 //
 // It reconciles the synapse ConfigMap to its desired state. It is called only
 // if the user hasn't provided its own ConfigMap for synapse
-func (r *SynapseReconciler) reconcileSynapseConfigMap(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) reconcileSynapseConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
 
@@ -63,8 +64,8 @@ func (r *SynapseReconciler) reconcileSynapseConfigMap(i interface{}, ctx context
 }
 
 // configMapForSynapse returns a synapse ConfigMap object
-func (r *SynapseReconciler) configMapForSynapse(i interface{}, objectMeta metav1.ObjectMeta) (*corev1.ConfigMap, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) configMapForSynapse(obj client.Object, objectMeta metav1.ObjectMeta) (*corev1.ConfigMap, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	homeserverYaml := `
 # Configuration file for Synapse.
@@ -2722,8 +2723,8 @@ redis:
 //
 // It creates a copy of the user-provided ConfigMap for synapse, defined in
 // synapse.Spec.Homeserver.ConfigMap
-func (r *SynapseReconciler) copyInputSynapseConfigMap(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) copyInputSynapseConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
 
@@ -2781,8 +2782,8 @@ func (r *SynapseReconciler) configMapForSynapseCopy(
 // It checks that the ConfigMap referenced by
 // synapse.Spec.Homeserver.ConfigMap.Name exists and extrats the server_name
 // and report_stats values.
-func (r *SynapseReconciler) parseInputSynapseConfigMap(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) parseInputSynapseConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	log := ctrllog.FromContext(ctx)
 
@@ -2878,8 +2879,8 @@ func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synaps
 //
 // It configures the 'database' section of homeserver.yaml to allow Synapse to
 // connect to the newly created PostgresCluster instance.
-func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	keyForSynapse := types.NamespacedName{
 		Name:      s.Name,
@@ -2890,7 +2891,7 @@ func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(i interface
 		ctx,
 		r.Client,
 		keyForSynapse,
-		*s,
+		s,
 		r.updateHomeserverWithPostgreSQLInfos,
 		"homeserver.yaml",
 	); err != nil {
@@ -2901,12 +2902,12 @@ func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(i interface
 }
 
 func (r *SynapseReconciler) updateHomeserverWithPostgreSQLInfos(
-	i interface{},
+	obj client.Object,
 	homeserver map[string]interface{},
 ) error {
-	s := i.(synapsev1alpha1.Synapse)
+	s := obj.(*synapsev1alpha1.Synapse)
 
-	databaseData, err := r.fetchDatabaseDataFromSynapseStatus(s)
+	databaseData, err := r.fetchDatabaseDataFromSynapseStatus(*s)
 	if err != nil {
 		return err
 	}
@@ -2979,8 +2980,8 @@ func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1
 //
 // It registers the heisenbridge as an application service in the
 // homeserver.yaml config file.
-func (r *SynapseReconciler) updateSynapseConfigMapForHeisenbridge(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) updateSynapseConfigMapForHeisenbridge(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	keyForSynapse := types.NamespacedName{
 		Name:      s.Name,
@@ -2992,7 +2993,7 @@ func (r *SynapseReconciler) updateSynapseConfigMapForHeisenbridge(i interface{},
 		ctx,
 		r.Client,
 		keyForSynapse,
-		*s,
+		s,
 		r.updateHomeserverWithHeisenbridgeInfos,
 		"homeserver.yaml",
 	); err != nil {
@@ -3007,7 +3008,7 @@ func (r *SynapseReconciler) updateSynapseConfigMapForHeisenbridge(i interface{},
 //
 // It enables the Heisenbridge as an AppService in Synapse.
 func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
-	_ interface{},
+	_ client.Object,
 	homeserver map[string]interface{},
 ) error {
 	// Add heisenbridge configuration file to the list of application services
@@ -3020,8 +3021,8 @@ func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
 //
 // It registers the mautrix-signal bridge as an application service in the
 // homeserver.yaml config file.
-func (r *SynapseReconciler) updateSynapseConfigMapForMautrixSignal(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) updateSynapseConfigMapForMautrixSignal(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	keyForSynapse := types.NamespacedName{
 		Name:      s.Name,
@@ -3033,7 +3034,7 @@ func (r *SynapseReconciler) updateSynapseConfigMapForMautrixSignal(i interface{}
 		ctx,
 		r.Client,
 		keyForSynapse,
-		*s,
+		s,
 		r.updateHomeserverWithMautrixSignalInfos,
 		"homeserver.yaml",
 	); err != nil {
@@ -3048,7 +3049,7 @@ func (r *SynapseReconciler) updateSynapseConfigMapForMautrixSignal(i interface{}
 //
 // It enables the mautrix-signal bridge as an AppService in Synapse.
 func (r *SynapseReconciler) updateHomeserverWithMautrixSignalInfos(
-	_ interface{},
+	_ client.Object,
 	homeserver map[string]interface{},
 ) error {
 	// Add mautrix-signal configuration file to the list of application services

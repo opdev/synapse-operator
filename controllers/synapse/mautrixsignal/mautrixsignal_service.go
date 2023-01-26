@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
@@ -33,8 +34,8 @@ import (
 // be called in the main reconciliation loop.
 //
 // It reconciles the Service for mautrix-signal to its desired state.
-func (r *MautrixSignalReconciler) reconcileMautrixSignalService(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	ms := i.(*synapsev1alpha1.MautrixSignal)
+func (r *MautrixSignalReconciler) reconcileMautrixSignalService(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	ms := obj.(*synapsev1alpha1.MautrixSignal)
 
 	objectMetaMautrixSignal := reconcile.SetObjectMeta(ms.Name, ms.Namespace, map[string]string{})
 

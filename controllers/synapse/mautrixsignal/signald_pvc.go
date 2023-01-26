@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
@@ -33,8 +34,8 @@ import (
 // in the main reconciliation loop.
 //
 // It reconciles the PVC for signald to its desired state.
-func (r *MautrixSignalReconciler) reconcileSignaldPVC(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	ms := i.(*synapsev1alpha1.MautrixSignal)
+func (r *MautrixSignalReconciler) reconcileSignaldPVC(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	ms := obj.(*synapsev1alpha1.MautrixSignal)
 
 	objectMetaSignald := reconcile.SetObjectMeta(GetSignaldResourceName(*ms), ms.Namespace, map[string]string{})
 

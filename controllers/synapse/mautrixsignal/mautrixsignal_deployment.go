@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
@@ -39,8 +40,8 @@ func labelsForMautrixSignal(name string) map[string]string {
 // to be called in the main reconciliation loop.
 //
 // It reconciles the Deployment for mautrix-signal to its desired state.
-func (r *MautrixSignalReconciler) reconcileMautrixSignalDeployment(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	ms := i.(*synapsev1alpha1.MautrixSignal)
+func (r *MautrixSignalReconciler) reconcileMautrixSignalDeployment(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	ms := obj.(*synapsev1alpha1.MautrixSignal)
 
 	objectMetaMautrixSignal := reconcile.SetObjectMeta(ms.Name, ms.Namespace, map[string]string{})
 

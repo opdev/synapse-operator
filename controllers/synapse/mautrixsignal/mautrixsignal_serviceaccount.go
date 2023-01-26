@@ -34,8 +34,8 @@ import (
 // subreconcilerFuncs, to be called in the main reconciliation loop.
 //
 // It reconciles the ServiceAccount for mautrix-signal to its desired state.
-func (r *MautrixSignalReconciler) reconcileMautrixSignalServiceAccount(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	ms := i.(*synapsev1alpha1.MautrixSignal)
+func (r *MautrixSignalReconciler) reconcileMautrixSignalServiceAccount(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	ms := obj.(*synapsev1alpha1.MautrixSignal)
 
 	objectMetaMautrixSignal := reconcile.SetObjectMeta(ms.Name, ms.Namespace, map[string]string{})
 
@@ -57,8 +57,8 @@ func (r *MautrixSignalReconciler) reconcileMautrixSignalServiceAccount(i interfa
 }
 
 // serviceAccountForMautrixSignal returns a ServiceAccount object for running the mautrix-signal bridge
-func (r *MautrixSignalReconciler) serviceAccountForMautrixSignal(i interface{}, objectMeta metav1.ObjectMeta) (client.Object, error) {
-	ms := i.(*synapsev1alpha1.MautrixSignal)
+func (r *MautrixSignalReconciler) serviceAccountForMautrixSignal(obj client.Object, objectMeta metav1.ObjectMeta) (client.Object, error) {
+	ms := obj.(*synapsev1alpha1.MautrixSignal)
 
 	// TODO: https://github.com/opdev/synapse-operator/issues/19
 	sa := &corev1.ServiceAccount{
@@ -76,8 +76,8 @@ func (r *MautrixSignalReconciler) serviceAccountForMautrixSignal(i interface{}, 
 // to be called in the main reconciliation loop.
 //
 // It reconciles the RoleBinding for mautrix-signal to its desired state.
-func (r *MautrixSignalReconciler) reconcileMautrixSignalRoleBinding(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	ms := i.(*synapsev1alpha1.MautrixSignal)
+func (r *MautrixSignalReconciler) reconcileMautrixSignalRoleBinding(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	ms := obj.(*synapsev1alpha1.MautrixSignal)
 
 	objectMetaMautrixSignal := reconcile.SetObjectMeta(ms.Name, ms.Namespace, map[string]string{})
 

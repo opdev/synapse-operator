@@ -271,8 +271,8 @@ func (r *SynapseReconciler) updateSynapseStatusDatabaseState(ctx context.Context
 //
 // It parses the PostgresCluster Secret and updates the Synapse status with the
 // database connection information.
-func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	var postgresSecret corev1.Secret
 
@@ -356,8 +356,8 @@ func (r *SynapseReconciler) updateSynapseStatusDatabase(
 // called in the main reconciliation loop.
 //
 // It set the Synapse Status 'State' field to 'RUNNING'.
-func (r *SynapseReconciler) setSynapseStatusAsRunning(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) setSynapseStatusAsRunning(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	s.Status.NeedsReconcile = false
 	s.Status.State = "RUNNING"

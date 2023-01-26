@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
@@ -37,8 +38,8 @@ import (
 //
 // It reconciles the heisenbridge ConfigMap to its desired state. It is called
 // only if the user hasn't provided its own ConfigMap for heisenbridge
-func (r *HeisenbridgeReconciler) reconcileHeisenbridgeConfigMap(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	h := i.(*synapsev1alpha1.Heisenbridge)
+func (r *HeisenbridgeReconciler) reconcileHeisenbridgeConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	h := obj.(*synapsev1alpha1.Heisenbridge)
 
 	objectMetaHeisenbridge := reconcile.SetObjectMeta(h.Name, h.Namespace, map[string]string{})
 
@@ -94,8 +95,8 @@ namespaces:
 //
 // It creates a copy of the user-provided ConfigMap for heisenbridge, defined
 // in synapse.Spec.Bridges.Heisenbridge.ConfigMap
-func (r *HeisenbridgeReconciler) copyInputHeisenbridgeConfigMap(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	h := i.(*synapsev1alpha1.Heisenbridge)
+func (r *HeisenbridgeReconciler) copyInputHeisenbridgeConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	h := obj.(*synapsev1alpha1.Heisenbridge)
 
 	log := ctrllog.FromContext(ctx)
 
@@ -183,8 +184,8 @@ func (r *HeisenbridgeReconciler) configMapForHeisenbridgeCopy(
 //
 // Following the previous copy of the user-provided ConfigMap, it edits the
 // content of the copy to ensure that heisenbridge is correctly configured.
-func (r *HeisenbridgeReconciler) configureHeisenbridgeConfigMap(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	h := i.(*synapsev1alpha1.Heisenbridge)
+func (r *HeisenbridgeReconciler) configureHeisenbridgeConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	h := obj.(*synapsev1alpha1.Heisenbridge)
 
 	keyForConfigMap := types.NamespacedName{
 		Name:      h.Name,
@@ -212,10 +213,10 @@ func (r *HeisenbridgeReconciler) configureHeisenbridgeConfigMap(i interface{}, c
 // It configures the correct Heisenbridge URL, needed for Synapse to reach the
 // bridge.
 func (r *HeisenbridgeReconciler) updateHeisenbridgeWithURL(
-	i interface{},
+	obj client.Object,
 	heisenbridge map[string]interface{},
 ) error {
-	h := i.(*synapsev1alpha1.Heisenbridge)
+	h := obj.(*synapsev1alpha1.Heisenbridge)
 
 	heisenbridge["url"] = "http://" + GetHeisenbridgeServiceFQDN(*h) + ":9898"
 	return nil
