@@ -21,6 +21,10 @@ func SetObjectMeta(name string, namespace string, labels map[string]string) meta
 	return objectMeta
 }
 
+// Generic function to reconcile a Kubernetes resource
+// `current` should be an empty resource (e.g. &appsv1.Deployment{}). It is
+// populated by the actual current state of the resource in the initial GET
+// request.
 func ReconcileResource(
 	ctx context.Context,
 	rclient client.Client,
@@ -74,6 +78,8 @@ func ReconcileResource(
 			"Namespace", desired.GetNamespace(),
 		)
 
+		// This ensures that the resource is patched only if there is a
+		// difference between desired and current.
 		patchDiff := client.MergeFrom(current.DeepCopyObject().(client.Object))
 		if err := mergo.Merge(current, desired, mergo.WithOverride); err != nil {
 			log.Error(err, "Error in merge")
