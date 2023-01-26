@@ -166,8 +166,8 @@ func (r *HeisenbridgeReconciler) fetchSynapseInstance(
 	return *s, nil
 }
 
-func (r *HeisenbridgeReconciler) triggerSynapseReconciliation(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *HeisenbridgeReconciler) triggerSynapseReconciliation(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 	s.Status.NeedsReconcile = true
 
 	current := &synapsev1alpha1.Synapse{}

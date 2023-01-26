@@ -5,6 +5,7 @@ import (
 	"time"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -13,7 +14,7 @@ import (
 // indicates that the Reconcile() function should continue reconciling.
 // Any other returned ctrl.Result indicates to the Reconcile() function
 // that reconciliation should halt.
-type SubreconcilerFuncs func(interface{}, context.Context) (*ctrl.Result, error)
+type SubreconcilerFuncs func(client.Object, context.Context) (*ctrl.Result, error)
 
 // Evaluate returns the actual reconcile struct and error. Wrap helpers in
 // this when returning from within the top-level Reconciler.

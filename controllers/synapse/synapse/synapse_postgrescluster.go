@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	pgov1beta1 "github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
@@ -39,8 +40,8 @@ import (
 //
 // It reconciles the PostgresCluster CR to its desired state, and requeues
 // until the PostgreSQL cluster is up.
-func (r *SynapseReconciler) reconcilePostgresClusterCR(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) reconcilePostgresClusterCR(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	createdPostgresCluster := pgov1beta1.PostgresCluster{}
 	postgresClusterObjectMeta := reconcile.SetObjectMeta(
@@ -171,8 +172,8 @@ func (r *SynapseReconciler) isPostgresClusterReady(p pgov1beta1.PostgresCluster)
 // to be called in the main reconciliation loop.
 //
 // It reconciles the PostgresCluster ConfigMap to its desired state.
-func (r *SynapseReconciler) reconcilePostgresClusterConfigMap(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) reconcilePostgresClusterConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	postgresClusterObjectMeta := reconcile.SetObjectMeta(
 		GetPostgresClusterResourceName(*s),

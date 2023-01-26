@@ -23,6 +23,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
@@ -33,8 +34,8 @@ import (
 // be called in the main reconciliation loop.
 //
 // It reconciles the ServiceAccount for synapse to its desired state.
-func (r *SynapseReconciler) reconcileSynapseServiceAccount(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) reconcileSynapseServiceAccount(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
 
@@ -72,8 +73,8 @@ func (r *SynapseReconciler) serviceAccountForSynapse(s *synapsev1alpha1.Synapse,
 // called in the main reconciliation loop.
 //
 // It reconciles the RoleBinding for synapse to its desired state.
-func (r *SynapseReconciler) reconcileSynapseRoleBinding(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) reconcileSynapseRoleBinding(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
+	s := obj.(*synapsev1alpha1.Synapse)
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
 
