@@ -1,7 +1,7 @@
 apiVersion: synapse.opdev.io/v1alpha1
 kind: Synapse
 metadata:
-  name: your-first-synapse-deployment
+  name: my-first-synapse-deployment
 spec:
   homeserver:
     values:
