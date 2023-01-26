@@ -292,6 +292,7 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 								ReportStats: false,
 							},
 						},
+						IsOpenshift: true,
 					},
 				}
 				Expect(k8sClient.Create(ctx, synapse)).Should(Succeed())
@@ -395,6 +396,7 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 						Synapse: synapsev1alpha1.MautrixSignalStatusSynapse{
 							ServerName: SynapseServerName,
 						},
+						IsOpenshift: true,
 					}
 
 					// Status may need some time to be updated
@@ -520,6 +522,7 @@ logging:
 						Synapse: synapsev1alpha1.MautrixSignalStatusSynapse{
 							ServerName: SynapseServerName,
 						},
+						IsOpenshift: true,
 					}
 					// Status may need some time to be updated
 					Eventually(func() synapsev1alpha1.MautrixSignalStatus {

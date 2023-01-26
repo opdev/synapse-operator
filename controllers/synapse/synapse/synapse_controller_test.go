@@ -383,6 +383,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 								ReportStats: ReportStats,
 							},
 						},
+						IsOpenshift: true,
 					}
 
 					createSynapseInstance()
@@ -481,6 +482,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 									Name: InputConfigMapName,
 								},
 							},
+							IsOpenshift: true,
 						}
 
 						createSynapseConfigMap()
@@ -572,6 +574,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 								},
 							},
 							CreateNewPostgreSQL: true,
+							IsOpenshift:         true,
 						}
 
 						createSynapseConfigMap()
@@ -722,6 +725,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 									Name: InputConfigMapName,
 								},
 							},
+							IsOpenshift: true,
 						}
 
 						createSynapseConfigMap()
@@ -833,6 +837,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 									Name: InputConfigMapName,
 								},
 							},
+							IsOpenshift: true,
 						}
 
 						createSynapseConfigMap()
