@@ -70,10 +70,10 @@ kind: Synapse
 metadata:
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"synapse.opdev.io/v1alpha1","kind":"Synapse","metadata":{"annotations":{},"name":"your-first-synapse-deployment","namespace":"default"},"spec":{"homeserver":{"values":{"reportStats":true,"serverName":"example.com"}}}}
+      {"apiVersion":"synapse.opdev.io/v1alpha1","kind":"Synapse","metadata":{"annotations":{},"name":"my-first-synapse-deployment","namespace":"default"},"spec":{"homeserver":{"values":{"reportStats":true,"serverName":"example.com"}}}}
   creationTimestamp: "2022-11-29T14:27:21Z"
   generation: 1
-  name: your-first-synapse-deployment
+  name: my-first-synapse-deployment
   namespace: default
   resourceVersion: "98298"
   uid: 086652b1-9ba9-40ed-9223-1336db12681d
@@ -122,7 +122,7 @@ To delete the resources:
 ```shell
 $ kubectl delete synapse using-existing-configmap
 synapse.synapse..opdevio "using-existing-configmap" deleted
-$ oc delete configmap my-custom-homeserver
+$ kubectl delete configmap my-custom-homeserver
 configmap "my-custom-homeserver" deleted
 ```
 
@@ -262,7 +262,7 @@ $ kubectl apply -f examples/04-deploying-heisenbridge/B-using-existing-configmap
 synapse.synapse.opdev.io/synapse-with-heisenbridge created
 $ kubectl create configmap my-custom-heisenbridge --from-file=heisenbridge.yaml=examples/04-deploying-heisenbridge/B-using-existing-configmap/heisenbridge_config.yaml 
 configmap/my-custom-heisenbridge created
-$ oc apply -f examples/04-deploying-heisenbridge/B-using-existing-configmap/heisenbridge.yaml
+$ kubectl apply -f examples/04-deploying-heisenbridge/B-using-existing-configmap/heisenbridge.yaml
 heisenbridge.synapse.opdev.io/heisenbridge-for-synapse created
 
 $ kubectl get pods,replicaset,deployment,pods,service,configmap
