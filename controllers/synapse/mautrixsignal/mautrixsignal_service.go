@@ -23,25 +23,31 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
-	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
 
-// reconcileMautrixSignalService is a function of type subreconcilerFuncs, to
+// reconcileMautrixSignalService is a function of type FnWithRequest, to
 // be called in the main reconciliation loop.
 //
 // It reconciles the Service for mautrix-signal to its desired state.
-func (r *MautrixSignalReconciler) reconcileMautrixSignalService(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	ms := obj.(*synapsev1alpha1.MautrixSignal)
+func (r *MautrixSignalReconciler) reconcileMautrixSignalService(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	ms := &synapsev1alpha1.MautrixSignal{}
+
+	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
+		log.Error(err, "Error getting latest version of Heisenbridge CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	objectMetaMautrixSignal := reconcile.SetObjectMeta(ms.Name, ms.Namespace, map[string]string{})
 
 	desiredService, err := r.serviceForMautrixSignal(ms, objectMetaMautrixSignal)
 	if err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
 	if err := reconcile.ReconcileResource(
@@ -50,10 +56,10 @@ func (r *MautrixSignalReconciler) reconcileMautrixSignalService(obj client.Objec
 		desiredService,
 		&corev1.Service{},
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // serviceForMautrixSignal returns a mautrix-signal Service object

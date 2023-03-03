@@ -23,25 +23,31 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
+	subreconciler "github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
-	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
 
-// reconcileSynapseService is a function of type subreconcilerFuncs, to be
+// reconcileSynapseService is a function of type FnWithRequest, to be
 // called in the main reconciliation loop.
 //
 // It reconciles the Service for synapse to its desired state.
-func (r *SynapseReconciler) reconcileSynapseService(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	s := obj.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) reconcileSynapseService(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	s := &synapsev1alpha1.Synapse{}
+
+	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+		log.Error(err, "Error getting latest version of Synapse CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
 
 	desiredService, err := r.serviceForSynapse(s, objectMetaForSynapse)
 	if err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
 	if err := reconcile.ReconcileResource(
@@ -50,9 +56,9 @@ func (r *SynapseReconciler) reconcileSynapseService(obj client.Object, ctx conte
 		desiredService,
 		&corev1.Service{},
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // serviceForSynapse returns a synapse Service object

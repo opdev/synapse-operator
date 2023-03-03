@@ -27,21 +27,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	pgov1beta1 "github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
+	subreconciler "github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
-	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
 
-// reconcilePostgresClusterCR is a function of type subreconcilerFuncs, to be
+// reconcilePostgresClusterCR is a function of type FnWithRequest, to be
 // called in the main reconciliation loop.
 //
 // It reconciles the PostgresCluster CR to its desired state, and requeues
 // until the PostgreSQL cluster is up.
-func (r *SynapseReconciler) reconcilePostgresClusterCR(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	s := obj.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) reconcilePostgresClusterCR(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	s := &synapsev1alpha1.Synapse{}
+
+	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+		log.Error(err, "Error getting latest version of Synapse CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	createdPostgresCluster := pgov1beta1.PostgresCluster{}
 	postgresClusterObjectMeta := reconcile.SetObjectMeta(
@@ -56,7 +62,7 @@ func (r *SynapseReconciler) reconcilePostgresClusterCR(obj client.Object, ctx co
 
 	desiredPostgresCluster, err := r.postgresClusterForSynapse(s, postgresClusterObjectMeta)
 	if err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
 	// Create PostgresCluster for Synapse
@@ -66,21 +72,21 @@ func (r *SynapseReconciler) reconcilePostgresClusterCR(obj client.Object, ctx co
 		desiredPostgresCluster,
 		&createdPostgresCluster,
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
 	// Wait for PostgresCluster to be up
 	// TODO: can be removed ?
 	if err := r.Get(ctx, keyForPostgresCluster, &createdPostgresCluster); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 	if !r.isPostgresClusterReady(createdPostgresCluster) {
 		r.updateSynapseStatusDatabaseState(ctx, s, "NOT READY")
 		err := errors.New("postgreSQL Database not ready yet")
-		return reconc.RequeueWithDelayAndError(time.Duration(5), err)
+		return subreconciler.RequeueWithDelayAndError(time.Duration(5), err)
 	}
 
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // postgresClusterForSynapse returns a PostgresCluster object
@@ -168,12 +174,18 @@ func (r *SynapseReconciler) isPostgresClusterReady(p pgov1beta1.PostgresCluster)
 	return true
 }
 
-// reconcilePostgresClusterConfigMap is a function of type subreconcilerFuncs,
+// reconcilePostgresClusterConfigMap is a function of type FnWithRequest,
 // to be called in the main reconciliation loop.
 //
 // It reconciles the PostgresCluster ConfigMap to its desired state.
-func (r *SynapseReconciler) reconcilePostgresClusterConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	s := obj.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) reconcilePostgresClusterConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	s := &synapsev1alpha1.Synapse{}
+
+	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+		log.Error(err, "Error getting latest version of Synapse CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	postgresClusterObjectMeta := reconcile.SetObjectMeta(
 		GetPostgresClusterResourceName(*s),
@@ -183,7 +195,7 @@ func (r *SynapseReconciler) reconcilePostgresClusterConfigMap(obj client.Object,
 
 	desiredConfigMap, err := r.configMapForPostgresCluster(s, postgresClusterObjectMeta)
 	if err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
 	// Create ConfigMap for PostgresCluster
@@ -193,10 +205,10 @@ func (r *SynapseReconciler) reconcilePostgresClusterConfigMap(obj client.Object,
 		desiredConfigMap,
 		&corev1.ConfigMap{},
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // configMapForPostgresCluster returns a ConfigMap object

@@ -23,25 +23,31 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
-	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
 
-// reconcileHeisenbridgeService is a function of type subreconcilerFuncs, to be
+// reconcileHeisenbridgeService is a function of type FnWithRequest, to be
 // called in the main reconciliation loop.
 //
 // It reconciles the Service for Heisenbridge to its desired state.
-func (r *HeisenbridgeReconciler) reconcileHeisenbridgeService(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	h := obj.(*synapsev1alpha1.Heisenbridge)
+func (r *HeisenbridgeReconciler) reconcileHeisenbridgeService(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	h := &synapsev1alpha1.Heisenbridge{}
+
+	if err := r.Get(ctx, req.NamespacedName, h); err != nil {
+		log.Error(err, "Error getting latest version of Heisenbridge CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	objectMetaHeisenbridge := reconcile.SetObjectMeta(h.Name, h.Namespace, map[string]string{})
 
 	desiredService, err := r.serviceForHeisenbridge(h, objectMetaHeisenbridge)
 	if err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
 	if err := reconcile.ReconcileResource(
@@ -50,10 +56,10 @@ func (r *HeisenbridgeReconciler) reconcileHeisenbridgeService(obj client.Object,
 		desiredService,
 		&corev1.Service{},
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // serviceForSynapse returns a Heisenbridge Service object
