@@ -102,10 +102,8 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// The list of subreconcilers to be run to reconciliate the Synapse
-	// ConfigMap. This is temporary, and will be merged with
-	// subreconcilersForSynapse in a later commit.
-	var subreconcilersForSynapseConfigMap []subreconciler.FnWithRequest
+	// The list of subreconcilers for Synapse.
+	var subreconcilersForSynapse []subreconciler.FnWithRequest
 
 	// Synapse should either have a Spec.Homeserver.ConfigMap or Spec.Homeserver.Values
 	if synapse.Spec.Homeserver.ConfigMap != nil {
@@ -113,7 +111,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// * We ensure that it exists and is a valid yaml file
 		// * We populate the Status.HomeserverConfiguration with the values defined in the input ConfigMap
 		// * We create a copy of the user-provided ConfigMap.
-		subreconcilersForSynapseConfigMap = []subreconciler.FnWithRequest{
+		subreconcilersForSynapse = []subreconciler.FnWithRequest{
 			r.parseInputSynapseConfigMap,
 			r.copyInputSynapseConfigMap,
 		}
@@ -122,29 +120,17 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// homeserver.yaml, we create a new ConfigMap. The default
 		// homeserver.yaml is configured with values defined in
 		// Spec.Homeserver.Values
-		synapse.Status.HomeserverConfiguration.ServerName = synapse.Spec.Homeserver.Values.ServerName
-		synapse.Status.HomeserverConfiguration.ReportStats = synapse.Spec.Homeserver.Values.ReportStats
-
-		subreconcilersForSynapseConfigMap = []subreconciler.FnWithRequest{
+		subreconcilersForSynapse = []subreconciler.FnWithRequest{
+			r.setStatusHomeserverConfiguration,
 			r.reconcileSynapseConfigMap,
 		}
 	}
 
-	for _, f := range subreconcilersForSynapseConfigMap {
-		if r, err := f(ctx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
-			return subreconciler.Evaluate(r, err)
-		}
-	}
-
-	if err := r.updateSynapseStatus(ctx, &synapse); err != nil {
-		log.Error(err, "Error updating Synapse Status")
-		return ctrl.Result{}, err
-	}
-
 	// Determine the existence of Bridges referencing this Synapse instance
-	if r, err := r.updateSynapseStatusBridges(ctx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return subreconciler.Evaluate(r, err)
-	}
+	subreconcilersForSynapse = append(
+		subreconcilersForSynapse,
+		r.updateSynapseStatusBridges,
+	)
 
 	if synapse.Spec.CreateNewPostgreSQL {
 		if !r.isPostgresOperatorInstalled(ctx) {
@@ -155,29 +141,20 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 			err := errors.New("cannot create PostgreSQL instance for synapse. Potsgres-operator is not installed")
 			log.Error(err, "Cannot create PostgreSQL instance for synapse. Potsgres-operator is not installed.")
-			return ctrl.Result{}, nil
+			return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 		}
 
 		// Reconcile the PostgresCluster CR and ConfigMap.
 		// Also update the Synapse Status and ConfigMap with database
 		// connection information.
-		subreconcilersForPostgresCluster := []subreconciler.FnWithRequest{
+		subreconcilersForSynapse = append(
+			subreconcilersForSynapse,
 			r.reconcilePostgresClusterConfigMap,
 			r.reconcilePostgresClusterCR,
 			r.updateSynapseStatusWithPostgreSQLInfos,
 			r.updateSynapseConfigMapForPostgresCluster,
-		}
-
-		for _, f := range subreconcilersForPostgresCluster {
-			if r, err := f(ctx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
-				return subreconciler.Evaluate(r, err)
-			}
-		}
+		)
 	}
-
-	// The list of subreconcilers for Synapse. The list is populated depending
-	// on which bridges are enabled.
-	var subreconcilersForSynapse []subreconciler.FnWithRequest
 
 	if synapse.Status.Bridges.Heisenbridge.Enabled {
 		// Add the update of the Synapse ConfigMap to the Synapse
@@ -215,6 +192,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.setSynapseStatusAsRunning,
 	)
 
+	// Run all subreconcilers sequentially
 	for _, f := range subreconcilersForSynapse {
 		if r, err := f(ctx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
 			return subreconciler.Evaluate(r, err)
@@ -234,36 +212,57 @@ func (r *SynapseReconciler) setFailedState(ctx context.Context, synapse *synapse
 	synapse.Status.State = "FAILED"
 	synapse.Status.Reason = reason
 
-	return r.updateSynapseStatus(ctx, synapse)
+	err, _ := r.updateSynapseStatus(ctx, synapse)
+	return err
 }
 
-func (r *SynapseReconciler) updateSynapseStatus(ctx context.Context, synapse *synapsev1alpha1.Synapse) error {
+func (r *SynapseReconciler) updateSynapseStatus(ctx context.Context, synapse *synapsev1alpha1.Synapse) (error, bool) {
 	current := &synapsev1alpha1.Synapse{}
 	if err := r.Get(
 		ctx,
 		types.NamespacedName{Name: synapse.Name, Namespace: synapse.Namespace},
 		current,
 	); err != nil {
-		return err
+		return err, false
 	}
 
 	if !reflect.DeepEqual(synapse.Status, current.Status) {
 		if err := r.Status().Patch(ctx, synapse, client.MergeFrom(current)); err != nil {
-			return err
+			return err, false
 		}
+		return nil, true
 	}
 
-	return nil
+	return nil, false
+}
+
+func (r *SynapseReconciler) setStatusHomeserverConfiguration(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	s := &synapsev1alpha1.Synapse{}
+
+	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+		log.Error(err, "Error getting latest version of Synapse CR")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	s.Status.HomeserverConfiguration.ServerName = s.Spec.Homeserver.Values.ServerName
+	s.Status.HomeserverConfiguration.ReportStats = s.Spec.Homeserver.Values.ReportStats
+
+	err, has_patched := r.updateSynapseStatus(ctx, s)
+	if err != nil {
+		log.Error(err, "Error updating Synapse Status")
+		return subreconciler.RequeueWithError(err)
+	}
+	if has_patched {
+		return subreconciler.Requeue()
+	}
+
+	return subreconciler.ContinueReconciling()
 }
 
 func (r *SynapseReconciler) isPostgresOperatorInstalled(ctx context.Context) bool {
 	err := r.Client.List(ctx, &pgov1beta1.PostgresClusterList{})
 	return err == nil
-}
-
-func (r *SynapseReconciler) updateSynapseStatusDatabaseState(ctx context.Context, synapse *synapsev1alpha1.Synapse, state string) error {
-	synapse.Status.DatabaseConnectionInfo.State = state
-	return r.updateSynapseStatus(ctx, synapse)
 }
 
 // updateSynapseStatusWithPostgreSQLInfos is a function of type
@@ -298,8 +297,13 @@ func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(ctx context.C
 	}
 
 	// Actually sends an API request to update the Status
-	if err := r.updateSynapseStatus(ctx, s); err != nil {
+	err, has_patched := r.updateSynapseStatus(ctx, s)
+	if err != nil {
+		log.Error(err, "Error updating Synapse Status")
 		return subreconciler.RequeueWithError(err)
+	}
+	if has_patched {
+		return subreconciler.Requeue()
 	}
 
 	return subreconciler.ContinueReconciling()
@@ -375,8 +379,13 @@ func (r *SynapseReconciler) setSynapseStatusAsRunning(ctx context.Context, req c
 	s.Status.State = "RUNNING"
 	s.Status.Reason = ""
 
-	if err := r.updateSynapseStatus(ctx, s); err != nil {
+	err, has_patched := r.updateSynapseStatus(ctx, s)
+	if err != nil {
+		log.Error(err, "Error updating Synapse Status")
 		return subreconciler.RequeueWithError(err)
+	}
+	if has_patched {
+		return subreconciler.Requeue()
 	}
 
 	return subreconciler.ContinueReconciling()
@@ -410,7 +419,14 @@ func (r *SynapseReconciler) updateSynapseStatusBridges(ctx context.Context, req 
 		}
 	}
 
-	r.updateSynapseStatus(ctx, s)
+	err, has_patched := r.updateSynapseStatus(ctx, s)
+	if err != nil {
+		log.Error(err, "Error updating Synapse Status")
+		return subreconciler.RequeueWithError(err)
+	}
+	if has_patched {
+		return subreconciler.Requeue()
+	}
 
 	return subreconciler.ContinueReconciling()
 }

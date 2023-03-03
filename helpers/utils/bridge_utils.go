@@ -17,10 +17,14 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"errors"
+	"reflect"
 	"strings"
 
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func ComputeFQDN(name string, namespace string) string {
@@ -33,4 +37,24 @@ func GetSynapseServerName(s synapsev1alpha1.Synapse) (string, error) {
 	}
 	err := errors.New("ServerName not yet populated")
 	return "", err
+}
+
+func UpdateSynapseStatus(ctx context.Context, kubeClient client.Client, s *synapsev1alpha1.Synapse) error {
+	current := &synapsev1alpha1.Synapse{}
+
+	if err := kubeClient.Get(
+		ctx,
+		types.NamespacedName{Name: s.Name, Namespace: s.Namespace},
+		current,
+	); err != nil {
+		return err
+	}
+
+	if !reflect.DeepEqual(s.Status, current.Status) {
+		if err := kubeClient.Status().Patch(ctx, s, client.MergeFrom(current)); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
