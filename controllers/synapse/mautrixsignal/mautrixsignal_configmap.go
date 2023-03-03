@@ -417,7 +417,11 @@ func (r *MautrixSignalReconciler) copyInputMautrixSignalConfigMap(ctx context.Co
 	// Get and check the input ConfigMap for MautrixSignal
 	if err := r.Get(ctx, keyForInputConfigMap, &corev1.ConfigMap{}); err != nil {
 		reason := "ConfigMap " + inputConfigMapName + " does not exist in namespace " + inputConfigMapNamespace
-		if err := r.setFailedState(ctx, ms, reason); err != nil {
+		ms.Status.State = "FAILED"
+		ms.Status.Reason = reason
+
+		err, _ := r.updateMautrixSignalStatus(ctx, ms)
+		if err != nil {
 			log.Error(err, "Error updating mautrix-signal State")
 		}
 

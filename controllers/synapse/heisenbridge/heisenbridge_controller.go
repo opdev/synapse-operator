@@ -84,34 +84,14 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Build Heisenbridge status
-	s, err := r.fetchSynapseInstance(ctx, h)
-	if err != nil {
-		if k8serrors.IsNotFound(err) {
-			log.Error(
-				err,
-				"Cannot find Synapse instance",
-				"Synapse Name", h.Spec.Synapse.Name,
-				"Synapse Namespace", utils.ComputeNamespace(h.Namespace, h.Spec.Synapse.Namespace),
-			)
-		} else {
-			log.Error(
-				err,
-				"Error fetching Synapse instance",
-				"Synapse Name", h.Spec.Synapse.Name,
-				"Synapse Namespace", utils.ComputeNamespace(h.Namespace, h.Spec.Synapse.Namespace),
-			)
-		}
-		return ctrl.Result{}, err
-	}
-
-	if r, err := r.triggerSynapseReconciliation(&s, ctx); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return subreconciler.Evaluate(r, err)
-	}
-
 	// The list of subreconcilers for Heisenbridge will be built next.
-	// Heisenbridge is composed of a ConfigMap, a Service and a Deployment.
 	var subreconcilersForHeisenbridge []subreconciler.FnWithRequest
+
+	// We need to trigger a Synapse reconciliation so that it becomes aware of
+	// the Heisenbridge.
+	subreconcilersForHeisenbridge = []subreconciler.FnWithRequest{
+		r.triggerSynapseReconciliation,
+	}
 
 	// The user may specify a ConfigMap, containing the heisenbridge.yaml
 	// config file, under Spec.Bridges.Heisenbridge.ConfigMap
@@ -120,17 +100,19 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// ConfigMap, we need to validate that the ConfigMap exists, and
 		// create a copy. We also need to edit the heisenbridge
 		// configuration.
-		subreconcilersForHeisenbridge = []subreconciler.FnWithRequest{
+		subreconcilersForHeisenbridge = append(
+			subreconcilersForHeisenbridge,
 			r.copyInputHeisenbridgeConfigMap,
 			r.configureHeisenbridgeConfigMap,
-		}
+		)
 	} else {
 		// If the user hasn't provided a ConfigMap with a custom
 		// heisenbridge.yaml, we create a new ConfigMap with a default
 		// heisenbridge.yaml.
-		subreconcilersForHeisenbridge = []subreconciler.FnWithRequest{
+		subreconcilersForHeisenbridge = append(
+			subreconcilersForHeisenbridge,
 			r.reconcileHeisenbridgeConfigMap,
-		}
+		)
 	}
 
 	// Reconcile Heisenbridge resources: Service and Deployment
@@ -140,13 +122,14 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		r.reconcileHeisenbridgeDeployment,
 	)
 
+	// Run all subreconcilers sequentially
 	for _, f := range subreconcilersForHeisenbridge {
 		if r, err := f(ctx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
 			return subreconciler.Evaluate(r, err)
 		}
 	}
 
-	return ctrl.Result{}, nil
+	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 }
 
 func (r *HeisenbridgeReconciler) fetchSynapseInstance(
@@ -166,23 +149,26 @@ func (r *HeisenbridgeReconciler) fetchSynapseInstance(
 	return *s, nil
 }
 
-func (r *HeisenbridgeReconciler) triggerSynapseReconciliation(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	s := obj.(*synapsev1alpha1.Synapse)
-	s.Status.NeedsReconcile = true
+func (r *HeisenbridgeReconciler) triggerSynapseReconciliation(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	h := &synapsev1alpha1.Heisenbridge{}
 
-	current := &synapsev1alpha1.Synapse{}
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{Name: s.Name, Namespace: s.Namespace},
-		current,
-	); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, h); err != nil {
+		log.Error(err, "Error getting latest version of Heisenbridge CR")
 		return subreconciler.RequeueWithError(err)
 	}
 
-	if !reflect.DeepEqual(s.Status, current.Status) {
-		if err := r.Status().Patch(ctx, s, client.MergeFrom(current)); err != nil {
-			return subreconciler.RequeueWithError(err)
-		}
+	s, err := r.fetchSynapseInstance(ctx, *h)
+	if err != nil {
+		log.Error(err, "Error getting Synapse instance")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	s.Status.NeedsReconcile = true
+
+	err = utils.UpdateSynapseStatus(ctx, r.Client, &s)
+	if err != nil {
+		return subreconciler.RequeueWithError(err)
 	}
 
 	return subreconciler.ContinueReconciling()

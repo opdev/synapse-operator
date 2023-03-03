@@ -88,67 +88,15 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Build mautrix-signal status
-	s, err := r.fetchSynapseInstance(ctx, ms)
-	if err != nil {
-		if k8serrors.IsNotFound(err) {
-			log.Error(
-				err,
-				"Cannot find Synapse instance",
-				"Synapse Name", ms.Spec.Synapse.Name,
-				"Synapse Namespace", utils.ComputeNamespace(ms.Namespace, ms.Spec.Synapse.Namespace),
-			)
-		} else {
-			log.Error(
-				err,
-				"Error fetching Synapse instance",
-				"Synapse Name", ms.Spec.Synapse.Name,
-				"Synapse Namespace", utils.ComputeNamespace(ms.Namespace, ms.Spec.Synapse.Namespace),
-			)
-		}
-		return ctrl.Result{}, err
-	}
-
-	// Get Synapse Status
-	// if !isSynapseRunning(s) {
-	// 	err = errors.New("Synapse is not ready")
-	// 	log.Error(
-	// 		err,
-	// 		"Synapse is not ready",
-	// 		"Synapse Name", ms.Spec.Synapse.Name,
-	// 		"Synapse Namespace", utils.ComputeNamespace(ms.Namespace, ms.Spec.Synapse.Namespace),
-	// 	)
-
-	// 	return ctrl.Result{}, err
-	// }
-
-	// Get Synapse ServerName
-	ms.Status.Synapse.ServerName, err = utils.GetSynapseServerName(s)
-	if err != nil {
-		log.Error(
-			err,
-			"Error getting Synapse ServerName",
-			"Synapse Name", ms.Spec.Synapse.Name,
-			"Synapse Namespace", utils.ComputeNamespace(ms.Namespace, ms.Spec.Synapse.Namespace),
-		)
-		return ctrl.Result{}, err
-	}
-	ms.Status.IsOpenshift = s.Spec.IsOpenshift
-
-	if r, err := r.triggerSynapseReconciliation(&s, ctx); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return subreconciler.Evaluate(r, err)
-	}
-
-	if err := r.updateMautrixSignalStatus(ctx, &ms); err != nil {
-		log.Error(err, "Error updating mautrix-signal Status")
-		return ctrl.Result{}, err
-	}
-
 	// The list of subreconcilers for mautrix-signal will be built next.
-	// mautrix-signal is composed of a ConfigMap, a Service, a SA, a RB,
-	// a PVC and a Deployment.
-	// In addition, a Deployment and a PVC are needed for signald.
 	var subreconcilersForMautrixSignal []subreconciler.FnWithRequest
+
+	// We need to trigger a Synapse reconciliation so that it becomes aware of
+	// the MautrixSignal. We also need to complete the MautrixSignal Status.
+	subreconcilersForMautrixSignal = []subreconciler.FnWithRequest{
+		r.triggerSynapseReconciliation,
+		r.buildMautrixSignalStatus,
+	}
 
 	// The user may specify a ConfigMap, containing the config.yaml config
 	// file, under Spec.Bridges.MautrixSignal.ConfigMap
@@ -157,18 +105,19 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		// ConfigMap, we need to validate that the ConfigMap exists, and
 		// create a copy. We also need to edit the mautrix-signal
 		// configuration.
-		subreconcilersForMautrixSignal = []subreconciler.FnWithRequest{
+		subreconcilersForMautrixSignal = append(
+			subreconcilersForMautrixSignal,
 			r.copyInputMautrixSignalConfigMap,
 			r.configureMautrixSignalConfigMap,
-		}
-
+		)
 	} else {
 		// If the user hasn't provided a ConfigMap with a custom
 		// config.yaml, we create a new ConfigMap with a default
 		// config.yaml.
-		subreconcilersForMautrixSignal = []subreconciler.FnWithRequest{
+		subreconcilersForMautrixSignal = append(
+			subreconcilersForMautrixSignal,
 			r.reconcileMautrixSignalConfigMap,
-		}
+		)
 	}
 
 	// SA and RB are only necessary if we're running on OpenShift
@@ -191,13 +140,14 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		r.reconcileMautrixSignalDeployment,
 	)
 
+	// Run all subreconcilers sequentially
 	for _, f := range subreconcilersForMautrixSignal {
 		if r, err := f(ctx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
 			return subreconciler.Evaluate(r, err)
 		}
 	}
 
-	return ctrl.Result{}, nil
+	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 }
 
 func (r *MautrixSignalReconciler) fetchSynapseInstance(
@@ -217,52 +167,91 @@ func (r *MautrixSignalReconciler) fetchSynapseInstance(
 	return *s, nil
 }
 
-func (r *MautrixSignalReconciler) triggerSynapseReconciliation(i interface{}, ctx context.Context) (*ctrl.Result, error) {
-	s := i.(*synapsev1alpha1.Synapse)
-	s.Status.NeedsReconcile = true
+func (r *MautrixSignalReconciler) triggerSynapseReconciliation(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	ms := &synapsev1alpha1.MautrixSignal{}
 
-	current := &synapsev1alpha1.Synapse{}
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{Name: s.Name, Namespace: s.Namespace},
-		current,
-	); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
+		log.Error(err, "Error getting latest version of Heisenbridge CR")
 		return subreconciler.RequeueWithError(err)
 	}
 
-	if !reflect.DeepEqual(s.Status, current.Status) {
-		if err := r.Status().Patch(ctx, s, client.MergeFrom(current)); err != nil {
-			return subreconciler.RequeueWithError(err)
-		}
+	s, err := r.fetchSynapseInstance(ctx, *ms)
+	if err != nil {
+		log.Error(err, "Error fetching Synapse instance")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	s.Status.NeedsReconcile = true
+
+	err = utils.UpdateSynapseStatus(ctx, r.Client, &s)
+	if err != nil {
+		log.Error(err, "Error updating Synapse status")
+		return subreconciler.RequeueWithError(err)
 	}
 
 	return subreconciler.ContinueReconciling()
 }
 
-func (r *MautrixSignalReconciler) setFailedState(ctx context.Context, ms *synapsev1alpha1.MautrixSignal, reason string) error {
-	ms.Status.State = "FAILED"
-	ms.Status.Reason = reason
+func (r *MautrixSignalReconciler) buildMautrixSignalStatus(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	ms := &synapsev1alpha1.MautrixSignal{}
 
-	return r.updateMautrixSignalStatus(ctx, ms)
+	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
+		log.Error(err, "Error getting latest version of Heisenbridge CR")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	s, err := r.fetchSynapseInstance(ctx, *ms)
+	if err != nil {
+		log.Error(err, "Error fetching Synapse instance")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	// Get Synapse ServerName
+	ms.Status.Synapse.ServerName, err = utils.GetSynapseServerName(s)
+	if err != nil {
+		log.Error(
+			err,
+			"Error getting Synapse ServerName",
+			"Synapse Name", ms.Spec.Synapse.Name,
+			"Synapse Namespace", utils.ComputeNamespace(ms.Namespace, ms.Spec.Synapse.Namespace),
+		)
+		return subreconciler.RequeueWithError(err)
+	}
+
+	ms.Status.IsOpenshift = s.Spec.IsOpenshift
+
+	err, has_patched := r.updateMautrixSignalStatus(ctx, ms)
+	if err != nil {
+		log.Error(err, "Error updating mautrix-signal Status")
+		return subreconciler.RequeueWithError(err)
+	}
+	if has_patched {
+		return subreconciler.Requeue()
+	}
+
+	return subreconciler.ContinueReconciling()
 }
 
-func (r *MautrixSignalReconciler) updateMautrixSignalStatus(ctx context.Context, ms *synapsev1alpha1.MautrixSignal) error {
+func (r *MautrixSignalReconciler) updateMautrixSignalStatus(ctx context.Context, ms *synapsev1alpha1.MautrixSignal) (error, bool) {
 	current := &synapsev1alpha1.MautrixSignal{}
 	if err := r.Get(
 		ctx,
 		types.NamespacedName{Name: ms.Name, Namespace: ms.Namespace},
 		current,
 	); err != nil {
-		return err
+		return err, false
 	}
 
 	if !reflect.DeepEqual(ms.Status, current.Status) {
 		if err := r.Status().Patch(ctx, ms, client.MergeFrom(current)); err != nil {
-			return err
+			return err, false
 		}
+		return nil, true
 	}
 
-	return nil
+	return nil, false
 }
 
 // SetupWithManager sets up the controller with the Manager.
