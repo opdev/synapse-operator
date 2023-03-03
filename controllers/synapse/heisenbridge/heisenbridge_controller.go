@@ -28,8 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
-	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 	"github.com/opdev/synapse-operator/helpers/utils"
 )
 
@@ -84,7 +84,7 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Build mautrix-signal status
+	// Build Heisenbridge status
 	s, err := r.fetchSynapseInstance(ctx, h)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
@@ -105,13 +105,13 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	if r, err := r.triggerSynapseReconciliation(&s, ctx); reconc.ShouldHaltOrRequeue(r, err) {
-		return reconc.Evaluate(r, err)
+	if r, err := r.triggerSynapseReconciliation(&s, ctx); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return subreconciler.Evaluate(r, err)
 	}
 
 	// The list of subreconcilers for Heisenbridge will be built next.
 	// Heisenbridge is composed of a ConfigMap, a Service and a Deployment.
-	var subreconcilersForHeisenbridge []reconc.SubreconcilerFuncs
+	var subreconcilersForHeisenbridge []subreconciler.FnWithRequest
 
 	// The user may specify a ConfigMap, containing the heisenbridge.yaml
 	// config file, under Spec.Bridges.Heisenbridge.ConfigMap
@@ -120,7 +120,7 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// ConfigMap, we need to validate that the ConfigMap exists, and
 		// create a copy. We also need to edit the heisenbridge
 		// configuration.
-		subreconcilersForHeisenbridge = []reconc.SubreconcilerFuncs{
+		subreconcilersForHeisenbridge = []subreconciler.FnWithRequest{
 			r.copyInputHeisenbridgeConfigMap,
 			r.configureHeisenbridgeConfigMap,
 		}
@@ -128,7 +128,7 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// If the user hasn't provided a ConfigMap with a custom
 		// heisenbridge.yaml, we create a new ConfigMap with a default
 		// heisenbridge.yaml.
-		subreconcilersForHeisenbridge = []reconc.SubreconcilerFuncs{
+		subreconcilersForHeisenbridge = []subreconciler.FnWithRequest{
 			r.reconcileHeisenbridgeConfigMap,
 		}
 	}
@@ -141,8 +141,8 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	)
 
 	for _, f := range subreconcilersForHeisenbridge {
-		if r, err := f(&h, ctx); reconc.ShouldHaltOrRequeue(r, err) {
-			return reconc.Evaluate(r, err)
+		if r, err := f(ctx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
+			return subreconciler.Evaluate(r, err)
 		}
 	}
 
@@ -176,16 +176,16 @@ func (r *HeisenbridgeReconciler) triggerSynapseReconciliation(obj client.Object,
 		types.NamespacedName{Name: s.Name, Namespace: s.Namespace},
 		current,
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
 	if !reflect.DeepEqual(s.Status, current.Status) {
 		if err := r.Status().Patch(ctx, s, client.MergeFrom(current)); err != nil {
-			return reconc.RequeueWithError(err)
+			return subreconciler.RequeueWithError(err)
 		}
 	}
 
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 func (r *HeisenbridgeReconciler) setFailedState(ctx context.Context, h *synapsev1alpha1.Heisenbridge, reason string) error {

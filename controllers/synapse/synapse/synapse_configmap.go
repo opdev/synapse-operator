@@ -30,25 +30,31 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
+	subreconciler "github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
-	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 	"github.com/opdev/synapse-operator/helpers/utils"
 )
 
-// reconcileSynapseConfigMap is a function of type subreconcilerFuncs, to be
+// reconcileSynapseConfigMap is a function of type FnWithRequest, to be
 // called in the main reconciliation loop.
 //
 // It reconciles the synapse ConfigMap to its desired state. It is called only
 // if the user hasn't provided its own ConfigMap for synapse
-func (r *SynapseReconciler) reconcileSynapseConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	s := obj.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) reconcileSynapseConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	s := &synapsev1alpha1.Synapse{}
+
+	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+		log.Error(err, "Error getting latest version of Synapse CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
 
 	desiredConfigMap, err := r.configMapForSynapse(s, objectMetaForSynapse)
 	if err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
 	if err := reconcile.ReconcileResource(
@@ -57,16 +63,14 @@ func (r *SynapseReconciler) reconcileSynapseConfigMap(obj client.Object, ctx con
 		desiredConfigMap,
 		&corev1.ConfigMap{},
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // configMapForSynapse returns a synapse ConfigMap object
-func (r *SynapseReconciler) configMapForSynapse(obj client.Object, objectMeta metav1.ObjectMeta) (*corev1.ConfigMap, error) {
-	s := obj.(*synapsev1alpha1.Synapse)
-
+func (r *SynapseReconciler) configMapForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (*corev1.ConfigMap, error) {
 	homeserverYaml := `
 # Configuration file for Synapse.
 #
@@ -2718,19 +2722,25 @@ redis:
 	return cm, nil
 }
 
-// copyInputSynapseConfigMap is a function of type subreconcilerFuncs, to be
+// copyInputSynapseConfigMap is a function of type FnWithRequest, to be
 // called in the main reconciliation loop.
 //
 // It creates a copy of the user-provided ConfigMap for synapse, defined in
 // synapse.Spec.Homeserver.ConfigMap
-func (r *SynapseReconciler) copyInputSynapseConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	s := obj.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) copyInputSynapseConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	s := &synapsev1alpha1.Synapse{}
+
+	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+		log.Error(err, "Error getting latest version of Synapse CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
 
 	desiredConfigMap, err := r.configMapForSynapseCopy(s, objectMetaForSynapse)
 	if err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
 	// Create a copy of the inputConfigMap defined in Spec.Homeserver.ConfigMap
@@ -2741,10 +2751,10 @@ func (r *SynapseReconciler) copyInputSynapseConfigMap(obj client.Object, ctx con
 		desiredConfigMap,
 		&corev1.ConfigMap{},
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // The ConfigMap returned by configMapForSynapseCopy is a copy of the ConfigMap
@@ -2776,16 +2786,20 @@ func (r *SynapseReconciler) configMapForSynapseCopy(
 	return copyConfigMap, nil
 }
 
-// parseInputSynapseConfigMap is a function of type subreconcilerFuncs, to be
+// parseInputSynapseConfigMap is a function of type FnWithRequest, to be
 // called in the main reconciliation loop.
 //
 // It checks that the ConfigMap referenced by
 // synapse.Spec.Homeserver.ConfigMap.Name exists and extrats the server_name
 // and report_stats values.
-func (r *SynapseReconciler) parseInputSynapseConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	s := obj.(*synapsev1alpha1.Synapse)
-
+func (r *SynapseReconciler) parseInputSynapseConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
+	s := &synapsev1alpha1.Synapse{}
+
+	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+		log.Error(err, "Error getting latest version of Synapse CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	var inputConfigMap corev1.ConfigMap // the user-provided ConfigMap. It should contain a valid homeserver.yaml
 	ConfigMapName := s.Spec.Homeserver.ConfigMap.Name
@@ -2810,14 +2824,19 @@ func (r *SynapseReconciler) parseInputSynapseConfigMap(obj client.Object, ctx co
 			"ConfigMap.Name",
 			ConfigMapName,
 		)
-		return reconc.RequeueWithDelayAndError(time.Duration(30), err)
+		return subreconciler.RequeueWithDelayAndError(time.Duration(30), err)
 	}
 
 	if err := r.ParseHomeserverConfigMap(ctx, s, inputConfigMap); err != nil {
-		return reconc.RequeueWithDelayAndError(time.Duration(30), err)
+		return subreconciler.RequeueWithDelayAndError(time.Duration(30), err)
 	}
 
-	return reconc.ContinueReconciling()
+	if err := r.updateSynapseStatus(ctx, s); err != nil {
+		log.Error(err, "Error updating Synapse Status")
+		return subreconciler.RequeueWithError(err)
+	}
+
+	return subreconciler.ContinueReconciling()
 }
 
 // ParseHomeserverConfigMap loads the ConfigMap, which name is determined by
@@ -2875,12 +2894,18 @@ func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synaps
 }
 
 // updateSynapseConfigMapForPostgresCluster is a function of type
-// subreconcilerFuncs, to be called in the main reconciliation loop.
+// FnWithRequest, to be called in the main reconciliation loop.
 //
 // It configures the 'database' section of homeserver.yaml to allow Synapse to
 // connect to the newly created PostgresCluster instance.
-func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	s := obj.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	s := &synapsev1alpha1.Synapse{}
+
+	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+		log.Error(err, "Error getting latest version of Synapse CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	keyForSynapse := types.NamespacedName{
 		Name:      s.Name,
@@ -2895,10 +2920,10 @@ func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(obj client.
 		r.updateHomeserverWithPostgreSQLInfos,
 		"homeserver.yaml",
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 func (r *SynapseReconciler) updateHomeserverWithPostgreSQLInfos(
@@ -2976,12 +3001,18 @@ func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1
 }
 
 // updateSynapseConfigMapForHeisenbridge is a function of type
-// subreconcilerFuncs, to be called in the main reconciliation loop.
+// FnWithRequest, to be called in the main reconciliation loop.
 //
 // It registers the heisenbridge as an application service in the
 // homeserver.yaml config file.
-func (r *SynapseReconciler) updateSynapseConfigMapForHeisenbridge(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	s := obj.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) updateSynapseConfigMapForHeisenbridge(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	s := &synapsev1alpha1.Synapse{}
+
+	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+		log.Error(err, "Error getting latest version of Synapse CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	keyForSynapse := types.NamespacedName{
 		Name:      s.Name,
@@ -2997,10 +3028,10 @@ func (r *SynapseReconciler) updateSynapseConfigMapForHeisenbridge(obj client.Obj
 		r.updateHomeserverWithHeisenbridgeInfos,
 		"homeserver.yaml",
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // updateHomeserverWithHeisenbridgeInfos is a function of type updateDataFunc
@@ -3017,12 +3048,18 @@ func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
 }
 
 // updateSynapseConfigMapForMautrixSignal is a function of type
-// subreconcilerFuncs, to be called in the main reconciliation loop.
+// FnWithRequest, to be called in the main reconciliation loop.
 //
 // It registers the mautrix-signal bridge as an application service in the
 // homeserver.yaml config file.
-func (r *SynapseReconciler) updateSynapseConfigMapForMautrixSignal(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	s := obj.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) updateSynapseConfigMapForMautrixSignal(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	s := &synapsev1alpha1.Synapse{}
+
+	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+		log.Error(err, "Error getting latest version of Synapse CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	keyForSynapse := types.NamespacedName{
 		Name:      s.Name,
@@ -3038,10 +3075,10 @@ func (r *SynapseReconciler) updateSynapseConfigMapForMautrixSignal(obj client.Ob
 		r.updateHomeserverWithMautrixSignalInfos,
 		"homeserver.yaml",
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // updateHomeserverWithMautrixSignalInfos is a function of type updateDataFunc

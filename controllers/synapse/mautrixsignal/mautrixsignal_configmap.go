@@ -28,26 +28,32 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
-	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 	"github.com/opdev/synapse-operator/helpers/utils"
 )
 
-// reconcileMautrixSignalConfigMap is a function of type subreconcilerFuncs, to
+// reconcileMautrixSignalConfigMap is a function of type FnWithRequest, to
 // be called in the main reconciliation loop.
 //
 // It reconciles the mautrix-signal ConfigMap to its desired state. It is
 // called only if the user hasn't provided its own ConfigMap for
 // mautrix-signal.
-func (r *MautrixSignalReconciler) reconcileMautrixSignalConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	ms := obj.(*synapsev1alpha1.MautrixSignal)
+func (r *MautrixSignalReconciler) reconcileMautrixSignalConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	ms := &synapsev1alpha1.MautrixSignal{}
+
+	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
+		log.Error(err, "Error getting latest version of Heisenbridge CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	objectMetaMautrixSignal := reconcile.SetObjectMeta(ms.Name, ms.Namespace, map[string]string{})
 
 	desiredConfigMap, err := r.configMapForMautrixSignal(ms, objectMetaMautrixSignal)
 	if err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
 	if err := reconcile.ReconcileResource(
@@ -56,10 +62,10 @@ func (r *MautrixSignalReconciler) reconcileMautrixSignalConfigMap(obj client.Obj
 		desiredConfigMap,
 		&corev1.ConfigMap{},
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // configMapForSynapse returns a synapse ConfigMap object
@@ -387,15 +393,19 @@ logging:
 	return cm, nil
 }
 
-// copyInputMautrixSignalConfigMap is a function of type subreconcilerFuncs, to
+// copyInputMautrixSignalConfigMap is a function of type FnWithRequest, to
 // be called in the main reconciliation loop.
 //
 // It creates a copy of the user-provided ConfigMap for mautrix-signal, defined
 // in synapse.Spec.Bridges.MautrixSignal.ConfigMap
-func (r *MautrixSignalReconciler) copyInputMautrixSignalConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	ms := obj.(*synapsev1alpha1.MautrixSignal)
-
+func (r *MautrixSignalReconciler) copyInputMautrixSignalConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
+	ms := &synapsev1alpha1.MautrixSignal{}
+
+	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
+		log.Error(err, "Error getting latest version of Heisenbridge CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	inputConfigMapName := ms.Spec.ConfigMap.Name
 	inputConfigMapNamespace := utils.ComputeNamespace(ms.Namespace, ms.Spec.ConfigMap.Namespace)
@@ -420,14 +430,14 @@ func (r *MautrixSignalReconciler) copyInputMautrixSignalConfigMap(obj client.Obj
 			inputConfigMapName,
 		)
 
-		return reconc.RequeueWithDelayAndError(time.Duration(30), err)
+		return subreconciler.RequeueWithDelayAndError(time.Duration(30), err)
 	}
 
 	objectMetaMautrixSignal := reconcile.SetObjectMeta(ms.Name, ms.Namespace, map[string]string{})
 
 	desiredConfigMap, err := r.configMapForMautrixSignalCopy(ms, objectMetaMautrixSignal)
 	if err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
 	// Create a copy of the inputMautrixSignalConfigMap defined in Spec.Bridges.MautrixSignal.ConfigMap
@@ -438,10 +448,10 @@ func (r *MautrixSignalReconciler) copyInputMautrixSignalConfigMap(obj client.Obj
 		desiredConfigMap,
 		&corev1.ConfigMap{},
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // configMapForMautrixSignalCopy is a function of type createResourceFunc, to be
@@ -476,13 +486,19 @@ func (r *MautrixSignalReconciler) configMapForMautrixSignalCopy(
 	return copyConfigMap, nil
 }
 
-// configureMautrixSignalConfigMap is a function of type subreconcilerFuncs, to
+// configureMautrixSignalConfigMap is a function of type FnWithRequest, to
 // be called in the main reconciliation loop.
 //
 // Following the previous copy of the user-provided ConfigMap, it edits the
 // content of the copy to ensure that mautrix-signal is correctly configured.
-func (r *MautrixSignalReconciler) configureMautrixSignalConfigMap(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	ms := obj.(*synapsev1alpha1.MautrixSignal)
+func (r *MautrixSignalReconciler) configureMautrixSignalConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	ms := &synapsev1alpha1.MautrixSignal{}
+
+	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
+		log.Error(err, "Error getting latest version of Heisenbridge CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	keyForConfigMap := types.NamespacedName{
 		Name:      ms.Name,
@@ -498,10 +514,10 @@ func (r *MautrixSignalReconciler) configureMautrixSignalConfigMap(obj client.Obj
 		r.updateMautrixSignalData,
 		"config.yaml",
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // updateMautrixSignalData is a function of type updateDataFunc function to

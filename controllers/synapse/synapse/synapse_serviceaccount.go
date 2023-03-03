@@ -23,25 +23,31 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
+	subreconciler "github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
-	reconc "github.com/opdev/synapse-operator/helpers/reconcileresults"
 )
 
-// reconcileSynapseServiceAccount is a function of type subreconcilerFuncs, to
+// reconcileSynapseServiceAccount is a function of type FnWithRequest, to
 // be called in the main reconciliation loop.
 //
 // It reconciles the ServiceAccount for synapse to its desired state.
-func (r *SynapseReconciler) reconcileSynapseServiceAccount(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	s := obj.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) reconcileSynapseServiceAccount(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	s := &synapsev1alpha1.Synapse{}
+
+	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+		log.Error(err, "Error getting latest version of Synapse CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
 
 	desiredServiceAccount, err := r.serviceAccountForSynapse(s, objectMetaForSynapse)
 	if err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
 	if err := reconcile.ReconcileResource(
@@ -50,9 +56,9 @@ func (r *SynapseReconciler) reconcileSynapseServiceAccount(obj client.Object, ct
 		desiredServiceAccount,
 		&corev1.ServiceAccount{},
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // serviceAccountForSynapse returns a synapse ServiceAccount object
@@ -69,18 +75,24 @@ func (r *SynapseReconciler) serviceAccountForSynapse(s *synapsev1alpha1.Synapse,
 	return sa, nil
 }
 
-// reconcileSynapseRoleBinding is a function of type subreconcilerFuncs, to be
+// reconcileSynapseRoleBinding is a function of type FnWithRequest, to be
 // called in the main reconciliation loop.
 //
 // It reconciles the RoleBinding for synapse to its desired state.
-func (r *SynapseReconciler) reconcileSynapseRoleBinding(obj client.Object, ctx context.Context) (*ctrl.Result, error) {
-	s := obj.(*synapsev1alpha1.Synapse)
+func (r *SynapseReconciler) reconcileSynapseRoleBinding(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+	s := &synapsev1alpha1.Synapse{}
+
+	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+		log.Error(err, "Error getting latest version of Synapse CR")
+		return subreconciler.RequeueWithError(err)
+	}
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
 
 	desiredRoleBinding, err := r.roleBindingForSynapse(s, objectMetaForSynapse)
 	if err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
 
 	if err := reconcile.ReconcileResource(
@@ -89,9 +101,9 @@ func (r *SynapseReconciler) reconcileSynapseRoleBinding(obj client.Object, ctx c
 		desiredRoleBinding,
 		&rbacv1.RoleBinding{},
 	); err != nil {
-		return reconc.RequeueWithError(err)
+		return subreconciler.RequeueWithError(err)
 	}
-	return reconc.ContinueReconciling()
+	return subreconciler.ContinueReconciling()
 }
 
 // roleBindingForSynapse returns a synapse RoleBinding object
