@@ -78,28 +78,8 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	log := ctrllog.FromContext(ctx)
 
 	var synapse synapsev1alpha1.Synapse // The Synapse object being reconciled
-
-	// Load the Synapse by name
-	if err := r.Get(ctx, req.NamespacedName, &synapse); err != nil {
-		if k8serrors.IsNotFound(err) {
-			// we'll ignore not-found errors, since they can't be fixed by an immediate
-			// requeue (we'll need to wait for a new notification), and we can get them
-			// on deleted requests.
-			log.Error(
-				err,
-				"Cannot find Synapse - has it been deleted ?",
-				"Synapse Name", synapse.Name,
-				"Synapse Namespace", synapse.Namespace,
-			)
-			return ctrl.Result{}, nil
-		}
-		log.Error(
-			err,
-			"Error fetching Synapse",
-			"Synapse Name", synapse.Name,
-			"Synapse Namespace", synapse.Namespace,
-		)
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+	if r, err := r.getLatestSynapse(ctx, req, &synapse); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return subreconciler.Evaluate(r, err)
 	}
 
 	// The list of subreconcilers for Synapse.
@@ -202,6 +182,38 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 }
 
+func (r *SynapseReconciler) getLatestSynapse(
+	ctx context.Context,
+	req ctrl.Request,
+	s *synapsev1alpha1.Synapse,
+) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+
+	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+		if k8serrors.IsNotFound(err) {
+			// we'll ignore not-found errors, since they can't be fixed by an immediate
+			// requeue (we'll need to wait for a new notification), and we can get them
+			// on deleted requests.
+			log.Error(
+				err,
+				"Cannot find Synapse - has it been deleted ?",
+				"Synapse Name", s.Name,
+				"Synapse Namespace", s.Namespace,
+			)
+			return subreconciler.DoNotRequeue()
+		}
+		log.Error(
+			err,
+			"Error fetching Synapse",
+			"Synapse Name", s.Name,
+			"Synapse Namespace", s.Namespace,
+		)
+		return subreconciler.RequeueWithError(err)
+	}
+
+	return subreconciler.ContinueReconciling()
+}
+
 // labelsForSynapse returns the labels for selecting the resources
 // belonging to the given synapse CR name.
 func labelsForSynapse(name string) map[string]string {
@@ -238,11 +250,10 @@ func (r *SynapseReconciler) updateSynapseStatus(ctx context.Context, synapse *sy
 
 func (r *SynapseReconciler) setStatusHomeserverConfiguration(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	s := &synapsev1alpha1.Synapse{}
 
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	s := &synapsev1alpha1.Synapse{}
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	s.Status.HomeserverConfiguration.ServerName = s.Spec.Homeserver.Values.ServerName
@@ -272,11 +283,10 @@ func (r *SynapseReconciler) isPostgresOperatorInstalled(ctx context.Context) boo
 // database connection information.
 func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	s := &synapsev1alpha1.Synapse{}
 
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	s := &synapsev1alpha1.Synapse{}
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	var postgresSecret corev1.Secret
@@ -368,11 +378,10 @@ func (r *SynapseReconciler) updateSynapseStatusDatabase(
 // It set the Synapse Status 'State' field to 'RUNNING'.
 func (r *SynapseReconciler) setSynapseStatusAsRunning(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	s := &synapsev1alpha1.Synapse{}
 
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	s := &synapsev1alpha1.Synapse{}
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	s.Status.NeedsReconcile = false
@@ -393,11 +402,10 @@ func (r *SynapseReconciler) setSynapseStatusAsRunning(ctx context.Context, req c
 
 func (r *SynapseReconciler) updateSynapseStatusBridges(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	s := &synapsev1alpha1.Synapse{}
 
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	s := &synapsev1alpha1.Synapse{}
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	hList := &synapsev1alpha1.HeisenbridgeList{}

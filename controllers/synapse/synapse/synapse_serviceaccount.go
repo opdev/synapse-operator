@@ -23,7 +23,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	subreconciler "github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
@@ -35,12 +34,9 @@ import (
 //
 // It reconciles the ServiceAccount for synapse to its desired state.
 func (r *SynapseReconciler) reconcileSynapseServiceAccount(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	s := &synapsev1alpha1.Synapse{}
-
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
@@ -80,12 +76,9 @@ func (r *SynapseReconciler) serviceAccountForSynapse(s *synapsev1alpha1.Synapse,
 //
 // It reconciles the RoleBinding for synapse to its desired state.
 func (r *SynapseReconciler) reconcileSynapseRoleBinding(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	s := &synapsev1alpha1.Synapse{}
-
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})

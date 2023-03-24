@@ -61,34 +61,12 @@ func GetMautrixSignalServiceFQDN(ms synapsev1alpha1.MautrixSignal) string {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
-
 	var ms synapsev1alpha1.MautrixSignal // The mautrix-signal object being reconciled
-
-	// Load the mautrix-signal by name
-	if err := r.Get(ctx, req.NamespacedName, &ms); err != nil {
-		if k8serrors.IsNotFound(err) {
-			// we'll ignore not-found errors, since they can't be fixed by an immediate
-			// requeue (we'll need to wait for a new notification), and we can get them
-			// on deleted requests.
-			log.Error(
-				err,
-				"Cannot find mautrix-signal - has it been deleted ?",
-				"mautrix-signal Name", ms.Name,
-				"mautrix-signal Namespace", ms.Namespace,
-			)
-			return ctrl.Result{}, nil
-		}
-		log.Error(
-			err,
-			"Error fetching mautrix-signal",
-			"mautrix-signal Name", ms.Name,
-			"mautrix-signal Namespace", ms.Namespace,
-		)
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+	if r, err := r.getLatestMautrixSignal(ctx, req, &ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return subreconciler.Evaluate(r, err)
 	}
 
-	// The list of subreconcilers for mautrix-signal will be built next.
+	// The list of subreconcilers for mautrix-signal.
 	var subreconcilersForMautrixSignal []subreconciler.FnWithRequest
 
 	// We need to trigger a Synapse reconciliation so that it becomes aware of
@@ -150,6 +128,38 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 }
 
+func (r *MautrixSignalReconciler) getLatestMautrixSignal(
+	ctx context.Context,
+	req ctrl.Request,
+	ms *synapsev1alpha1.MautrixSignal,
+) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+
+	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
+		if k8serrors.IsNotFound(err) {
+			// we'll ignore not-found errors, since they can't be fixed by an immediate
+			// requeue (we'll need to wait for a new notification), and we can get them
+			// on deleted requests.
+			log.Error(
+				err,
+				"Cannot find mautrix-signal - has it been deleted ?",
+				"mautrix-signal Name", ms.Name,
+				"mautrix-signal Namespace", ms.Namespace,
+			)
+			return subreconciler.DoNotRequeue()
+		}
+		log.Error(
+			err,
+			"Error fetching mautrix-signal",
+			"mautrix-signal Name", ms.Name,
+			"mautrix-signal Namespace", ms.Namespace,
+		)
+		return subreconciler.RequeueWithError(err)
+	}
+
+	return subreconciler.ContinueReconciling()
+}
+
 func (r *MautrixSignalReconciler) fetchSynapseInstance(
 	ctx context.Context,
 	ms synapsev1alpha1.MautrixSignal,
@@ -169,11 +179,10 @@ func (r *MautrixSignalReconciler) fetchSynapseInstance(
 
 func (r *MautrixSignalReconciler) triggerSynapseReconciliation(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	ms := &synapsev1alpha1.MautrixSignal{}
 
-	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
-		log.Error(err, "Error getting latest version of Heisenbridge CR")
-		return subreconciler.RequeueWithError(err)
+	ms := &synapsev1alpha1.MautrixSignal{}
+	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	s, err := r.fetchSynapseInstance(ctx, *ms)
@@ -195,11 +204,10 @@ func (r *MautrixSignalReconciler) triggerSynapseReconciliation(ctx context.Conte
 
 func (r *MautrixSignalReconciler) buildMautrixSignalStatus(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	ms := &synapsev1alpha1.MautrixSignal{}
 
-	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
-		log.Error(err, "Error getting latest version of Heisenbridge CR")
-		return subreconciler.RequeueWithError(err)
+	ms := &synapsev1alpha1.MautrixSignal{}
+	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	s, err := r.fetchSynapseInstance(ctx, *ms)
