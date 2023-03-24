@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	pgov1beta1 "github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
-	"github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/utils"
 )
@@ -695,19 +694,19 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						heisenbridgeName      = "test-heisenbridge"
 						heisenbridgeNamespace = "default"
 					)
-					var heisenbridge *v1alpha1.Heisenbridge
+					var heisenbridge *synapsev1alpha1.Heisenbridge
 
 					BeforeAll(func() {
 						initSynapseVariables()
 
 						By("Creating the MautrixSignal object")
-						heisenbridge = &v1alpha1.Heisenbridge{
+						heisenbridge = &synapsev1alpha1.Heisenbridge{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      heisenbridgeName,
 								Namespace: heisenbridgeNamespace,
 							},
-							Spec: v1alpha1.HeisenbridgeSpec{
-								Synapse: v1alpha1.HeisenbridgeSynapseSpec{
+							Spec: synapsev1alpha1.HeisenbridgeSpec{
+								Synapse: synapsev1alpha1.HeisenbridgeSynapseSpec{
 									Name: SynapseName,
 								},
 							},
@@ -741,11 +740,11 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					})
 
 					It("Should register the presence of the bridge in the Synapse status", func() {
-						expectedStatusBridgesHeisenbridge := v1alpha1.SynapseStatusBridgesHeisenbridge{
+						expectedStatusBridgesHeisenbridge := synapsev1alpha1.SynapseStatusBridgesHeisenbridge{
 							Enabled: true,
 							Name:    heisenbridgeName,
 						}
-						Eventually(func(g Gomega) v1alpha1.SynapseStatusBridgesHeisenbridge {
+						Eventually(func(g Gomega) synapsev1alpha1.SynapseStatusBridgesHeisenbridge {
 							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
 							return synapse.Status.Bridges.Heisenbridge
 						}, timeout, interval).Should(Equal(expectedStatusBridgesHeisenbridge))
@@ -807,19 +806,19 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						mautrixSignalNamespace = "default"
 					)
 
-					var mautrixsignal *v1alpha1.MautrixSignal
+					var mautrixsignal *synapsev1alpha1.MautrixSignal
 
 					BeforeAll(func() {
 						initSynapseVariables()
 
 						By("Creating the MautrixSignal object")
-						mautrixsignal = &v1alpha1.MautrixSignal{
+						mautrixsignal = &synapsev1alpha1.MautrixSignal{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      mautrixSignalName,
 								Namespace: mautrixSignalNamespace,
 							},
-							Spec: v1alpha1.MautrixSignalSpec{
-								Synapse: v1alpha1.MautrixSignalSynapseSpec{
+							Spec: synapsev1alpha1.MautrixSignalSpec{
+								Synapse: synapsev1alpha1.MautrixSignalSynapseSpec{
 									Name: SynapseName,
 								},
 							},
@@ -853,11 +852,11 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					})
 
 					It("Should register the presence of the bridge in the Synapse status", func() {
-						expectedStatusBridgesMautrixSignal := v1alpha1.SynapseStatusBridgesMautrixSignal{
+						expectedStatusBridgesMautrixSignal := synapsev1alpha1.SynapseStatusBridgesMautrixSignal{
 							Enabled: true,
 							Name:    mautrixSignalName,
 						}
-						Eventually(func(g Gomega) v1alpha1.SynapseStatusBridgesMautrixSignal {
+						Eventually(func(g Gomega) synapsev1alpha1.SynapseStatusBridgesMautrixSignal {
 							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
 							return synapse.Status.Bridges.MautrixSignal
 						}, timeout, interval).Should(Equal(expectedStatusBridgesMautrixSignal))
