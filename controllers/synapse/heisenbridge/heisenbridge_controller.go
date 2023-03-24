@@ -145,18 +145,14 @@ func (r *HeisenbridgeReconciler) getLatestHeisenbridge(
 func (r *HeisenbridgeReconciler) fetchSynapseInstance(
 	ctx context.Context,
 	h synapsev1alpha1.Heisenbridge,
-) (synapsev1alpha1.Synapse, error) {
+	s *synapsev1alpha1.Synapse,
+) error {
 	// Validate Synapse instance exists
-	s := &synapsev1alpha1.Synapse{}
 	keyForSynapse := types.NamespacedName{
 		Name:      h.Spec.Synapse.Name,
 		Namespace: utils.ComputeNamespace(h.Namespace, h.Spec.Synapse.Namespace),
 	}
-	if err := r.Get(ctx, keyForSynapse, s); err != nil {
-		return synapsev1alpha1.Synapse{}, err
-	}
-
-	return *s, nil
+	return r.Get(ctx, keyForSynapse, s)
 }
 
 func (r *HeisenbridgeReconciler) triggerSynapseReconciliation(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
@@ -167,16 +163,15 @@ func (r *HeisenbridgeReconciler) triggerSynapseReconciliation(ctx context.Contex
 		return r, err
 	}
 
-	s, err := r.fetchSynapseInstance(ctx, *h)
-	if err != nil {
+	s := synapsev1alpha1.Synapse{}
+	if err := r.fetchSynapseInstance(ctx, *h, &s); err != nil {
 		log.Error(err, "Error getting Synapse instance")
 		return subreconciler.RequeueWithError(err)
 	}
 
 	s.Status.NeedsReconcile = true
 
-	err = utils.UpdateSynapseStatus(ctx, r.Client, &s)
-	if err != nil {
+	if err := utils.UpdateSynapseStatus(ctx, r.Client, &s); err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
 

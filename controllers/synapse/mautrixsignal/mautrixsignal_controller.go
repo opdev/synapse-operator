@@ -163,18 +163,14 @@ func (r *MautrixSignalReconciler) getLatestMautrixSignal(
 func (r *MautrixSignalReconciler) fetchSynapseInstance(
 	ctx context.Context,
 	ms synapsev1alpha1.MautrixSignal,
-) (synapsev1alpha1.Synapse, error) {
+	s *synapsev1alpha1.Synapse,
+) error {
 	// Validate Synapse instance exists
-	s := &synapsev1alpha1.Synapse{}
 	keyForSynapse := types.NamespacedName{
 		Name:      ms.Spec.Synapse.Name,
 		Namespace: utils.ComputeNamespace(ms.Namespace, ms.Spec.Synapse.Namespace),
 	}
-	if err := r.Get(ctx, keyForSynapse, s); err != nil {
-		return synapsev1alpha1.Synapse{}, err
-	}
-
-	return *s, nil
+	return r.Get(ctx, keyForSynapse, s)
 }
 
 func (r *MautrixSignalReconciler) triggerSynapseReconciliation(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
@@ -185,16 +181,15 @@ func (r *MautrixSignalReconciler) triggerSynapseReconciliation(ctx context.Conte
 		return r, err
 	}
 
-	s, err := r.fetchSynapseInstance(ctx, *ms)
-	if err != nil {
+	s := synapsev1alpha1.Synapse{}
+	if err := r.fetchSynapseInstance(ctx, *ms, &s); err != nil {
 		log.Error(err, "Error fetching Synapse instance")
 		return subreconciler.RequeueWithError(err)
 	}
 
 	s.Status.NeedsReconcile = true
 
-	err = utils.UpdateSynapseStatus(ctx, r.Client, &s)
-	if err != nil {
+	if err := utils.UpdateSynapseStatus(ctx, r.Client, &s); err != nil {
 		log.Error(err, "Error updating Synapse status")
 		return subreconciler.RequeueWithError(err)
 	}
@@ -210,14 +205,14 @@ func (r *MautrixSignalReconciler) buildMautrixSignalStatus(ctx context.Context, 
 		return r, err
 	}
 
-	s, err := r.fetchSynapseInstance(ctx, *ms)
-	if err != nil {
+	s := synapsev1alpha1.Synapse{}
+	if err := r.fetchSynapseInstance(ctx, *ms, &s); err != nil {
 		log.Error(err, "Error fetching Synapse instance")
 		return subreconciler.RequeueWithError(err)
 	}
 
 	// Get Synapse ServerName
-	ms.Status.Synapse.ServerName, err = utils.GetSynapseServerName(s)
+	serverName, err := utils.GetSynapseServerName(s)
 	if err != nil {
 		log.Error(
 			err,
@@ -227,6 +222,7 @@ func (r *MautrixSignalReconciler) buildMautrixSignalStatus(ctx context.Context, 
 		)
 		return subreconciler.RequeueWithError(err)
 	}
+	ms.Status.Synapse.ServerName = serverName
 
 	ms.Status.IsOpenshift = s.Spec.IsOpenshift
 
