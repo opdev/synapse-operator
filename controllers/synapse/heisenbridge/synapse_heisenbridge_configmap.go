@@ -39,12 +39,9 @@ import (
 // It reconciles the heisenbridge ConfigMap to its desired state. It is called
 // only if the user hasn't provided its own ConfigMap for heisenbridge
 func (r *HeisenbridgeReconciler) reconcileHeisenbridgeConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	h := &synapsev1alpha1.Heisenbridge{}
-
-	if err := r.Get(ctx, req.NamespacedName, h); err != nil {
-		log.Error(err, "Error getting latest version of Heisenbridge CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestHeisenbridge(ctx, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	objectMetaHeisenbridge := reconcile.SetObjectMeta(h.Name, h.Namespace, map[string]string{})
@@ -103,11 +100,10 @@ namespaces:
 // in synapse.Spec.Bridges.Heisenbridge.ConfigMap
 func (r *HeisenbridgeReconciler) copyInputHeisenbridgeConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	h := &synapsev1alpha1.Heisenbridge{}
 
-	if err := r.Get(ctx, req.NamespacedName, h); err != nil {
-		log.Error(err, "Error getting latest version of Heisenbridge CR")
-		return subreconciler.RequeueWithError(err)
+	h := &synapsev1alpha1.Heisenbridge{}
+	if r, err := r.getLatestHeisenbridge(ctx, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	inputConfigMapName := h.Spec.ConfigMap.Name
@@ -195,12 +191,9 @@ func (r *HeisenbridgeReconciler) configMapForHeisenbridgeCopy(
 // Following the previous copy of the user-provided ConfigMap, it edits the
 // content of the copy to ensure that heisenbridge is correctly configured.
 func (r *HeisenbridgeReconciler) configureHeisenbridgeConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	h := &synapsev1alpha1.Heisenbridge{}
-
-	if err := r.Get(ctx, req.NamespacedName, h); err != nil {
-		log.Error(err, "Error getting latest version of Heisenbridge CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestHeisenbridge(ctx, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	keyForConfigMap := types.NamespacedName{

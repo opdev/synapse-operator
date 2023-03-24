@@ -41,12 +41,9 @@ import (
 // called only if the user hasn't provided its own ConfigMap for
 // mautrix-signal.
 func (r *MautrixSignalReconciler) reconcileMautrixSignalConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	ms := &synapsev1alpha1.MautrixSignal{}
-
-	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
-		log.Error(err, "Error getting latest version of Heisenbridge CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	objectMetaMautrixSignal := reconcile.SetObjectMeta(ms.Name, ms.Namespace, map[string]string{})
@@ -400,11 +397,10 @@ logging:
 // in synapse.Spec.Bridges.MautrixSignal.ConfigMap
 func (r *MautrixSignalReconciler) copyInputMautrixSignalConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	ms := &synapsev1alpha1.MautrixSignal{}
 
-	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
-		log.Error(err, "Error getting latest version of Heisenbridge CR")
-		return subreconciler.RequeueWithError(err)
+	ms := &synapsev1alpha1.MautrixSignal{}
+	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	inputConfigMapName := ms.Spec.ConfigMap.Name
@@ -496,12 +492,9 @@ func (r *MautrixSignalReconciler) configMapForMautrixSignalCopy(
 // Following the previous copy of the user-provided ConfigMap, it edits the
 // content of the copy to ensure that mautrix-signal is correctly configured.
 func (r *MautrixSignalReconciler) configureMautrixSignalConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	ms := &synapsev1alpha1.MautrixSignal{}
-
-	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
-		log.Error(err, "Error getting latest version of Heisenbridge CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	keyForConfigMap := types.NamespacedName{

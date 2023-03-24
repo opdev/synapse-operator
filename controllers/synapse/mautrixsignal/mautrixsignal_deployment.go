@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
@@ -41,12 +40,9 @@ func labelsForMautrixSignal(name string) map[string]string {
 //
 // It reconciles the Deployment for mautrix-signal to its desired state.
 func (r *MautrixSignalReconciler) reconcileMautrixSignalDeployment(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	ms := &synapsev1alpha1.MautrixSignal{}
-
-	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
-		log.Error(err, "Error getting latest version of Heisenbridge CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	objectMetaMautrixSignal := reconcile.SetObjectMeta(ms.Name, ms.Namespace, map[string]string{})

@@ -42,12 +42,9 @@ import (
 // It reconciles the synapse ConfigMap to its desired state. It is called only
 // if the user hasn't provided its own ConfigMap for synapse
 func (r *SynapseReconciler) reconcileSynapseConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	s := &synapsev1alpha1.Synapse{}
-
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
@@ -2728,12 +2725,9 @@ redis:
 // It creates a copy of the user-provided ConfigMap for synapse, defined in
 // synapse.Spec.Homeserver.ConfigMap
 func (r *SynapseReconciler) copyInputSynapseConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	s := &synapsev1alpha1.Synapse{}
-
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
@@ -2794,11 +2788,10 @@ func (r *SynapseReconciler) configMapForSynapseCopy(
 // and report_stats values.
 func (r *SynapseReconciler) parseInputSynapseConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	s := &synapsev1alpha1.Synapse{}
 
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	s := &synapsev1alpha1.Synapse{}
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	var inputConfigMap corev1.ConfigMap // the user-provided ConfigMap. It should contain a valid homeserver.yaml
@@ -2903,12 +2896,9 @@ func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synaps
 // It configures the 'database' section of homeserver.yaml to allow Synapse to
 // connect to the newly created PostgresCluster instance.
 func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	s := &synapsev1alpha1.Synapse{}
-
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	keyForSynapse := types.NamespacedName{
@@ -3010,12 +3000,9 @@ func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1
 // It registers the heisenbridge as an application service in the
 // homeserver.yaml config file.
 func (r *SynapseReconciler) updateSynapseConfigMapForHeisenbridge(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	s := &synapsev1alpha1.Synapse{}
-
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	keyForSynapse := types.NamespacedName{
@@ -3057,12 +3044,9 @@ func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
 // It registers the mautrix-signal bridge as an application service in the
 // homeserver.yaml config file.
 func (r *SynapseReconciler) updateSynapseConfigMapForMautrixSignal(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	s := &synapsev1alpha1.Synapse{}
-
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	keyForSynapse := types.NamespacedName{

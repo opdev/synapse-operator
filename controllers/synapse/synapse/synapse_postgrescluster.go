@@ -42,11 +42,10 @@ import (
 // until the PostgreSQL cluster is up.
 func (r *SynapseReconciler) reconcilePostgresClusterCR(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	s := &synapsev1alpha1.Synapse{}
 
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	s := &synapsev1alpha1.Synapse{}
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	createdPostgresCluster := pgov1beta1.PostgresCluster{}
@@ -184,12 +183,9 @@ func (r *SynapseReconciler) isPostgresClusterReady(p pgov1beta1.PostgresCluster)
 //
 // It reconciles the PostgresCluster ConfigMap to its desired state.
 func (r *SynapseReconciler) reconcilePostgresClusterConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	s := &synapsev1alpha1.Synapse{}
-
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
-		log.Error(err, "Error getting latest version of Synapse CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	postgresClusterObjectMeta := reconcile.SetObjectMeta(

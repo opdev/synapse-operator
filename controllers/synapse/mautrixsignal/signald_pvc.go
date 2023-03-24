@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
@@ -35,12 +34,9 @@ import (
 //
 // It reconciles the PVC for signald to its desired state.
 func (r *MautrixSignalReconciler) reconcileSignaldPVC(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	ms := &synapsev1alpha1.MautrixSignal{}
-
-	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
-		log.Error(err, "Error getting latest version of Heisenbridge CR")
-		return subreconciler.RequeueWithError(err)
+	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
 	}
 
 	objectMetaSignald := reconcile.SetObjectMeta(GetSignaldResourceName(*ms), ms.Namespace, map[string]string{})
