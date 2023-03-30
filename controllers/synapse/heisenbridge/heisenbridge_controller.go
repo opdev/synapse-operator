@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"strings"
 
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -58,7 +57,7 @@ func GetHeisenbridgeServiceFQDN(h synapsev1alpha1.Heisenbridge) string {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var h synapsev1alpha1.Heisenbridge // The Heisenbridge object being reconciled
-	if r, err := r.getLatestHeisenbridge(ctx, req, &h); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, &h); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return subreconciler.Evaluate(r, err)
 	}
 
@@ -110,38 +109,6 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 }
 
-func (r *HeisenbridgeReconciler) getLatestHeisenbridge(
-	ctx context.Context,
-	req ctrl.Request,
-	h *synapsev1alpha1.Heisenbridge,
-) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
-
-	if err := r.Get(ctx, req.NamespacedName, h); err != nil {
-		if k8serrors.IsNotFound(err) {
-			// we'll ignore not-found errors, since they can't be fixed by an immediate
-			// requeue (we'll need to wait for a new notification), and we can get them
-			// on deleted requests.
-			log.Error(
-				err,
-				"Cannot find Heisenbridge - has it been deleted ?",
-				"Heisenbridge Name", h.Name,
-				"Heisenbridge Namespace", h.Namespace,
-			)
-			return subreconciler.DoNotRequeue()
-		}
-		log.Error(
-			err,
-			"Error fetching Heisenbridge",
-			"Heisenbridge Name", h.Name,
-			"Heisenbridge Namespace", h.Namespace,
-		)
-		return subreconciler.RequeueWithError(err)
-	}
-
-	return subreconciler.ContinueReconciling()
-}
-
 func (r *HeisenbridgeReconciler) fetchSynapseInstance(
 	ctx context.Context,
 	h synapsev1alpha1.Heisenbridge,
@@ -159,7 +126,7 @@ func (r *HeisenbridgeReconciler) triggerSynapseReconciliation(ctx context.Contex
 	log := ctrllog.FromContext(ctx)
 
 	h := &synapsev1alpha1.Heisenbridge{}
-	if r, err := r.getLatestHeisenbridge(ctx, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 

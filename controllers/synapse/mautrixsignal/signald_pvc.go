@@ -27,6 +27,7 @@ import (
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
+	"github.com/opdev/synapse-operator/helpers/utils"
 )
 
 // reconcileSignaldPVC is a function of type FnWithRequest, to be called
@@ -35,7 +36,7 @@ import (
 // It reconciles the PVC for signald to its desired state.
 func (r *MautrixSignalReconciler) reconcileSignaldPVC(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	ms := &synapsev1alpha1.MautrixSignal{}
-	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 

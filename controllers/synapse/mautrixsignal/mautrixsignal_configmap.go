@@ -42,7 +42,7 @@ import (
 // mautrix-signal.
 func (r *MautrixSignalReconciler) reconcileMautrixSignalConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	ms := &synapsev1alpha1.MautrixSignal{}
-	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
@@ -399,7 +399,7 @@ func (r *MautrixSignalReconciler) copyInputMautrixSignalConfigMap(ctx context.Co
 	log := ctrllog.FromContext(ctx)
 
 	ms := &synapsev1alpha1.MautrixSignal{}
-	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
@@ -493,7 +493,7 @@ func (r *MautrixSignalReconciler) configMapForMautrixSignalCopy(
 // content of the copy to ensure that mautrix-signal is correctly configured.
 func (r *MautrixSignalReconciler) configureMautrixSignalConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	ms := &synapsev1alpha1.MautrixSignal{}
-	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 

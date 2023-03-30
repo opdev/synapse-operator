@@ -27,6 +27,7 @@ import (
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
+	"github.com/opdev/synapse-operator/helpers/utils"
 )
 
 // labelsForSignald returns the labels for selecting the resources
@@ -41,7 +42,7 @@ func labelsForSignald(name string) map[string]string {
 // It reconciles the Deployment for signald to its desired state.
 func (r *MautrixSignalReconciler) reconcileSignaldDeployment(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	ms := &synapsev1alpha1.MautrixSignal{}
-	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 

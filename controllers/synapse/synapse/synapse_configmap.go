@@ -43,7 +43,7 @@ import (
 // if the user hasn't provided its own ConfigMap for synapse
 func (r *SynapseReconciler) reconcileSynapseConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
-	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
@@ -2726,7 +2726,7 @@ redis:
 // synapse.Spec.Homeserver.ConfigMap
 func (r *SynapseReconciler) copyInputSynapseConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
-	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
@@ -2790,7 +2790,7 @@ func (r *SynapseReconciler) parseInputSynapseConfigMap(ctx context.Context, req 
 	log := ctrllog.FromContext(ctx)
 
 	s := &synapsev1alpha1.Synapse{}
-	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
@@ -2897,7 +2897,7 @@ func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synaps
 // connect to the newly created PostgresCluster instance.
 func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
-	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
@@ -3001,7 +3001,7 @@ func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1
 // homeserver.yaml config file.
 func (r *SynapseReconciler) updateSynapseConfigMapForHeisenbridge(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
-	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
@@ -3045,7 +3045,7 @@ func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
 // homeserver.yaml config file.
 func (r *SynapseReconciler) updateSynapseConfigMapForMautrixSignal(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
-	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 

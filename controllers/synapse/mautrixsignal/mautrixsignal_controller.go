@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"strings"
 
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -62,7 +61,7 @@ func GetMautrixSignalServiceFQDN(ms synapsev1alpha1.MautrixSignal) string {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var ms synapsev1alpha1.MautrixSignal // The mautrix-signal object being reconciled
-	if r, err := r.getLatestMautrixSignal(ctx, req, &ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, &ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return subreconciler.Evaluate(r, err)
 	}
 
@@ -128,38 +127,6 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 }
 
-func (r *MautrixSignalReconciler) getLatestMautrixSignal(
-	ctx context.Context,
-	req ctrl.Request,
-	ms *synapsev1alpha1.MautrixSignal,
-) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
-
-	if err := r.Get(ctx, req.NamespacedName, ms); err != nil {
-		if k8serrors.IsNotFound(err) {
-			// we'll ignore not-found errors, since they can't be fixed by an immediate
-			// requeue (we'll need to wait for a new notification), and we can get them
-			// on deleted requests.
-			log.Error(
-				err,
-				"Cannot find mautrix-signal - has it been deleted ?",
-				"mautrix-signal Name", ms.Name,
-				"mautrix-signal Namespace", ms.Namespace,
-			)
-			return subreconciler.DoNotRequeue()
-		}
-		log.Error(
-			err,
-			"Error fetching mautrix-signal",
-			"mautrix-signal Name", ms.Name,
-			"mautrix-signal Namespace", ms.Namespace,
-		)
-		return subreconciler.RequeueWithError(err)
-	}
-
-	return subreconciler.ContinueReconciling()
-}
-
 func (r *MautrixSignalReconciler) fetchSynapseInstance(
 	ctx context.Context,
 	ms synapsev1alpha1.MautrixSignal,
@@ -177,7 +144,7 @@ func (r *MautrixSignalReconciler) triggerSynapseReconciliation(ctx context.Conte
 	log := ctrllog.FromContext(ctx)
 
 	ms := &synapsev1alpha1.MautrixSignal{}
-	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
@@ -201,7 +168,7 @@ func (r *MautrixSignalReconciler) buildMautrixSignalStatus(ctx context.Context, 
 	log := ctrllog.FromContext(ctx)
 
 	ms := &synapsev1alpha1.MautrixSignal{}
-	if r, err := r.getLatestMautrixSignal(ctx, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 

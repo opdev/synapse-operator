@@ -27,6 +27,7 @@ import (
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
+	"github.com/opdev/synapse-operator/helpers/utils"
 )
 
 // reconcileHeisenbridgeService is a function of type FnWithRequest, to be
@@ -35,7 +36,7 @@ import (
 // It reconciles the Service for Heisenbridge to its desired state.
 func (r *HeisenbridgeReconciler) reconcileHeisenbridgeService(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	h := &synapsev1alpha1.Heisenbridge{}
-	if r, err := r.getLatestHeisenbridge(ctx, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 

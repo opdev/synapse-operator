@@ -40,7 +40,7 @@ import (
 // only if the user hasn't provided its own ConfigMap for heisenbridge
 func (r *HeisenbridgeReconciler) reconcileHeisenbridgeConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	h := &synapsev1alpha1.Heisenbridge{}
-	if r, err := r.getLatestHeisenbridge(ctx, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
@@ -102,7 +102,7 @@ func (r *HeisenbridgeReconciler) copyInputHeisenbridgeConfigMap(ctx context.Cont
 	log := ctrllog.FromContext(ctx)
 
 	h := &synapsev1alpha1.Heisenbridge{}
-	if r, err := r.getLatestHeisenbridge(ctx, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
@@ -192,7 +192,7 @@ func (r *HeisenbridgeReconciler) configMapForHeisenbridgeCopy(
 // content of the copy to ensure that heisenbridge is correctly configured.
 func (r *HeisenbridgeReconciler) configureHeisenbridgeConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	h := &synapsev1alpha1.Heisenbridge{}
-	if r, err := r.getLatestHeisenbridge(ctx, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 

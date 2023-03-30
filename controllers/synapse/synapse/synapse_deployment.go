@@ -36,7 +36,7 @@ import (
 // It reconciles the Deployment for Synapse to its desired state.
 func (r *SynapseReconciler) reconcileSynapseDeployment(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
-	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
