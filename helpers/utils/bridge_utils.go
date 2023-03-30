@@ -58,3 +58,23 @@ func UpdateSynapseStatus(ctx context.Context, kubeClient client.Client, s *synap
 
 	return nil
 }
+
+type Bridge interface {
+	client.Object // *synapsev1alpha1.Heisenbridge | *synapsev1alpha1.MautrixSignal
+	GetSynapseName() string
+	GetSynapseNamespace() string
+}
+
+func FetchSynapseInstance(
+	ctx context.Context,
+	kubeClient client.Client,
+	resource Bridge,
+	s *synapsev1alpha1.Synapse,
+) error {
+	// Validate Synapse instance exists
+	keyForSynapse := types.NamespacedName{
+		Name:      resource.GetSynapseName(),
+		Namespace: ComputeNamespace(resource.GetName(), resource.GetSynapseNamespace()),
+	}
+	return kubeClient.Get(ctx, keyForSynapse, s)
+}

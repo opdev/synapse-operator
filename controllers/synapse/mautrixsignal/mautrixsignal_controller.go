@@ -127,19 +127,6 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 }
 
-func (r *MautrixSignalReconciler) fetchSynapseInstance(
-	ctx context.Context,
-	ms synapsev1alpha1.MautrixSignal,
-	s *synapsev1alpha1.Synapse,
-) error {
-	// Validate Synapse instance exists
-	keyForSynapse := types.NamespacedName{
-		Name:      ms.Spec.Synapse.Name,
-		Namespace: utils.ComputeNamespace(ms.Namespace, ms.Spec.Synapse.Namespace),
-	}
-	return r.Get(ctx, keyForSynapse, s)
-}
-
 func (r *MautrixSignalReconciler) triggerSynapseReconciliation(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
@@ -149,7 +136,7 @@ func (r *MautrixSignalReconciler) triggerSynapseReconciliation(ctx context.Conte
 	}
 
 	s := synapsev1alpha1.Synapse{}
-	if err := r.fetchSynapseInstance(ctx, *ms, &s); err != nil {
+	if err := utils.FetchSynapseInstance(ctx, r.Client, ms, &s); err != nil {
 		log.Error(err, "Error fetching Synapse instance")
 		return subreconciler.RequeueWithError(err)
 	}
@@ -173,7 +160,7 @@ func (r *MautrixSignalReconciler) buildMautrixSignalStatus(ctx context.Context, 
 	}
 
 	s := synapsev1alpha1.Synapse{}
-	if err := r.fetchSynapseInstance(ctx, *ms, &s); err != nil {
+	if err := utils.FetchSynapseInstance(ctx, r.Client, ms, &s); err != nil {
 		log.Error(err, "Error fetching Synapse instance")
 		return subreconciler.RequeueWithError(err)
 	}

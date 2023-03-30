@@ -106,3 +106,11 @@ type MautrixSignalList struct {
 func init() {
 	SchemeBuilder.Register(&MautrixSignal{}, &MautrixSignalList{})
 }
+
+func (ms *MautrixSignal) GetSynapseName() string {
+	return ms.Spec.Synapse.Name
+}
+
+func (ms *MautrixSignal) GetSynapseNamespace() string {
+	return ms.Spec.Synapse.Namespace
+}

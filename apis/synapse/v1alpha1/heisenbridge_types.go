@@ -103,3 +103,11 @@ type HeisenbridgeList struct {
 func init() {
 	SchemeBuilder.Register(&Heisenbridge{}, &HeisenbridgeList{})
 }
+
+func (h *Heisenbridge) GetSynapseName() string {
+	return h.Spec.Synapse.Name
+}
+
+func (h *Heisenbridge) GetSynapseNamespace() string {
+	return h.Spec.Synapse.Namespace
+}
