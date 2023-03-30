@@ -27,6 +27,7 @@ import (
 	subreconciler "github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
+	"github.com/opdev/synapse-operator/helpers/utils"
 )
 
 // reconcileSynapseServiceAccount is a function of type FnWithRequest, to
@@ -35,7 +36,7 @@ import (
 // It reconciles the ServiceAccount for synapse to its desired state.
 func (r *SynapseReconciler) reconcileSynapseServiceAccount(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
-	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
@@ -77,7 +78,7 @@ func (r *SynapseReconciler) serviceAccountForSynapse(s *synapsev1alpha1.Synapse,
 // It reconciles the RoleBinding for synapse to its desired state.
 func (r *SynapseReconciler) reconcileSynapseRoleBinding(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
-	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 

@@ -42,7 +42,7 @@ func labelsForHeisenbridge(name string) map[string]string {
 // It reconciles the Deployment for Heisenbridge to its desired state.
 func (r *HeisenbridgeReconciler) reconcileHeisenbridgeDeployment(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	h := &synapsev1alpha1.Heisenbridge{}
-	if r, err := r.getLatestHeisenbridge(ctx, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 

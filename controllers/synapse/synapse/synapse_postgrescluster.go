@@ -33,6 +33,7 @@ import (
 	subreconciler "github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
+	"github.com/opdev/synapse-operator/helpers/utils"
 )
 
 // reconcilePostgresClusterCR is a function of type FnWithRequest, to be
@@ -44,7 +45,7 @@ func (r *SynapseReconciler) reconcilePostgresClusterCR(ctx context.Context, req 
 	log := ctrllog.FromContext(ctx)
 
 	s := &synapsev1alpha1.Synapse{}
-	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
@@ -184,7 +185,7 @@ func (r *SynapseReconciler) isPostgresClusterReady(p pgov1beta1.PostgresCluster)
 // It reconciles the PostgresCluster ConfigMap to its desired state.
 func (r *SynapseReconciler) reconcilePostgresClusterConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
-	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 

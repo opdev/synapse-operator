@@ -27,6 +27,7 @@ import (
 	subreconciler "github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
+	"github.com/opdev/synapse-operator/helpers/utils"
 )
 
 // reconcileSynapsePVC is a function of type FnWithRequest, to be called
@@ -35,7 +36,7 @@ import (
 // It reconciles the PVC for synapse to its desired state.
 func (r *SynapseReconciler) reconcileSynapsePVC(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
-	if r, err := r.getLatestSynapse(ctx, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
 	}
 
