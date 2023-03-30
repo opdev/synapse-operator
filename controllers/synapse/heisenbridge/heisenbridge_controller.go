@@ -109,19 +109,6 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 }
 
-func (r *HeisenbridgeReconciler) fetchSynapseInstance(
-	ctx context.Context,
-	h synapsev1alpha1.Heisenbridge,
-	s *synapsev1alpha1.Synapse,
-) error {
-	// Validate Synapse instance exists
-	keyForSynapse := types.NamespacedName{
-		Name:      h.Spec.Synapse.Name,
-		Namespace: utils.ComputeNamespace(h.Namespace, h.Spec.Synapse.Namespace),
-	}
-	return r.Get(ctx, keyForSynapse, s)
-}
-
 func (r *HeisenbridgeReconciler) triggerSynapseReconciliation(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
@@ -131,7 +118,7 @@ func (r *HeisenbridgeReconciler) triggerSynapseReconciliation(ctx context.Contex
 	}
 
 	s := synapsev1alpha1.Synapse{}
-	if err := r.fetchSynapseInstance(ctx, *h, &s); err != nil {
+	if err := utils.FetchSynapseInstance(ctx, r.Client, h, &s); err != nil {
 		log.Error(err, "Error getting Synapse instance")
 		return subreconciler.RequeueWithError(err)
 	}
