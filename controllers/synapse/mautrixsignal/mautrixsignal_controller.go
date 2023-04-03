@@ -66,10 +66,15 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// The list of subreconcilers for mautrix-signal.
 	var subreconcilersForMautrixSignal []subreconciler.FnWithRequest
 
+	// Generic subreconcilers need to access the reconciler's client and know
+	// which type of resource is being reconciled. We pass this information
+	// using the context values.
+	ctx = utils.AddValuesToContext(ctx, r.Client, &synapsev1alpha1.MautrixSignal{})
+
 	// We need to trigger a Synapse reconciliation so that it becomes aware of
 	// the MautrixSignal. We also need to complete the MautrixSignal Status.
 	subreconcilersForMautrixSignal = []subreconciler.FnWithRequest{
-		r.triggerSynapseReconciliation,
+		utils.TriggerSynapseReconciliation,
 		r.buildMautrixSignalStatus,
 	}
 
@@ -123,30 +128,6 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
-}
-
-func (r *MautrixSignalReconciler) triggerSynapseReconciliation(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
-
-	ms := &synapsev1alpha1.MautrixSignal{}
-	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return r, err
-	}
-
-	s := synapsev1alpha1.Synapse{}
-	if err := utils.FetchSynapseInstance(ctx, r.Client, ms, &s); err != nil {
-		log.Error(err, "Error fetching Synapse instance")
-		return subreconciler.RequeueWithError(err)
-	}
-
-	s.Status.NeedsReconcile = true
-
-	if err := utils.UpdateSynapseStatus(ctx, r.Client, &s); err != nil {
-		log.Error(err, "Error updating Synapse status")
-		return subreconciler.RequeueWithError(err)
-	}
-
-	return subreconciler.ContinueReconciling()
 }
 
 func (r *MautrixSignalReconciler) buildMautrixSignalStatus(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
