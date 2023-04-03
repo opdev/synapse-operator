@@ -18,7 +18,6 @@ package utils
 
 import (
 	"context"
-	"reflect"
 
 	"github.com/opdev/subreconciler"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -62,18 +61,7 @@ func GetResource(
 	return subreconciler.ContinueReconciling()
 }
 
-// All v1alpha1 resources in the synapse module should implement this interface
-// in order to be able to call the generic function UpdateResourceStatus.
-type Synapsev1alpha1Resource interface {
-	client.Object
-
-	GetStatus() interface{}
-}
-
-func UpdateResourceStatus(ctx context.Context, kubeClient client.Client, resource Synapsev1alpha1Resource, current Synapsev1alpha1Resource) error {
-	// Ideally I'd like to instantiate current within this function as follow:
-	// current := &Synapsev1alpha1Resource{} ----> InvalidLit: invalid composite literal type Synapsev1alpha1Resource
-
+func UpdateResourceStatus(ctx context.Context, kubeClient client.Client, resource client.Object, current client.Object) error {
 	if err := kubeClient.Get(
 		ctx,
 		types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()},
@@ -82,10 +70,8 @@ func UpdateResourceStatus(ctx context.Context, kubeClient client.Client, resourc
 		return err
 	}
 
-	if !reflect.DeepEqual(resource.GetStatus(), current.GetStatus()) {
-		if err := kubeClient.Status().Patch(ctx, resource, client.MergeFrom(current)); err != nil {
-			return err
-		}
+	if err := kubeClient.Status().Patch(ctx, resource, client.MergeFrom(current)); err != nil {
+		return err
 	}
 
 	return nil
