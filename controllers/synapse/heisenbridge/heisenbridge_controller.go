@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
@@ -62,10 +61,15 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// The list of subreconcilers for Heisenbridge.
 	var subreconcilersForHeisenbridge []subreconciler.FnWithRequest
 
+	// Generic subreconcilers need to access the reconciler's client and know
+	// which type of resource is being reconciled. We pass this information
+	// using the context values.
+	ctx = utils.AddValuesToContext(ctx, r.Client, &synapsev1alpha1.Heisenbridge{})
+
 	// We need to trigger a Synapse reconciliation so that it becomes aware of
 	// the Heisenbridge.
 	subreconcilersForHeisenbridge = []subreconciler.FnWithRequest{
-		r.triggerSynapseReconciliation,
+		utils.TriggerSynapseReconciliation,
 	}
 
 	// The user may specify a ConfigMap, containing the heisenbridge.yaml
@@ -105,29 +109,6 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
-}
-
-func (r *HeisenbridgeReconciler) triggerSynapseReconciliation(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
-
-	h := &synapsev1alpha1.Heisenbridge{}
-	if r, err := utils.GetResource(ctx, r.Client, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return r, err
-	}
-
-	s := synapsev1alpha1.Synapse{}
-	if err := utils.FetchSynapseInstance(ctx, r.Client, h, &s); err != nil {
-		log.Error(err, "Error getting Synapse instance")
-		return subreconciler.RequeueWithError(err)
-	}
-
-	s.Status.NeedsReconcile = true
-
-	if err := utils.UpdateSynapseStatus(ctx, r.Client, &s); err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-
-	return subreconciler.ContinueReconciling()
 }
 
 func (r *HeisenbridgeReconciler) setFailedState(ctx context.Context, h *synapsev1alpha1.Heisenbridge, reason string) error {
