@@ -111,3 +111,7 @@ func (h *Heisenbridge) GetSynapseName() string {
 func (h *Heisenbridge) GetSynapseNamespace() string {
 	return h.Spec.Synapse.Namespace
 }
+
+func (h *Heisenbridge) GetStatus() interface{} {
+	return h.Status
+}

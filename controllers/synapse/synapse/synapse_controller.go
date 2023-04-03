@@ -19,7 +19,6 @@ package synapse
 import (
 	"context"
 	"errors"
-	"reflect"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -192,28 +191,7 @@ func (r *SynapseReconciler) setFailedState(ctx context.Context, synapse *synapse
 	synapse.Status.State = "FAILED"
 	synapse.Status.Reason = reason
 
-	err, _ := r.updateSynapseStatus(ctx, synapse)
-	return err
-}
-
-func (r *SynapseReconciler) updateSynapseStatus(ctx context.Context, synapse *synapsev1alpha1.Synapse) (error, bool) {
-	current := &synapsev1alpha1.Synapse{}
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{Name: synapse.Name, Namespace: synapse.Namespace},
-		current,
-	); err != nil {
-		return err, false
-	}
-
-	if !reflect.DeepEqual(synapse.Status, current.Status) {
-		if err := r.Status().Patch(ctx, synapse, client.MergeFrom(current)); err != nil {
-			return err, false
-		}
-		return nil, true
-	}
-
-	return nil, false
+	return utils.UpdateResourceStatus(ctx, r.Client, synapse, &synapsev1alpha1.Synapse{})
 }
 
 func (r *SynapseReconciler) setStatusHomeserverConfiguration(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
@@ -227,13 +205,10 @@ func (r *SynapseReconciler) setStatusHomeserverConfiguration(ctx context.Context
 	s.Status.HomeserverConfiguration.ServerName = s.Spec.Homeserver.Values.ServerName
 	s.Status.HomeserverConfiguration.ReportStats = s.Spec.Homeserver.Values.ReportStats
 
-	err, has_patched := r.updateSynapseStatus(ctx, s)
+	err := utils.UpdateResourceStatus(ctx, r.Client, s, &synapsev1alpha1.Synapse{})
 	if err != nil {
 		log.Error(err, "Error updating Synapse Status")
 		return subreconciler.RequeueWithError(err)
-	}
-	if has_patched {
-		return subreconciler.Requeue()
 	}
 
 	return subreconciler.ContinueReconciling()
@@ -275,13 +250,10 @@ func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(ctx context.C
 	}
 
 	// Actually sends an API request to update the Status
-	err, has_patched := r.updateSynapseStatus(ctx, s)
+	err := utils.UpdateResourceStatus(ctx, r.Client, s, &synapsev1alpha1.Synapse{})
 	if err != nil {
 		log.Error(err, "Error updating Synapse Status")
 		return subreconciler.RequeueWithError(err)
-	}
-	if has_patched {
-		return subreconciler.Requeue()
 	}
 
 	return subreconciler.ContinueReconciling()
@@ -356,13 +328,10 @@ func (r *SynapseReconciler) setSynapseStatusAsRunning(ctx context.Context, req c
 	s.Status.State = "RUNNING"
 	s.Status.Reason = ""
 
-	err, has_patched := r.updateSynapseStatus(ctx, s)
+	err := utils.UpdateResourceStatus(ctx, r.Client, s, &synapsev1alpha1.Synapse{})
 	if err != nil {
 		log.Error(err, "Error updating Synapse Status")
 		return subreconciler.RequeueWithError(err)
-	}
-	if has_patched {
-		return subreconciler.Requeue()
 	}
 
 	return subreconciler.ContinueReconciling()
@@ -395,13 +364,10 @@ func (r *SynapseReconciler) updateSynapseStatusBridges(ctx context.Context, req 
 		}
 	}
 
-	err, has_patched := r.updateSynapseStatus(ctx, s)
+	err := utils.UpdateResourceStatus(ctx, r.Client, s, &synapsev1alpha1.Synapse{})
 	if err != nil {
 		log.Error(err, "Error updating Synapse Status")
 		return subreconciler.RequeueWithError(err)
-	}
-	if has_patched {
-		return subreconciler.Requeue()
 	}
 
 	return subreconciler.ContinueReconciling()

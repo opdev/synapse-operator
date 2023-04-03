@@ -416,7 +416,7 @@ func (r *MautrixSignalReconciler) copyInputMautrixSignalConfigMap(ctx context.Co
 		ms.Status.State = "FAILED"
 		ms.Status.Reason = reason
 
-		err, _ := r.updateMautrixSignalStatus(ctx, ms)
+		err = utils.UpdateResourceStatus(ctx, r.Client, ms, &synapsev1alpha1.MautrixSignal{})
 		if err != nil {
 			log.Error(err, "Error updating mautrix-signal State")
 		}

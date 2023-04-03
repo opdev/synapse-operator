@@ -2824,13 +2824,10 @@ func (r *SynapseReconciler) parseInputSynapseConfigMap(ctx context.Context, req 
 		return subreconciler.RequeueWithDelayAndError(time.Duration(30), err)
 	}
 
-	err, has_patched := r.updateSynapseStatus(ctx, s)
+	err := utils.UpdateResourceStatus(ctx, r.Client, s, &synapsev1alpha1.Synapse{})
 	if err != nil {
 		log.Error(err, "Error updating Synapse Status")
 		return subreconciler.RequeueWithError(err)
-	}
-	if has_patched {
-		return subreconciler.Requeue()
 	}
 
 	return subreconciler.ContinueReconciling()

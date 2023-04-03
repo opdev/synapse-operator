@@ -182,3 +182,7 @@ type SynapseList struct {
 func init() {
 	SchemeBuilder.Register(&Synapse{}, &SynapseList{})
 }
+
+func (s *Synapse) GetStatus() interface{} {
+	return s.Status
+}

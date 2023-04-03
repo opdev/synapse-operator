@@ -82,12 +82,12 @@ func (r *SynapseReconciler) reconcilePostgresClusterCR(ctx context.Context, req 
 	}
 	if !r.isPostgresClusterReady(createdPostgresCluster) {
 		s.Status.DatabaseConnectionInfo.State = "NOT READY"
-		err, _ = r.updateSynapseStatus(ctx, s)
+		err = utils.UpdateResourceStatus(ctx, r.Client, s, &synapsev1alpha1.Synapse{})
 		if err != nil {
 			log.Error(err, "Error updating Synapse State")
 		}
 
-		err := errors.New("postgreSQL Database not ready yet")
+		err = errors.New("postgreSQL Database not ready yet")
 		return subreconciler.RequeueWithDelayAndError(time.Duration(5), err)
 	}
 
