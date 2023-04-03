@@ -64,7 +64,7 @@ func UpdateSynapseStatus(ctx context.Context, kubeClient client.Client, s *synap
 
 // Matrix Bridges should implement the Bridge interface
 type Bridge interface {
-	Synapsev1alpha1Resource // *synapsev1alpha1.Heisenbridge | *synapsev1alpha1.MautrixSignal
+	client.Object // *synapsev1alpha1.Heisenbridge | *synapsev1alpha1.MautrixSignal
 	GetSynapseName() string
 	GetSynapseNamespace() string
 }

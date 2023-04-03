@@ -114,7 +114,3 @@ func (ms *MautrixSignal) GetSynapseName() string {
 func (ms *MautrixSignal) GetSynapseNamespace() string {
 	return ms.Spec.Synapse.Namespace
 }
-
-func (ms *MautrixSignal) GetStatus() interface{} {
-	return ms.Status
-}
