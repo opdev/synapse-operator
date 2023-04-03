@@ -18,11 +18,9 @@ package mautrixsignal
 
 import (
 	"context"
-	"reflect"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
@@ -180,36 +178,13 @@ func (r *MautrixSignalReconciler) buildMautrixSignalStatus(ctx context.Context, 
 
 	ms.Status.IsOpenshift = s.Spec.IsOpenshift
 
-	err, has_patched := r.updateMautrixSignalStatus(ctx, ms)
+	err = utils.UpdateResourceStatus(ctx, r.Client, ms, &synapsev1alpha1.MautrixSignal{})
 	if err != nil {
 		log.Error(err, "Error updating mautrix-signal Status")
 		return subreconciler.RequeueWithError(err)
 	}
-	if has_patched {
-		return subreconciler.Requeue()
-	}
 
 	return subreconciler.ContinueReconciling()
-}
-
-func (r *MautrixSignalReconciler) updateMautrixSignalStatus(ctx context.Context, ms *synapsev1alpha1.MautrixSignal) (error, bool) {
-	current := &synapsev1alpha1.MautrixSignal{}
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{Name: ms.Name, Namespace: ms.Namespace},
-		current,
-	); err != nil {
-		return err, false
-	}
-
-	if !reflect.DeepEqual(ms.Status, current.Status) {
-		if err := r.Status().Patch(ctx, ms, client.MergeFrom(current)); err != nil {
-			return err, false
-		}
-		return nil, true
-	}
-
-	return nil, false
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -18,11 +18,9 @@ package heisenbridge
 
 import (
 	"context"
-	"reflect"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
@@ -136,26 +134,7 @@ func (r *HeisenbridgeReconciler) setFailedState(ctx context.Context, h *synapsev
 	h.Status.State = "FAILED"
 	h.Status.Reason = reason
 
-	return r.updateHeisenbridgeStatus(ctx, h)
-}
-
-func (r *HeisenbridgeReconciler) updateHeisenbridgeStatus(ctx context.Context, h *synapsev1alpha1.Heisenbridge) error {
-	current := &synapsev1alpha1.Heisenbridge{}
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{Name: h.Name, Namespace: h.Namespace},
-		current,
-	); err != nil {
-		return err
-	}
-
-	if !reflect.DeepEqual(h.Status, current.Status) {
-		if err := r.Status().Patch(ctx, h, client.MergeFrom(current)); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return utils.UpdateResourceStatus(ctx, r.Client, h, &synapsev1alpha1.Heisenbridge{})
 }
 
 // SetupWithManager sets up the controller with the Manager.
