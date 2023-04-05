@@ -2719,67 +2719,6 @@ redis:
 	return cm, nil
 }
 
-// copyInputSynapseConfigMap is a function of type FnWithRequest, to be
-// called in the main reconciliation loop.
-//
-// It creates a copy of the user-provided ConfigMap for synapse, defined in
-// synapse.Spec.Homeserver.ConfigMap
-func (r *SynapseReconciler) copyInputSynapseConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	s := &synapsev1alpha1.Synapse{}
-	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return r, err
-	}
-
-	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
-
-	desiredConfigMap, err := r.configMapForSynapseCopy(s, objectMetaForSynapse)
-	if err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-
-	// Create a copy of the inputConfigMap defined in Spec.Homeserver.ConfigMap
-	// Here we use the configMapForSynapseCopy function as createResourceFunc
-	if err := reconcile.ReconcileResource(
-		ctx,
-		r.Client,
-		desiredConfigMap,
-		&corev1.ConfigMap{},
-	); err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-
-	return subreconciler.ContinueReconciling()
-}
-
-// The ConfigMap returned by configMapForSynapseCopy is a copy of the ConfigMap
-// defined in Spec.Homeserver.ConfigMap.
-func (r *SynapseReconciler) configMapForSynapseCopy(
-	s *synapsev1alpha1.Synapse,
-	objectMeta metav1.ObjectMeta,
-) (*corev1.ConfigMap, error) {
-	var copyConfigMap *corev1.ConfigMap
-
-	sourceConfigMapName := s.Spec.Homeserver.ConfigMap.Name
-	sourceConfigMapNamespace := utils.ComputeNamespace(s.Namespace, s.Spec.Homeserver.ConfigMap.Namespace)
-
-	copyConfigMap, err := utils.GetConfigMapCopy(
-		r.Client,
-		sourceConfigMapName,
-		sourceConfigMapNamespace,
-		objectMeta,
-	)
-	if err != nil {
-		return &corev1.ConfigMap{}, err
-	}
-
-	// Set Synapse instance as the owner and controller
-	if err := ctrl.SetControllerReference(s, copyConfigMap, r.Scheme); err != nil {
-		return nil, err
-	}
-
-	return copyConfigMap, nil
-}
-
 // parseInputSynapseConfigMap is a function of type FnWithRequest, to be
 // called in the main reconciliation loop.
 //

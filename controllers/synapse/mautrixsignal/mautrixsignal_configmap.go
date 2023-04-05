@@ -19,14 +19,12 @@ package mautrixsignal
 import (
 	"context"
 	"errors"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
@@ -388,102 +386,6 @@ logging:
 	}
 
 	return cm, nil
-}
-
-// copyInputMautrixSignalConfigMap is a function of type FnWithRequest, to
-// be called in the main reconciliation loop.
-//
-// It creates a copy of the user-provided ConfigMap for mautrix-signal, defined
-// in synapse.Spec.Bridges.MautrixSignal.ConfigMap
-func (r *MautrixSignalReconciler) copyInputMautrixSignalConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
-
-	ms := &synapsev1alpha1.MautrixSignal{}
-	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return r, err
-	}
-
-	inputConfigMapName := ms.Spec.ConfigMap.Name
-	inputConfigMapNamespace := utils.ComputeNamespace(ms.Namespace, ms.Spec.ConfigMap.Namespace)
-	keyForInputConfigMap := types.NamespacedName{
-		Name:      inputConfigMapName,
-		Namespace: inputConfigMapNamespace,
-	}
-
-	// Get and check the input ConfigMap for MautrixSignal
-	if err := r.Get(ctx, keyForInputConfigMap, &corev1.ConfigMap{}); err != nil {
-		reason := "ConfigMap " + inputConfigMapName + " does not exist in namespace " + inputConfigMapNamespace
-		ms.Status.State = "FAILED"
-		ms.Status.Reason = reason
-
-		err = utils.UpdateResourceStatus(ctx, r.Client, ms, &synapsev1alpha1.MautrixSignal{})
-		if err != nil {
-			log.Error(err, "Error updating mautrix-signal State")
-		}
-
-		log.Error(
-			err,
-			"Failed to get ConfigMap",
-			"ConfigMap.Namespace",
-			inputConfigMapNamespace,
-			"ConfigMap.Name",
-			inputConfigMapName,
-		)
-
-		return subreconciler.RequeueWithDelayAndError(time.Duration(30), err)
-	}
-
-	objectMetaMautrixSignal := reconcile.SetObjectMeta(ms.Name, ms.Namespace, map[string]string{})
-
-	desiredConfigMap, err := r.configMapForMautrixSignalCopy(ms, objectMetaMautrixSignal)
-	if err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-
-	// Create a copy of the inputMautrixSignalConfigMap defined in Spec.Bridges.MautrixSignal.ConfigMap
-	// Here we use the createdMautrixSignalConfigMap function as createResourceFunc
-	if err := reconcile.ReconcileResource(
-		ctx,
-		r.Client,
-		desiredConfigMap,
-		&corev1.ConfigMap{},
-	); err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-
-	return subreconciler.ContinueReconciling()
-}
-
-// configMapForMautrixSignalCopy is a function of type createResourceFunc, to be
-// passed as an argument in a call to reconcileResouce.
-//
-// The ConfigMap returned by configMapForMautrixSignalCopy is a copy of the ConfigMap
-// defined in Spec.Bridges.MautrixSignal.ConfigMap.
-func (r *MautrixSignalReconciler) configMapForMautrixSignalCopy(
-	ms *synapsev1alpha1.MautrixSignal,
-	objectMeta metav1.ObjectMeta,
-) (*corev1.ConfigMap, error) {
-	var copyConfigMap *corev1.ConfigMap
-
-	sourceConfigMapName := ms.Spec.ConfigMap.Name
-	sourceConfigMapNamespace := utils.ComputeNamespace(ms.Namespace, ms.Spec.ConfigMap.Namespace)
-
-	copyConfigMap, err := utils.GetConfigMapCopy(
-		r.Client,
-		sourceConfigMapName,
-		sourceConfigMapNamespace,
-		objectMeta,
-	)
-	if err != nil {
-		return &corev1.ConfigMap{}, err
-	}
-
-	// Set Synapse instance as the owner and controller
-	if err := ctrl.SetControllerReference(ms, copyConfigMap, r.Scheme); err != nil {
-		return &corev1.ConfigMap{}, err
-	}
-
-	return copyConfigMap, nil
 }
 
 // configureMautrixSignalConfigMap is a function of type FnWithRequest, to
