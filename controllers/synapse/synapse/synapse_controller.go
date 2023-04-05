@@ -84,11 +84,6 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// The list of subreconcilers for Synapse.
 	var subreconcilersForSynapse []subreconciler.FnWithRequest
 
-	// Generic subreconcilers need to access the reconciler's client and scheme,
-	// and know which type of resource is being reconciled. We pass this
-	// information using the context values.
-	ctx = utils.AddValuesToContext(ctx, r.Client, r.Scheme, &synapsev1alpha1.Synapse{})
-
 	// Synapse should either have a Spec.Homeserver.ConfigMap or Spec.Homeserver.Values
 	if synapse.Spec.Homeserver.ConfigMap != nil {
 		// If the user provided a ConfigMap for the Homeserver config file:
@@ -97,7 +92,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// * We create a copy of the user-provided ConfigMap.
 		subreconcilersForSynapse = []subreconciler.FnWithRequest{
 			r.parseInputSynapseConfigMap,
-			utils.CopyInputConfigMap,
+			utils.CopyInputConfigMap(r.Client, r.Scheme, &synapsev1alpha1.Synapse{}),
 		}
 	} else {
 		// If the user hasn't provided a ConfigMap with a custom
