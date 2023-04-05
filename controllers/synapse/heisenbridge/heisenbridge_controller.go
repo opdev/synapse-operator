@@ -61,10 +61,10 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// The list of subreconcilers for Heisenbridge.
 	var subreconcilersForHeisenbridge []subreconciler.FnWithRequest
 
-	// Generic subreconcilers need to access the reconciler's client and know
-	// which type of resource is being reconciled. We pass this information
-	// using the context values.
-	ctx = utils.AddValuesToContext(ctx, r.Client, &synapsev1alpha1.Heisenbridge{})
+	// Generic subreconcilers need to access the reconciler's client and scheme,
+	// and know which type of resource is being reconciled. We pass this
+	// information using the context values.
+	ctx = utils.AddValuesToContext(ctx, r.Client, r.Scheme, &synapsev1alpha1.Heisenbridge{})
 
 	// We need to trigger a Synapse reconciliation so that it becomes aware of
 	// the Heisenbridge.
@@ -81,7 +81,7 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// configuration.
 		subreconcilersForHeisenbridge = append(
 			subreconcilersForHeisenbridge,
-			r.copyInputHeisenbridgeConfigMap,
+			utils.CopyInputConfigMap,
 			r.configureHeisenbridgeConfigMap,
 		)
 	} else {
@@ -109,13 +109,6 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
-}
-
-func (r *HeisenbridgeReconciler) setFailedState(ctx context.Context, h *synapsev1alpha1.Heisenbridge, reason string) error {
-	h.Status.State = "FAILED"
-	h.Status.Reason = reason
-
-	return utils.UpdateResourceStatus(ctx, r.Client, h, &synapsev1alpha1.Heisenbridge{})
 }
 
 // SetupWithManager sets up the controller with the Manager.

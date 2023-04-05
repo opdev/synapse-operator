@@ -66,10 +66,10 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// The list of subreconcilers for mautrix-signal.
 	var subreconcilersForMautrixSignal []subreconciler.FnWithRequest
 
-	// Generic subreconcilers need to access the reconciler's client and know
-	// which type of resource is being reconciled. We pass this information
-	// using the context values.
-	ctx = utils.AddValuesToContext(ctx, r.Client, &synapsev1alpha1.MautrixSignal{})
+	// Generic subreconcilers need to access the reconciler's client and scheme,
+	// and know which type of resource is being reconciled. We pass this
+	// information using the context values.
+	ctx = utils.AddValuesToContext(ctx, r.Client, r.Scheme, &synapsev1alpha1.MautrixSignal{})
 
 	// We need to trigger a Synapse reconciliation so that it becomes aware of
 	// the MautrixSignal. We also need to complete the MautrixSignal Status.
@@ -87,7 +87,7 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		// configuration.
 		subreconcilersForMautrixSignal = append(
 			subreconcilersForMautrixSignal,
-			r.copyInputMautrixSignalConfigMap,
+			utils.CopyInputConfigMap,
 			r.configureMautrixSignalConfigMap,
 		)
 	} else {

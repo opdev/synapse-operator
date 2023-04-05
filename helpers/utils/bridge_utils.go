@@ -24,6 +24,7 @@ import (
 
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -71,19 +72,22 @@ type Bridge interface {
 
 type resourceKeyType int
 type kubeClientKeyType int
+type runtimeSchemeKeyType int
 
 var resourceKey resourceKeyType
 var kubeClientKey kubeClientKeyType
+var runtimeSchemeKey runtimeSchemeKeyType
 
-func AddValuesToContext(ctx context.Context, kubeClient client.Client, resource Bridge) context.Context {
+func AddValuesToContext(ctx context.Context, kubeClient client.Client, runtimeScheme *runtime.Scheme, resource client.Object) context.Context {
 	newContext := context.WithValue(ctx, resourceKey, resource)
 	newContext = context.WithValue(newContext, kubeClientKey, kubeClient)
+	newContext = context.WithValue(newContext, runtimeSchemeKey, runtimeScheme)
 
 	return newContext
 }
 
-func GetValuesToContext(ctx context.Context) (client.Client, Bridge, error) {
-	var resource Bridge
+func GetValuesFromContext(ctx context.Context) (client.Client, client.Object, error) {
+	var resource client.Object
 
 	kubeClient, ok := ctx.Value(kubeClientKey).(client.Client)
 	if !ok {
@@ -91,7 +95,7 @@ func GetValuesToContext(ctx context.Context) (client.Client, Bridge, error) {
 		return nil, resource, err
 	}
 
-	resource, ok = ctx.Value(resourceKey).(Bridge)
+	resource, ok = ctx.Value(resourceKey).(client.Object)
 	if !ok {
 		err := errors.New("error getting bridge resource from context")
 		return nil, resource, err
@@ -119,8 +123,15 @@ func FetchSynapseInstance(
 // so that Synapse can add the bridge as an application service in its configuration.
 func TriggerSynapseReconciliation(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	kubeClient, resource, err := GetValuesToContext(ctx)
+	kubeClient, resourceObject, err := GetValuesFromContext(ctx)
 	if err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+
+	resource, ok := resourceObject.(Bridge)
+	if !ok {
+		err := errors.New("error in type assertion")
+		log.Error(err, "Error in type assertion")
 		return subreconciler.RequeueWithError(err)
 	}
 

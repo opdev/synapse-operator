@@ -18,14 +18,12 @@ package heisenbridge
 
 import (
 	"context"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
@@ -91,98 +89,6 @@ namespaces:
 	}
 
 	return cm, nil
-}
-
-// copyInputHeisenbridgeConfigMap is a function of type FnWithRequest, to
-// be called in the main reconciliation loop.
-//
-// It creates a copy of the user-provided ConfigMap for heisenbridge, defined
-// in synapse.Spec.Bridges.Heisenbridge.ConfigMap
-func (r *HeisenbridgeReconciler) copyInputHeisenbridgeConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
-
-	h := &synapsev1alpha1.Heisenbridge{}
-	if r, err := utils.GetResource(ctx, r.Client, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return r, err
-	}
-
-	inputConfigMapName := h.Spec.ConfigMap.Name
-	inputConfigMapNamespace := utils.ComputeNamespace(h.Namespace, h.Spec.ConfigMap.Namespace)
-	keyForConfigMap := types.NamespacedName{
-		Name:      inputConfigMapName,
-		Namespace: inputConfigMapNamespace,
-	}
-
-	// Get and check the input ConfigMap for Heisenbridge
-	if err := r.Get(ctx, keyForConfigMap, &corev1.ConfigMap{}); err != nil {
-		reason := "ConfigMap " + inputConfigMapName + " does not exist in namespace " + inputConfigMapNamespace
-		if err := r.setFailedState(ctx, h, reason); err != nil {
-			log.Error(err, "Error updating Heisenbridge State")
-		}
-
-		log.Error(
-			err,
-			"Failed to get ConfigMap",
-			"ConfigMap.Namespace",
-			inputConfigMapNamespace,
-			"ConfigMap.Name",
-			inputConfigMapName,
-		)
-
-		return subreconciler.RequeueWithDelayAndError(time.Duration(30), err)
-	}
-
-	objectMetaHeisenbridge := reconcile.SetObjectMeta(h.Name, h.Namespace, map[string]string{})
-
-	desiredConfigMap, err := r.configMapForHeisenbridgeCopy(h, objectMetaHeisenbridge)
-	if err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-
-	// Create a copy of the inputHeisenbridgeConfigMap defined in Spec.Bridges.Heisenbridge.ConfigMap
-	// Here we use the configMapForHeisenbridgeCopy function as createResourceFunc
-	if err := reconcile.ReconcileResource(
-		ctx,
-		r.Client,
-		desiredConfigMap,
-		&corev1.ConfigMap{},
-	); err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-
-	return subreconciler.ContinueReconciling()
-}
-
-// configMapForHeisenbridgeCopy is a function of type createResourceFunc, to be
-// passed as an argument in a call to reconcileResouce.
-//
-// The ConfigMap returned by configMapForHeisenbridgeCopy is a copy of the ConfigMap
-// defined in Spec.Bridges.Heisenbridge.ConfigMap.
-func (r *HeisenbridgeReconciler) configMapForHeisenbridgeCopy(
-	h *synapsev1alpha1.Heisenbridge,
-	objectMeta metav1.ObjectMeta,
-) (*corev1.ConfigMap, error) {
-	var copyConfigMap *corev1.ConfigMap
-
-	sourceConfigMapName := h.Spec.ConfigMap.Name
-	sourceConfigMapNamespace := utils.ComputeNamespace(h.Namespace, h.Spec.ConfigMap.Namespace)
-
-	copyConfigMap, err := utils.GetConfigMapCopy(
-		r.Client,
-		sourceConfigMapName,
-		sourceConfigMapNamespace,
-		objectMeta,
-	)
-	if err != nil {
-		return &corev1.ConfigMap{}, err
-	}
-
-	// Set Synapse instance as the owner and controller
-	if err := ctrl.SetControllerReference(h, copyConfigMap, r.Scheme); err != nil {
-		return &corev1.ConfigMap{}, err
-	}
-
-	return copyConfigMap, nil
 }
 
 // configureHeisenbridgeConfigMap is a function of type FnWithRequest, to

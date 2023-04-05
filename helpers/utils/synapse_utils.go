@@ -18,9 +18,16 @@ package utils
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/opdev/subreconciler"
+	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	"github.com/opdev/synapse-operator/helpers/reconcile"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -73,6 +80,153 @@ func UpdateResourceStatus(ctx context.Context, kubeClient client.Client, resourc
 	if err := kubeClient.Status().Patch(ctx, resource, client.MergeFrom(current)); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// CopyInputConfigMap is a function of type FnWithRequest, to
+// be called in the main reconciliation loop.
+//
+// It creates a copy of the user-provided ConfigMap.
+func CopyInputConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+
+	kubeClient, resource, err := GetValuesFromContext(ctx)
+	if err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+
+	if r, err := GetResource(ctx, kubeClient, req, resource); subreconciler.ShouldHaltOrRequeue(r, err) {
+		return r, err
+	}
+
+	var keyForInputConfigMap types.NamespacedName
+	if err := getInputConfigMapInfo(resource, &keyForInputConfigMap); err != nil {
+		return nil, err
+	}
+
+	// Get and check the input ConfigMap for MautrixSignal
+	if err := kubeClient.Get(ctx, keyForInputConfigMap, &corev1.ConfigMap{}); err != nil {
+		reason := "ConfigMap " + keyForInputConfigMap.Name + " does not exist in namespace " + keyForInputConfigMap.Namespace
+		setFailedState(ctx, kubeClient, resource, reason)
+
+		log.Error(
+			err,
+			"Failed to get ConfigMap",
+			"ConfigMap.Namespace",
+			keyForInputConfigMap.Namespace,
+			"ConfigMap.Name",
+			keyForInputConfigMap.Name,
+		)
+
+		return subreconciler.RequeueWithDelayAndError(time.Duration(30), err)
+	}
+
+	objectMeta := reconcile.SetObjectMeta(resource.GetName(), resource.GetNamespace(), map[string]string{})
+
+	desiredConfigMap, err := configMapForCopy(ctx, kubeClient, resource, objectMeta)
+	if err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+
+	// Create a copy of the inputConfigMap
+	if err := reconcile.ReconcileResource(
+		ctx,
+		kubeClient,
+		desiredConfigMap,
+		&corev1.ConfigMap{},
+	); err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+
+	return subreconciler.ContinueReconciling()
+}
+
+// configMapForCopy is a function of type createResourceFunc, to be
+// passed as an argument in a call to reconcileResouce.
+//
+// The ConfigMap returned by configMapForCopy is a copy of the user-defined
+// ConfigMap.
+func configMapForCopy(ctx context.Context, kubeClient client.Client, resource client.Object, objectMeta metav1.ObjectMeta) (*corev1.ConfigMap, error) {
+	var copyConfigMap *corev1.ConfigMap
+
+	var keyForInputConfigMap types.NamespacedName
+	if err := getInputConfigMapInfo(resource, &keyForInputConfigMap); err != nil {
+		return nil, err
+	}
+
+	copyConfigMap, err := GetConfigMapCopy(
+		kubeClient,
+		keyForInputConfigMap.Name,
+		keyForInputConfigMap.Namespace,
+		objectMeta,
+	)
+	if err != nil {
+		return &corev1.ConfigMap{}, err
+	}
+
+	// Set owner references
+	runtimeScheme, ok := ctx.Value(runtimeSchemeKey).(*runtime.Scheme)
+	if !ok {
+		err := errors.New("error getting Kubernetes client from context")
+		return &corev1.ConfigMap{}, err
+	}
+	if err := ctrl.SetControllerReference(resource, copyConfigMap, runtimeScheme); err != nil {
+		return &corev1.ConfigMap{}, err
+	}
+
+	return copyConfigMap, nil
+}
+
+func setFailedState(ctx context.Context, kubeClient client.Client, resource client.Object, reason string) {
+	log := ctrllog.FromContext(ctx)
+	var err error
+
+	switch v := resource.(type) {
+	case *synapsev1alpha1.Synapse:
+		v.Status.State = "FAILED"
+		v.Status.Reason = reason
+
+		err = UpdateResourceStatus(ctx, kubeClient, v, &synapsev1alpha1.Synapse{})
+	case *synapsev1alpha1.Heisenbridge:
+		v.Status.State = "FAILED"
+		v.Status.Reason = reason
+
+		err = UpdateResourceStatus(ctx, kubeClient, v, &synapsev1alpha1.Heisenbridge{})
+	case *synapsev1alpha1.MautrixSignal:
+		v.Status.State = "FAILED"
+		v.Status.Reason = reason
+
+		err = UpdateResourceStatus(ctx, kubeClient, v, &synapsev1alpha1.MautrixSignal{})
+	default:
+		err = errors.New("error in type assertion")
+	}
+
+	if err != nil {
+		log.Error(err, "Error updating mautrix-signal State")
+	}
+}
+
+func getInputConfigMapInfo(resource client.Object, keys *types.NamespacedName) error {
+	var inputConfigMapName, inputConfigMapNamespace string
+
+	switch v := resource.(type) {
+	case *synapsev1alpha1.Synapse:
+		inputConfigMapName = v.Spec.Homeserver.ConfigMap.Name
+		inputConfigMapNamespace = ComputeNamespace(resource.GetNamespace(), v.Spec.Homeserver.ConfigMap.Namespace)
+	case *synapsev1alpha1.Heisenbridge:
+		inputConfigMapName = v.Spec.ConfigMap.Name
+		inputConfigMapNamespace = ComputeNamespace(resource.GetNamespace(), v.Spec.ConfigMap.Namespace)
+	case *synapsev1alpha1.MautrixSignal:
+		inputConfigMapName = v.Spec.ConfigMap.Name
+		inputConfigMapNamespace = ComputeNamespace(resource.GetNamespace(), v.Spec.ConfigMap.Namespace)
+	default:
+		err := errors.New("error in type assertion")
+		return err
+	}
+
+	keys.Name = inputConfigMapName
+	keys.Namespace = inputConfigMapNamespace
 
 	return nil
 }
