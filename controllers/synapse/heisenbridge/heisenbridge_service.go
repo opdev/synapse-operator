@@ -18,16 +18,16 @@ package heisenbridge
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
 	"github.com/opdev/synapse-operator/helpers/utils"
+	"github.com/opdev/synapse-operator/internal/templates"
 )
 
 // reconcileHeisenbridgeService is a function of type FnWithRequest, to be
@@ -40,9 +40,7 @@ func (r *HeisenbridgeReconciler) reconcileHeisenbridgeService(ctx context.Contex
 		return r, err
 	}
 
-	objectMetaHeisenbridge := reconcile.SetObjectMeta(h.Name, h.Namespace, map[string]string{})
-
-	desiredService, err := r.serviceForHeisenbridge(h, objectMetaHeisenbridge)
+	desiredService, err := r.serviceForHeisenbridge(h)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -60,21 +58,29 @@ func (r *HeisenbridgeReconciler) reconcileHeisenbridgeService(ctx context.Contex
 }
 
 // serviceForSynapse returns a Heisenbridge Service object
-func (r *HeisenbridgeReconciler) serviceForHeisenbridge(h *synapsev1alpha1.Heisenbridge, objectMeta metav1.ObjectMeta) (*corev1.Service, error) {
-	service := &corev1.Service{
-		ObjectMeta: objectMeta,
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{{
-				Name:       "heisenbridge",
-				Protocol:   corev1.ProtocolTCP,
-				Port:       9898,
-				TargetPort: intstr.FromInt(9898),
-			}},
-			Selector: labelsForHeisenbridge(h.Name),
-			Type:     corev1.ServiceTypeClusterIP,
-		},
+func (r *HeisenbridgeReconciler) serviceForHeisenbridge(h *synapsev1alpha1.Heisenbridge) (*corev1.Service, error) {
+	type serviceExtraValues struct {
+		synapsev1alpha1.Heisenbridge
+		Labels     map[string]string
+		PortName   string
+		Port       int
+		TargetPort int
 	}
-	// Set Synapse instance as the owner and controller
+
+	extraValues := serviceExtraValues{
+		Heisenbridge: *h,
+		Labels:       labelsForHeisenbridge(h.Name),
+		PortName:     "heisenbridge",
+		Port:         9898,
+		TargetPort:   9898,
+	}
+
+	service, err := templates.ResourceFromTemplate[serviceExtraValues, corev1.Service](&extraValues, "service")
+	if err != nil {
+		return nil, fmt.Errorf("could not get template: %v", err)
+	}
+
+	// Set Heisenbridge instance as the owner and controller
 	if err := ctrl.SetControllerReference(h, service, r.Scheme); err != nil {
 		return &corev1.Service{}, err
 	}

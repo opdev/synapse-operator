@@ -18,16 +18,16 @@ package synapse
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	subreconciler "github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
 	"github.com/opdev/synapse-operator/helpers/utils"
+	"github.com/opdev/synapse-operator/internal/templates"
 )
 
 // reconcileSynapseService is a function of type FnWithRequest, to be
@@ -40,9 +40,9 @@ func (r *SynapseReconciler) reconcileSynapseService(ctx context.Context, req ctr
 		return r, err
 	}
 
-	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
+	// objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
 
-	desiredService, err := r.serviceForSynapse(s, objectMetaForSynapse)
+	desiredService, err := r.serviceForSynapse(s)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -59,20 +59,28 @@ func (r *SynapseReconciler) reconcileSynapseService(ctx context.Context, req ctr
 }
 
 // serviceForSynapse returns a synapse Service object
-func (r *SynapseReconciler) serviceForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (*corev1.Service, error) {
-	service := &corev1.Service{
-		ObjectMeta: objectMeta,
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{{
-				Name:       "synapse-unsecure",
-				Protocol:   corev1.ProtocolTCP,
-				Port:       8008,
-				TargetPort: intstr.FromInt(8008),
-			}},
-			Selector: labelsForSynapse(s.Name),
-			Type:     corev1.ServiceTypeClusterIP,
-		},
+func (r *SynapseReconciler) serviceForSynapse(s *synapsev1alpha1.Synapse) (*corev1.Service, error) {
+	type serviceExtraValues struct {
+		synapsev1alpha1.Synapse
+		Labels     map[string]string
+		PortName   string
+		Port       int
+		TargetPort int
 	}
+
+	extraValues := serviceExtraValues{
+		Synapse:    *s,
+		Labels:     labelsForSynapse(s.Name),
+		PortName:   "synapse-unsecure",
+		Port:       8008,
+		TargetPort: 8008,
+	}
+
+	service, err := templates.ResourceFromTemplate[serviceExtraValues, corev1.Service](&extraValues, "service")
+	if err != nil {
+		return nil, fmt.Errorf("could not get template: %v", err)
+	}
+
 	// Set Synapse instance as the owner and controller
 	if err := ctrl.SetControllerReference(s, service, r.Scheme); err != nil {
 		return &corev1.Service{}, err

@@ -18,16 +18,16 @@ package mautrixsignal
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
 	"github.com/opdev/synapse-operator/helpers/utils"
+	"github.com/opdev/synapse-operator/internal/templates"
 )
 
 // labelsForSignald returns the labels for selecting the resources
@@ -46,9 +46,7 @@ func (r *MautrixSignalReconciler) reconcileSignaldDeployment(ctx context.Context
 		return r, err
 	}
 
-	objectMetaSignald := reconcile.SetObjectMeta(GetSignaldResourceName(*ms), ms.Namespace, map[string]string{})
-
-	desiredDeployment, err := r.deploymentForSignald(ms, objectMetaSignald)
+	desiredDeployment, err := r.deploymentForSignald(ms)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -66,44 +64,25 @@ func (r *MautrixSignalReconciler) reconcileSignaldDeployment(ctx context.Context
 }
 
 // deploymentForSynapse returns a synapse Deployment object
-func (r *MautrixSignalReconciler) deploymentForSignald(ms *synapsev1alpha1.MautrixSignal, objectMeta metav1.ObjectMeta) (*appsv1.Deployment, error) {
-	ls := labelsForSignald(ms.Name)
-	replicas := int32(1)
-	signaldPVCName := objectMeta.Name
-
-	dep := &appsv1.Deployment{
-		ObjectMeta: objectMeta,
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: ls,
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: ls,
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Image: "docker.io/signald/signald:0.23.0",
-						Name:  "signald",
-						VolumeMounts: []corev1.VolumeMount{{
-							Name:      "signald",
-							MountPath: "/signald",
-						}},
-					}},
-					Volumes: []corev1.Volume{{
-						Name: "signald",
-						VolumeSource: corev1.VolumeSource{
-							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-								ClaimName: signaldPVCName,
-							},
-						},
-					}},
-				},
-			},
-		},
+func (r *MautrixSignalReconciler) deploymentForSignald(ms *synapsev1alpha1.MautrixSignal) (*appsv1.Deployment, error) {
+	type deploymentExtraValues struct {
+		synapsev1alpha1.MautrixSignal
+		Labels map[string]string
+		Name   string
 	}
-	// Set Synapse instance as the owner and controller
+
+	extraValues := deploymentExtraValues{
+		MautrixSignal: *ms,
+		Labels:        labelsForSignald(ms.Name),
+		Name:          getSignaldResourceName(*ms),
+	}
+
+	dep, err := templates.ResourceFromTemplate[deploymentExtraValues, appsv1.Deployment](&extraValues, "signald_deployment")
+	if err != nil {
+		return nil, fmt.Errorf("could not get template: %v", err)
+	}
+
+	// Set MautrixSignal instance as the owner and controller
 	if err := ctrl.SetControllerReference(ms, dep, r.Scheme); err != nil {
 		return &appsv1.Deployment{}, err
 	}

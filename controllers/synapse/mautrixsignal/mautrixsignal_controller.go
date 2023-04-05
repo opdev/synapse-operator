@@ -36,12 +36,8 @@ type MautrixSignalReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-func GetSignaldResourceName(ms synapsev1alpha1.MautrixSignal) string {
+func getSignaldResourceName(ms synapsev1alpha1.MautrixSignal) string {
 	return strings.Join([]string{ms.Name, "signald"}, "-")
-}
-
-func GetMautrixSignalServiceFQDN(ms synapsev1alpha1.MautrixSignal) string {
-	return strings.Join([]string{ms.Name, ms.Namespace, "svc", "cluster", "local"}, ".")
 }
 
 //+kubebuilder:rbac:groups=synapse.opdev.io,resources=mautrixsignals,verbs=get;list;watch;create;update;patch;delete

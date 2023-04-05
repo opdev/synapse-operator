@@ -7,3 +7,4 @@ spec:
     values:
       serverName: example.com
       reportStats: true
+  isOpenshift: true
