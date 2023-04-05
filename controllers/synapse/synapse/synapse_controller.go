@@ -119,9 +119,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if synapse.Spec.CreateNewPostgreSQL {
 		if !r.isPostgresOperatorInstalled(ctx) {
 			reason := "Cannot create PostgreSQL instance for synapse. Postgres-operator is not installed."
-			if err := r.setFailedState(ctx, &synapse, reason); err != nil {
-				log.Error(err, "Error updating Synapse State")
-			}
+			utils.SetFailedState(ctx, r.Client, &synapse, reason)
 
 			err := errors.New("cannot create PostgreSQL instance for synapse. Potsgres-operator is not installed")
 			log.Error(err, "Cannot create PostgreSQL instance for synapse. Potsgres-operator is not installed.")
@@ -190,13 +188,6 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // belonging to the given synapse CR name.
 func labelsForSynapse(name string) map[string]string {
 	return map[string]string{"app": "synapse", "synapse_cr": name}
-}
-
-func (r *SynapseReconciler) setFailedState(ctx context.Context, synapse *synapsev1alpha1.Synapse, reason string) error {
-	synapse.Status.State = "FAILED"
-	synapse.Status.Reason = reason
-
-	return utils.UpdateResourceStatus(ctx, r.Client, synapse, &synapsev1alpha1.Synapse{})
 }
 
 func (r *SynapseReconciler) setStatusHomeserverConfiguration(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {

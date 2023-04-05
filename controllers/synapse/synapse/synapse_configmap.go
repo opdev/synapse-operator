@@ -2744,9 +2744,7 @@ func (r *SynapseReconciler) parseInputSynapseConfigMap(ctx context.Context, req 
 	// Get and validate the inputConfigMap
 	if err := r.Get(ctx, keyForInputConfigMap, &inputConfigMap); err != nil {
 		reason := "ConfigMap " + ConfigMapName + " does not exist in namespace " + ConfigMapNamespace
-		if err := r.setFailedState(ctx, s, reason); err != nil {
-			log.Error(err, "Error updating Synapse State")
-		}
+		utils.SetFailedState(ctx, r.Client, s, reason)
 
 		log.Error(
 			err,
