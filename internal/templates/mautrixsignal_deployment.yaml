@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.Name }}
+  namespace: {{ .Values.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- range $key, $val := .Values.Labels }}
+      {{ $key }}: {{ $val }}
+      {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- range $key, $val := .Values.Labels }}
+        {{ $key }}: {{ $val }}
+        {{- end }}
+    spec:
+      {{if .Values.Status.IsOpenshift -}}
+      serviceAccountName: {{ .Values.Name }}
+      {{- end }}
+      # The init container is responsible of copying the
+      # config.yaml from the read-only ConfigMap to the
+      # mautrixsignal-data volume. The mautrixsignal process
+      # needs read & write access to the config.yaml file.
+      initContainers:
+      - image: registry.access.redhat.com/ubi8/ubi-minimal:8.7
+        name: initconfig
+        args:
+        - if [ ! -f /data/config.yaml ]; then cp /input/config.yaml /data/config.yaml; fi
+        command:
+        - bin/sh
+        - -c
+        volumeMounts:
+        - mountPath: /input
+          name: config
+        - mountPath: /data
+          name: mautrixsignal-data
+      containers:
+      - image: dock.mau.dev/mautrix/signal:v0.4.1
+        name: mautrix-signal
+        volumeMounts:
+        - mountPath: /signald
+          name: signald
+        - mountPath: /data
+          name: mautrixsignal-data
+      volumes:
+      - name: config
+        configMap:
+          defaultMode: 420
+          name: {{ .Values.Name }}
+      - name: signald
+        persistentVolumeClaim:
+          claimName: {{ .Values.Name }}-signald
+      - name: mautrixsignal-data
+        persistentVolumeClaim:
+          claimName: {{ .Values.Name }}

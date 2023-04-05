@@ -18,16 +18,16 @@ package synapse
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
 	"github.com/opdev/synapse-operator/helpers/utils"
+	"github.com/opdev/synapse-operator/internal/templates"
 )
 
 // reconcileSynapseDeployment is a function of type FnWithRequest, to be
@@ -40,8 +40,7 @@ func (r *SynapseReconciler) reconcileSynapseDeployment(ctx context.Context, req 
 		return r, err
 	}
 
-	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
-	depl, err := r.deploymentForSynapse(s, objectMetaForSynapse)
+	depl, err := r.deploymentForSynapse(s)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -59,150 +58,20 @@ func (r *SynapseReconciler) reconcileSynapseDeployment(ctx context.Context, req 
 }
 
 // deploymentForSynapse returns a synapse Deployment object
-func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (*appsv1.Deployment, error) {
-	ls := labelsForSynapse(s.Name)
-	replicas := int32(1)
-
-	server_name := s.Status.HomeserverConfiguration.ServerName
-	report_stats := s.Status.HomeserverConfiguration.ReportStats
-	// The created Synapse ConfigMap shares the same name as the Synapse deployment
-	synapseConfigMapName := objectMeta.Name
-
-	dep := &appsv1.Deployment{
-		ObjectMeta: objectMeta,
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: ls,
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: ls,
-				},
-				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{{
-						Image: "matrixdotorg/synapse:v1.71.0",
-						Name:  "synapse-generate",
-						Args:  []string{"generate"},
-						Env: []corev1.EnvVar{{
-							Name:  "SYNAPSE_CONFIG_PATH",
-							Value: "/data-homeserver/homeserver.yaml",
-						}, {
-							Name:  "SYNAPSE_SERVER_NAME",
-							Value: server_name,
-						}, {
-							Name:  "SYNAPSE_REPORT_STATS",
-							Value: utils.BoolToYesNo(report_stats),
-						}},
-						VolumeMounts: []corev1.VolumeMount{{
-							Name:      "homeserver",
-							MountPath: "/data-homeserver",
-						}, {
-							Name:      "data-pv",
-							MountPath: "/data",
-						}},
-					}},
-					Containers: []corev1.Container{{
-						Image: "matrixdotorg/synapse:v1.71.0",
-						Name:  "synapse",
-						Env: []corev1.EnvVar{{
-							Name:  "SYNAPSE_CONFIG_PATH",
-							Value: "/data-homeserver/homeserver.yaml",
-						}},
-						VolumeMounts: []corev1.VolumeMount{{
-							Name:      "homeserver",
-							MountPath: "/data-homeserver",
-						}, {
-							Name:      "data-pv",
-							MountPath: "/data",
-						}},
-						Ports: []corev1.ContainerPort{{
-							ContainerPort: 8008,
-						}},
-					}},
-					Volumes: []corev1.Volume{{
-						Name: "homeserver",
-						VolumeSource: corev1.VolumeSource{
-							ConfigMap: &corev1.ConfigMapVolumeSource{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: synapseConfigMapName,
-								},
-							},
-						},
-					}, {
-						Name: "data-pv",
-						VolumeSource: corev1.VolumeSource{
-							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-								ClaimName: s.Name,
-							},
-						},
-					}},
-				},
-			},
-		},
+func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse) (*appsv1.Deployment, error) {
+	type deploymentExtraValues struct {
+		synapsev1alpha1.Synapse
+		Labels map[string]string
 	}
 
-	if s.Spec.IsOpenshift {
-		// Synapse must run with user 991.
-		// If deploying on Openshift, we must run the workload with a Service
-		// Account associated to the 'anyuid' SCC.
-		dep.Spec.Template.Spec.ServiceAccountName = s.Name
+	extraValues := deploymentExtraValues{
+		Synapse: *s,
+		Labels:  labelsForSynapse(s.Name),
 	}
 
-	if s.Status.Bridges.Heisenbridge.Enabled {
-		heisenbridgeConfigMapName := s.Status.Bridges.Heisenbridge.Name
-
-		dep.Spec.Template.Spec.Containers[0].VolumeMounts = append(
-			dep.Spec.Template.Spec.Containers[0].VolumeMounts,
-			corev1.VolumeMount{
-				Name:      "data-heisenbridge",
-				MountPath: "/data-heisenbridge",
-			},
-		)
-
-		dep.Spec.Template.Spec.Volumes = append(
-			dep.Spec.Template.Spec.Volumes,
-			corev1.Volume{
-				Name: "data-heisenbridge",
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: heisenbridgeConfigMapName,
-						},
-					},
-				},
-			},
-		)
-	}
-
-	if s.Status.Bridges.MautrixSignal.Enabled {
-		// If the mautrix-signal bridge is enabled, then Synapse needs access
-		// to the registration.yaml file, containing all information to
-		// register the mautrix-signal bridge as an application service in
-		// homeserver.yaml. This registration file is generated by the bridge
-		// the first time it runs and located alongside the config.yaml (config
-		// file for mautrix-signal), that is it's in the mautrix-signal PV
-		mautrixSignalPVCName := s.Status.Bridges.MautrixSignal.Name
-
-		dep.Spec.Template.Spec.Containers[0].VolumeMounts = append(
-			dep.Spec.Template.Spec.Containers[0].VolumeMounts,
-			corev1.VolumeMount{
-				Name:      "data-mautrixsignal",
-				MountPath: "/data-mautrixsignal",
-			},
-		)
-
-		dep.Spec.Template.Spec.Volumes = append(
-			dep.Spec.Template.Spec.Volumes,
-			corev1.Volume{
-				Name: "data-mautrixsignal",
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: mautrixSignalPVCName,
-					},
-				},
-			},
-		)
+	dep, err := templates.ResourceFromTemplate[deploymentExtraValues, appsv1.Deployment](&extraValues, "synapse_deployment")
+	if err != nil {
+		return nil, fmt.Errorf("could not get template: %v", err)
 	}
 
 	// Set Synapse instance as the owner and controller

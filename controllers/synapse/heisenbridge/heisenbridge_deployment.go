@@ -18,16 +18,16 @@ package heisenbridge
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
 	"github.com/opdev/synapse-operator/helpers/utils"
+	"github.com/opdev/synapse-operator/internal/templates"
 )
 
 // labelsForSynapse returns the labels for selecting the resources
@@ -46,9 +46,7 @@ func (r *HeisenbridgeReconciler) reconcileHeisenbridgeDeployment(ctx context.Con
 		return r, err
 	}
 
-	objectMetaHeisenbridge := reconcile.SetObjectMeta(h.Name, h.Namespace, map[string]string{})
-
-	desiredDeployment, err := r.deploymentForHeisenbridge(h, objectMetaHeisenbridge)
+	desiredDeployment, err := r.deploymentForHeisenbridge(h)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -66,54 +64,25 @@ func (r *HeisenbridgeReconciler) reconcileHeisenbridgeDeployment(ctx context.Con
 }
 
 // deploymentForHeisenbridge returns a Heisenbridge Deployment object
-func (r *HeisenbridgeReconciler) deploymentForHeisenbridge(h *synapsev1alpha1.Heisenbridge, objectMeta metav1.ObjectMeta) (*appsv1.Deployment, error) {
-	ls := labelsForHeisenbridge(h.Name)
-	replicas := int32(1)
-
-	command := r.craftHeisenbridgeCommad(*h)
-	// The created Heisenbridge ConfigMap Name share the same name as the
-	// Heisenbridge Deployment
-	heisenbridgeConfigMapName := objectMeta.Name
-
-	dep := &appsv1.Deployment{
-		ObjectMeta: objectMeta,
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: ls,
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: ls,
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Image: "hif1/heisenbridge:1.14",
-						Name:  "heisenbridge",
-						VolumeMounts: []corev1.VolumeMount{{
-							Name:      "data-heisenbridge",
-							MountPath: "/data-heisenbridge",
-						}},
-						Ports: []corev1.ContainerPort{{
-							ContainerPort: 9898,
-						}},
-						Command: command,
-					}},
-					Volumes: []corev1.Volume{{
-						Name: "data-heisenbridge",
-						VolumeSource: corev1.VolumeSource{
-							ConfigMap: &corev1.ConfigMapVolumeSource{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: heisenbridgeConfigMapName,
-								},
-							},
-						},
-					}},
-				},
-			},
-		},
+func (r *HeisenbridgeReconciler) deploymentForHeisenbridge(h *synapsev1alpha1.Heisenbridge) (*appsv1.Deployment, error) {
+	type deploymentExtraValues struct {
+		synapsev1alpha1.Heisenbridge
+		Labels  map[string]string
+		Command []string
 	}
-	// Set Synapse instance as the owner and controller
+
+	extraValues := deploymentExtraValues{
+		Heisenbridge: *h,
+		Labels:       labelsForHeisenbridge(h.Name),
+		Command:      r.craftHeisenbridgeCommad(*h),
+	}
+
+	dep, err := templates.ResourceFromTemplate[deploymentExtraValues, appsv1.Deployment](&extraValues, "heisenbridge_deployment")
+	if err != nil {
+		return nil, fmt.Errorf("could not get template: %v", err)
+	}
+
+	// Set Heisenbridge instance as the owner and controller
 	if err := ctrl.SetControllerReference(h, dep, r.Scheme); err != nil {
 		return &appsv1.Deployment{}, err
 	}

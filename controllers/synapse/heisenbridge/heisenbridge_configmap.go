@@ -18,9 +18,9 @@ package heisenbridge
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,6 +29,7 @@ import (
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
 	"github.com/opdev/synapse-operator/helpers/utils"
+	"github.com/opdev/synapse-operator/internal/templates"
 )
 
 // reconcileHeisenbridgeConfigMap is a function of type FnWithRequest, to
@@ -42,9 +43,7 @@ func (r *HeisenbridgeReconciler) reconcileHeisenbridgeConfigMap(ctx context.Cont
 		return r, err
 	}
 
-	objectMetaHeisenbridge := reconcile.SetObjectMeta(h.Name, h.Namespace, map[string]string{})
-
-	desiredConfigMap, err := r.configMapForHeisenbridge(h, objectMetaHeisenbridge)
+	desiredConfigMap, err := r.configMapForHeisenbridge(h)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -62,28 +61,23 @@ func (r *HeisenbridgeReconciler) reconcileHeisenbridgeConfigMap(ctx context.Cont
 }
 
 // configMapForSynapse returns a synapse ConfigMap object
-func (r *HeisenbridgeReconciler) configMapForHeisenbridge(h *synapsev1alpha1.Heisenbridge, objectMeta metav1.ObjectMeta) (*corev1.ConfigMap, error) {
-	heisenbridgeYaml := `
-id: heisenbridge
-url: http://` + GetHeisenbridgeServiceFQDN(*h) + `:9898
-as_token: EUFqSPQusV4mXkPKbwdHyIhthELQ1Xf9S5lSEzTrrlb0uz0ZJRHhwEljT71ByObe
-hs_token: If6r2GGlsNN4MnoW3djToADNdq0JuIJ1WNM4rKHO73WuG5QvVubj1Q4JHrmQBcS6
-rate_limited: false
-sender_localpart: heisenbridge
-namespaces:
-    users:
-    - regex: '@irc_.*'
-      exclusive: true
-    aliases: []
-    rooms: []
-  `
-
-	cm := &corev1.ConfigMap{
-		ObjectMeta: objectMeta,
-		Data:       map[string]string{"heisenbridge.yaml": heisenbridgeYaml},
+func (r *HeisenbridgeReconciler) configMapForHeisenbridge(h *synapsev1alpha1.Heisenbridge) (*corev1.ConfigMap, error) {
+	type configmapExtraValues struct {
+		synapsev1alpha1.Heisenbridge
+		HeisenbridgeFQDN string
 	}
 
-	// Set Synapse instance as the owner and controller
+	extraValues := configmapExtraValues{
+		Heisenbridge:     *h,
+		HeisenbridgeFQDN: utils.ComputeFQDN(h.Name, h.Namespace),
+	}
+
+	cm, err := templates.ResourceFromTemplate[configmapExtraValues, corev1.ConfigMap](&extraValues, "heisenbridge_configmap")
+	if err != nil {
+		return nil, fmt.Errorf("could not get template: %v", err)
+	}
+
+	// Set Heisenbridge instance as the owner and controller
 	if err := ctrl.SetControllerReference(h, cm, r.Scheme); err != nil {
 		return &corev1.ConfigMap{}, err
 	}
@@ -133,6 +127,6 @@ func (r *HeisenbridgeReconciler) updateHeisenbridgeWithURL(
 ) error {
 	h := obj.(*synapsev1alpha1.Heisenbridge)
 
-	heisenbridge["url"] = "http://" + GetHeisenbridgeServiceFQDN(*h) + ":9898"
+	heisenbridge["url"] = "http://" + utils.ComputeFQDN(h.Name, h.Namespace) + ":9898"
 	return nil
 }

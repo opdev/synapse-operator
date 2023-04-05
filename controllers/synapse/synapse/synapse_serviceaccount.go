@@ -18,16 +18,17 @@ package synapse
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	subreconciler "github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
 	"github.com/opdev/synapse-operator/helpers/utils"
+	"github.com/opdev/synapse-operator/internal/templates"
 )
 
 // reconcileSynapseServiceAccount is a function of type FnWithRequest, to
@@ -40,9 +41,7 @@ func (r *SynapseReconciler) reconcileSynapseServiceAccount(ctx context.Context, 
 		return r, err
 	}
 
-	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
-
-	desiredServiceAccount, err := r.serviceAccountForSynapse(s, objectMetaForSynapse)
+	desiredServiceAccount, err := r.serviceAccountForSynapse(s)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -59,10 +58,11 @@ func (r *SynapseReconciler) reconcileSynapseServiceAccount(ctx context.Context, 
 }
 
 // serviceAccountForSynapse returns a synapse ServiceAccount object
-func (r *SynapseReconciler) serviceAccountForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (*corev1.ServiceAccount, error) {
+func (r *SynapseReconciler) serviceAccountForSynapse(s *synapsev1alpha1.Synapse) (*corev1.ServiceAccount, error) {
 	// TODO: https://github.com/opdev/synapse-operator/issues/19
-	sa := &corev1.ServiceAccount{
-		ObjectMeta: objectMeta,
+	sa, err := templates.ResourceFromTemplate[synapsev1alpha1.Synapse, corev1.ServiceAccount](s, "serviceaccount")
+	if err != nil {
+		return nil, fmt.Errorf("could not get template: %v", err)
 	}
 
 	// Set Synapse instance as the owner and controller
@@ -82,9 +82,7 @@ func (r *SynapseReconciler) reconcileSynapseRoleBinding(ctx context.Context, req
 		return r, err
 	}
 
-	objectMetaForSynapse := reconcile.SetObjectMeta(s.Name, s.Namespace, map[string]string{})
-
-	desiredRoleBinding, err := r.roleBindingForSynapse(s, objectMetaForSynapse)
+	desiredRoleBinding, err := r.roleBindingForSynapse(s)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -101,20 +99,11 @@ func (r *SynapseReconciler) reconcileSynapseRoleBinding(ctx context.Context, req
 }
 
 // roleBindingForSynapse returns a synapse RoleBinding object
-func (r *SynapseReconciler) roleBindingForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (*rbacv1.RoleBinding, error) {
+func (r *SynapseReconciler) roleBindingForSynapse(s *synapsev1alpha1.Synapse) (*rbacv1.RoleBinding, error) {
 	// TODO: https://github.com/opdev/synapse-operator/issues/19
-	rb := &rbacv1.RoleBinding{
-		ObjectMeta: objectMeta,
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "system:openshift:scc:anyuid",
-		},
-		Subjects: []rbacv1.Subject{{
-			Kind:      "ServiceAccount",
-			Name:      objectMeta.Name,
-			Namespace: objectMeta.Namespace,
-		}},
+	rb, err := templates.ResourceFromTemplate[synapsev1alpha1.Synapse, rbacv1.RoleBinding](s, "rolebinding")
+	if err != nil {
+		return nil, fmt.Errorf("could not get template: %v", err)
 	}
 
 	// Set Synapse instance as the owner and controller

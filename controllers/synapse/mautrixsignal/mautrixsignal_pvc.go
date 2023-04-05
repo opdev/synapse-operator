@@ -18,16 +18,16 @@ package mautrixsignal
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/opdev/subreconciler"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
 	"github.com/opdev/synapse-operator/helpers/utils"
+	"github.com/opdev/synapse-operator/internal/templates"
 )
 
 // reconcileMautrixSignalPVC is a function of type FnWithRequest, to be
@@ -40,9 +40,7 @@ func (r *MautrixSignalReconciler) reconcileMautrixSignalPVC(ctx context.Context,
 		return r, err
 	}
 
-	objectMetaMautrixSignal := reconcile.SetObjectMeta(ms.Name, ms.Namespace, map[string]string{})
-
-	desiredPVC, err := r.persistentVolumeClaimForMautrixSignal(ms, objectMetaMautrixSignal)
+	desiredPVC, err := r.persistentVolumeClaimForMautrixSignal(ms)
 	if err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
@@ -60,23 +58,13 @@ func (r *MautrixSignalReconciler) reconcileMautrixSignalPVC(ctx context.Context,
 }
 
 // persistentVolumeClaimForMautrixSignal returns a mautrix-signal PVC object
-func (r *MautrixSignalReconciler) persistentVolumeClaimForMautrixSignal(ms *synapsev1alpha1.MautrixSignal, objectMeta metav1.ObjectMeta) (*corev1.PersistentVolumeClaim, error) {
-	pvcmode := corev1.PersistentVolumeFilesystem
-
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: objectMeta,
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{"ReadWriteOnce"},
-			VolumeMode:  &pvcmode,
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					"storage": *resource.NewQuantity(5*1024*1024*1024, resource.BinarySI),
-				},
-			},
-		},
+func (r *MautrixSignalReconciler) persistentVolumeClaimForMautrixSignal(ms *synapsev1alpha1.MautrixSignal) (*corev1.PersistentVolumeClaim, error) {
+	pvc, err := templates.ResourceFromTemplate[synapsev1alpha1.MautrixSignal, corev1.PersistentVolumeClaim](ms, "pvc")
+	if err != nil {
+		return nil, fmt.Errorf("could not get template: %v", err)
 	}
 
-	// Set Synapse instance as the owner and controller
+	// Set MautrixSignal instance as the owner and controller
 	if err := ctrl.SetControllerReference(ms, pvc, r.Scheme); err != nil {
 		return &corev1.PersistentVolumeClaim{}, err
 	}

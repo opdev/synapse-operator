@@ -18,7 +18,6 @@ package heisenbridge
 
 import (
 	"context"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -33,10 +32,6 @@ import (
 type HeisenbridgeReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-}
-
-func GetHeisenbridgeServiceFQDN(h synapsev1alpha1.Heisenbridge) string {
-	return strings.Join([]string{h.Name, h.Namespace, "svc", "cluster", "local"}, ".")
 }
 
 //+kubebuilder:rbac:groups=synapse.opdev.io,resources=heisenbridges,verbs=get;list;watch;create;update;patch;delete
