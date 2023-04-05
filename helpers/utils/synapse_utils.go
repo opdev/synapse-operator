@@ -108,7 +108,7 @@ func CopyInputConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, er
 	// Get and check the input ConfigMap for MautrixSignal
 	if err := kubeClient.Get(ctx, keyForInputConfigMap, &corev1.ConfigMap{}); err != nil {
 		reason := "ConfigMap " + keyForInputConfigMap.Name + " does not exist in namespace " + keyForInputConfigMap.Namespace
-		setFailedState(ctx, kubeClient, resource, reason)
+		SetFailedState(ctx, kubeClient, resource, reason)
 
 		log.Error(
 			err,
@@ -178,7 +178,7 @@ func configMapForCopy(ctx context.Context, kubeClient client.Client, resource cl
 	return copyConfigMap, nil
 }
 
-func setFailedState(ctx context.Context, kubeClient client.Client, resource client.Object, reason string) {
+func SetFailedState(ctx context.Context, kubeClient client.Client, resource client.Object, reason string) {
 	log := ctrllog.FromContext(ctx)
 	var err error
 
