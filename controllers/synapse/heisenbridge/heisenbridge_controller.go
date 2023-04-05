@@ -61,15 +61,10 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// The list of subreconcilers for Heisenbridge.
 	var subreconcilersForHeisenbridge []subreconciler.FnWithRequest
 
-	// Generic subreconcilers need to access the reconciler's client and scheme,
-	// and know which type of resource is being reconciled. We pass this
-	// information using the context values.
-	ctx = utils.AddValuesToContext(ctx, r.Client, r.Scheme, &synapsev1alpha1.Heisenbridge{})
-
 	// We need to trigger a Synapse reconciliation so that it becomes aware of
 	// the Heisenbridge.
 	subreconcilersForHeisenbridge = []subreconciler.FnWithRequest{
-		utils.TriggerSynapseReconciliation,
+		utils.TriggerSynapseReconciliation(r.Client, &synapsev1alpha1.Heisenbridge{}),
 	}
 
 	// The user may specify a ConfigMap, containing the heisenbridge.yaml
@@ -81,7 +76,7 @@ func (r *HeisenbridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// configuration.
 		subreconcilersForHeisenbridge = append(
 			subreconcilersForHeisenbridge,
-			utils.CopyInputConfigMap,
+			utils.CopyInputConfigMap(r.Client, r.Scheme, &synapsev1alpha1.Heisenbridge{}),
 			r.configureHeisenbridgeConfigMap,
 		)
 	} else {
