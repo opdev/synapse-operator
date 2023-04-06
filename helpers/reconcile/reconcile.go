@@ -41,35 +41,35 @@ func ReconcileResource(
 
 	key := types.NamespacedName{Name: desired.GetName(), Namespace: desired.GetNamespace()}
 	if err := rclient.Get(ctx, key, current); err != nil {
-		if k8serrors.IsNotFound(err) {
-			log.Info(
-				"Creating a new child resource",
+		if !k8serrors.IsNotFound(err) {
+			log.Error(
+				err,
+				"Error reading child resource",
 				"Kind", desired.GetObjectKind().GroupVersionKind().Kind,
 				"Name", desired.GetName(),
 				"Namespace", desired.GetNamespace(),
 			)
-
-			err = rclient.Create(ctx, desired)
-			if err != nil {
-				log.Error(
-					err,
-					"Failed to create a new child resource",
-					"Kind", desired.GetObjectKind().GroupVersionKind().Kind,
-					"Name", desired.GetName(),
-					"Namespace", desired.GetNamespace(),
-				)
-				return err
-			}
+			return err
 		}
 
-		log.Error(
-			err,
-			"Error reading child resource",
+		log.Info(
+			"Creating a new child resource",
 			"Kind", desired.GetObjectKind().GroupVersionKind().Kind,
 			"Name", desired.GetName(),
 			"Namespace", desired.GetNamespace(),
 		)
-		return err
+
+		err = rclient.Create(ctx, desired)
+		if err != nil {
+			log.Error(
+				err,
+				"Failed to create a new child resource",
+				"Kind", desired.GetObjectKind().GroupVersionKind().Kind,
+				"Name", desired.GetName(),
+				"Namespace", desired.GetNamespace(),
+			)
+			return err
+		}
 	} else {
 		log.Info(
 			"Patching existing child resource",
