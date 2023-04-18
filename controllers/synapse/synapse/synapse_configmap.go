@@ -18,7 +18,10 @@ package synapse
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"io"
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
@@ -68,6 +71,19 @@ func (r *SynapseReconciler) reconcileSynapseConfigMap(ctx context.Context, req c
 
 // configMapForSynapse returns a synapse ConfigMap object
 func (r *SynapseReconciler) configMapForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (*corev1.ConfigMap, error) {
+	registrationSharedSecret, err := generateASCIIPassword(defaultGeneratedPasswordLength)
+	if err != nil {
+		return nil, err
+	}
+	macaroonSecretKey, err := generateASCIIPassword(defaultGeneratedPasswordLength)
+	if err != nil {
+		return nil, err
+	}
+	formSecret, err := generateASCIIPassword(defaultGeneratedPasswordLength)
+	if err != nil {
+		return nil, err
+	}
+
 	homeserverYaml := `
 # Configuration file for Synapse.
 #
@@ -1268,7 +1284,7 @@ account_validity:
 # If set, allows registration of standard or admin accounts by anyone who
 # has the shared secret, even if registration is otherwise disabled.
 #
-registration_shared_secret: ":Cc*s^6_Xm*zcxu.jcxJXN=zGFaMzaUgmsP^gnCRFYg3,Tacsx"
+registration_shared_secret: "` + registrationSharedSecret + `"
 
 # Set the number of bcrypt rounds used to generate password hash.
 # Larger numbers increase the work factor needed to generate the hash.
@@ -1484,13 +1500,13 @@ report_stats: ` + utils.BoolToString(s.Spec.Homeserver.Values.ReportStats) + `
 # the registration_shared_secret is used, if one is given; otherwise,
 # a secret key is derived from the signing key.
 #
-macaroon_secret_key: "EVr3uuImrTyxDVY1ukw*;r^zu1Y#8UkAp0@Bl8i9rzi~-+n95;"
+macaroon_secret_key: "` + macaroonSecretKey + `"
 
 # a secret which is used to calculate HMACs for form values, to stop
 # falsification of values. Must be specified for the User Consent
 # forms to work.
 #
-form_secret: "uD#~UE2pAzLUQIvj8x1;0iCzNL-UcUs1._WtUGXHRp@1Ogmyg4"
+form_secret: "` + formSecret + `"
 
 ## Signing Keys ##
 
@@ -3050,4 +3066,62 @@ func (r *SynapseReconciler) addAppServiceToHomeserver(
 		// There are already app services registered. Adding to the list.
 		homeserver["app_service_config_files"] = append(homeserverAppService, configFilePath)
 	}
+}
+
+// The following constant is used as a part of password generation.
+const (
+	// DefaultGeneratedPasswordLength is the default length of what a generated
+	// password should be if it's not set elsewhere
+	defaultGeneratedPasswordLength = 24
+)
+
+// accumulate gathers n bytes from f and returns them as a string. It returns
+// an empty string when f returns an error.
+func accumulate(n int, f func() (byte, error)) (string, error) {
+	result := make([]byte, n)
+
+	for i := range result {
+		if b, err := f(); err == nil {
+			result[i] = b
+		} else {
+			return "", err
+		}
+	}
+
+	return string(result), nil
+}
+
+// randomCharacter builds a function that returns random bytes from class.
+func randomCharacter(random io.Reader, class string) func() (byte, error) {
+	if random == nil {
+		panic("requires a random source")
+	}
+	if len(class) == 0 {
+		panic("class cannot be empty")
+	}
+
+	size := big.NewInt(int64(len(class)))
+
+	return func() (byte, error) {
+		if i, err := rand.Int(random, size); err == nil {
+			return class[int(i.Int64())], nil
+		} else {
+			return 0, err
+		}
+	}
+}
+
+// policyASCII is the list of acceptable characters from which to generate an
+// ASCII password.
+const policyASCII = `` +
+	`()*+,-./` + `:;<=>?@` + `[]^_` + `{|}` +
+	`ABCDEFGHIJKLMNOPQRSTUVWXYZ` +
+	`abcdefghijklmnopqrstuvwxyz` +
+	`0123456789`
+
+var randomASCII = randomCharacter(rand.Reader, policyASCII)
+
+// GenerateASCIIPassword returns a random string of printable ASCII characters.
+func generateASCIIPassword(length int) (string, error) {
+	return accumulate(length, randomASCII)
 }
