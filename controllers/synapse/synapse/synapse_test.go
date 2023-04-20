@@ -20,7 +20,7 @@ import (
 var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 	// Testing ParseHomeserverConfigMap
 	Context("When parsing the homeserver ConfigMap", func() {
-		var r SynapseReconciler
+		var r SynapseStatusReconciler
 		var ctx context.Context
 		var s synapsev1alpha1.Synapse
 		var cm corev1.ConfigMap
@@ -28,7 +28,7 @@ var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 
 		BeforeEach(func() {
 			// Init variables needed for each test
-			r = SynapseReconciler{}
+			r = SynapseStatusReconciler{}
 			ctx = context.Background()
 			s = synapsev1alpha1.Synapse{}
 		})
@@ -257,7 +257,7 @@ var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 	})
 
 	Context("When updating the Synapse Status with PostgreSQL database information", func() {
-		var r SynapseReconciler
+		var r SynapseStatusReconciler
 		var s synapsev1alpha1.Synapse
 		var synapseDatabaseInfo synapsev1alpha1.SynapseStatusDatabaseConnectionInfo
 		var postgresSecret corev1.Secret
@@ -278,7 +278,7 @@ var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 
 		BeforeEach(func() {
 			// Init variables
-			r = SynapseReconciler{}
+			r = SynapseStatusReconciler{}
 			s = synapsev1alpha1.Synapse{}
 			postgresSecret = corev1.Secret{}
 

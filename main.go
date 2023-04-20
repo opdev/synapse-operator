@@ -90,6 +90,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Synapse")
 		os.Exit(1)
 	}
+	if err = (&synapsecontroller.SynapseStatusReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Synapse Status")
+		os.Exit(1)
+	}
 	if err = (&mautrixsignalcontroller.MautrixSignalReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),

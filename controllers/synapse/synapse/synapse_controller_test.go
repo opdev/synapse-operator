@@ -82,6 +82,12 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 		}).SetupWithManager(k8sManager)
 		Expect(err).ToNot(HaveOccurred())
 
+		err = (&SynapseStatusReconciler{
+			Client: k8sManager.GetClient(),
+			Scheme: k8sManager.GetScheme(),
+		}).SetupWithManager(k8sManager)
+		Expect(err).ToNot(HaveOccurred())
+
 		deleteResource = utils.DeleteResourceFunc(k8sClient, ctx, timeout, interval)
 		checkSubresourceAbsence = utils.CheckSubresourceAbsenceFunc(k8sClient, ctx, timeout, interval)
 		checkResourcePresence = utils.CheckResourcePresenceFunc(k8sClient, ctx, timeout, interval)

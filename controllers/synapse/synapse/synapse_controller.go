@@ -23,7 +23,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -91,7 +90,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// * We populate the Status.HomeserverConfiguration with the values defined in the input ConfigMap
 		// * We create a copy of the user-provided ConfigMap.
 		subreconcilersForSynapse = []subreconciler.FnWithRequest{
-			r.parseInputSynapseConfigMap,
+			// r.parseInputSynapseConfigMap,
 			utils.CopyInputConfigMap(r.Client, r.Scheme, &synapsev1alpha1.Synapse{}),
 		}
 	} else {
@@ -100,7 +99,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// homeserver.yaml is configured with values defined in
 		// Spec.Homeserver.Values
 		subreconcilersForSynapse = []subreconciler.FnWithRequest{
-			r.setStatusHomeserverConfiguration,
+			// r.setStatusHomeserverConfiguration,
 			r.reconcileSynapseConfigMap,
 		}
 	}
@@ -108,7 +107,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Determine the existence of Bridges referencing this Synapse instance
 	subreconcilersForSynapse = append(
 		subreconcilersForSynapse,
-		r.updateSynapseStatusBridges,
+		// r.updateSynapseStatusBridges,
 		r.updateSynapseConfigMapForBridges,
 	)
 
@@ -129,7 +128,7 @@ func (r *SynapseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			subreconcilersForSynapse,
 			r.reconcilePostgresClusterConfigMap,
 			r.reconcilePostgresClusterCR,
-			r.updateSynapseStatusWithPostgreSQLInfos,
+			// r.updateSynapseStatusWithPostgreSQLInfos,
 			r.updateSynapseConfigMapForPostgresCluster,
 		)
 	}
@@ -168,123 +167,123 @@ func labelsForSynapse(name string) map[string]string {
 	return map[string]string{"app": "synapse", "synapse_cr": name}
 }
 
-func (r *SynapseReconciler) setStatusHomeserverConfiguration(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
+// func (r *SynapseReconciler) setStatusHomeserverConfiguration(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+// 	log := ctrllog.FromContext(ctx)
 
-	s := &synapsev1alpha1.Synapse{}
-	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return r, err
-	}
+// 	s := &synapsev1alpha1.Synapse{}
+// 	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+// 		return r, err
+// 	}
 
-	s.Status.HomeserverConfiguration.ServerName = s.Spec.Homeserver.Values.ServerName
-	s.Status.HomeserverConfiguration.ReportStats = s.Spec.Homeserver.Values.ReportStats
+// 	s.Status.HomeserverConfiguration.ServerName = s.Spec.Homeserver.Values.ServerName
+// 	s.Status.HomeserverConfiguration.ReportStats = s.Spec.Homeserver.Values.ReportStats
 
-	err := utils.UpdateResourceStatus(ctx, r.Client, s, &synapsev1alpha1.Synapse{})
-	if err != nil {
-		log.Error(err, "Error updating Synapse Status")
-		return subreconciler.RequeueWithError(err)
-	}
+// 	err := utils.UpdateResourceStatus(ctx, r.Client, s, &synapsev1alpha1.Synapse{})
+// 	if err != nil {
+// 		log.Error(err, "Error updating Synapse Status")
+// 		return subreconciler.RequeueWithError(err)
+// 	}
 
-	return subreconciler.ContinueReconciling()
-}
+// 	return subreconciler.ContinueReconciling()
+// }
 
 func (r *SynapseReconciler) isPostgresOperatorInstalled(ctx context.Context) bool {
 	err := r.Client.List(ctx, &pgov1beta1.PostgresClusterList{})
 	return err == nil
 }
 
-// updateSynapseStatusWithPostgreSQLInfos is a function of type
-// FnWithRequest, to be called in the main reconciliation loop.
-//
-// It parses the PostgresCluster Secret and updates the Synapse status with the
-// database connection information.
-func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
+// // updateSynapseStatusWithPostgreSQLInfos is a function of type
+// // FnWithRequest, to be called in the main reconciliation loop.
+// //
+// // It parses the PostgresCluster Secret and updates the Synapse status with the
+// // database connection information.
+// func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+// 	log := ctrllog.FromContext(ctx)
 
-	s := &synapsev1alpha1.Synapse{}
-	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return r, err
-	}
+// 	s := &synapsev1alpha1.Synapse{}
+// 	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+// 		return r, err
+// 	}
 
-	var postgresSecret corev1.Secret
+// 	var postgresSecret corev1.Secret
 
-	keyForPostgresClusterSecret := types.NamespacedName{
-		Name:      GetPostgresClusterResourceName(*s) + "-pguser-synapse",
-		Namespace: s.Namespace,
-	}
+// 	keyForPostgresClusterSecret := types.NamespacedName{
+// 		Name:      GetPostgresClusterResourceName(*s) + "-pguser-synapse",
+// 		Namespace: s.Namespace,
+// 	}
 
-	// Get PostgresCluster Secret containing information for the synapse user
-	if err := r.Get(ctx, keyForPostgresClusterSecret, &postgresSecret); err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
+// 	// Get PostgresCluster Secret containing information for the synapse user
+// 	if err := r.Get(ctx, keyForPostgresClusterSecret, &postgresSecret); err != nil {
+// 		return subreconciler.RequeueWithError(err)
+// 	}
 
-	// Locally updates the Synapse Status
-	if err := r.updateSynapseStatusDatabase(s, postgresSecret); err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
+// 	// Locally updates the Synapse Status
+// 	if err := r.updateSynapseStatusDatabase(s, postgresSecret); err != nil {
+// 		return subreconciler.RequeueWithError(err)
+// 	}
 
-	// Actually sends an API request to update the Status
-	err := utils.UpdateResourceStatus(ctx, r.Client, s, &synapsev1alpha1.Synapse{})
-	if err != nil {
-		log.Error(err, "Error updating Synapse Status")
-		return subreconciler.RequeueWithError(err)
-	}
+// 	// Actually sends an API request to update the Status
+// 	err := utils.UpdateResourceStatus(ctx, r.Client, s, &synapsev1alpha1.Synapse{})
+// 	if err != nil {
+// 		log.Error(err, "Error updating Synapse Status")
+// 		return subreconciler.RequeueWithError(err)
+// 	}
 
-	return subreconciler.ContinueReconciling()
-}
+// 	return subreconciler.ContinueReconciling()
+// }
 
-func (r *SynapseReconciler) updateSynapseStatusDatabase(
-	s *synapsev1alpha1.Synapse,
-	postgresSecret corev1.Secret,
-) error {
-	var postgresSecretData map[string][]byte = postgresSecret.Data
+// func (r *SynapseReconciler) updateSynapseStatusDatabase(
+// 	s *synapsev1alpha1.Synapse,
+// 	postgresSecret corev1.Secret,
+// ) error {
+// 	var postgresSecretData map[string][]byte = postgresSecret.Data
 
-	host, ok := postgresSecretData["host"]
-	if !ok {
-		err := errors.New("missing host in PostgreSQL Secret")
-		// log.Error(err, "Missing host in PostgreSQL Secret")
-		return err
-	}
+// 	host, ok := postgresSecretData["host"]
+// 	if !ok {
+// 		err := errors.New("missing host in PostgreSQL Secret")
+// 		// log.Error(err, "Missing host in PostgreSQL Secret")
+// 		return err
+// 	}
 
-	port, ok := postgresSecretData["port"]
-	if !ok {
-		err := errors.New("missing port in PostgreSQL Secret")
-		// log.Error(err, "Missing port in PostgreSQL Secret")
-		return err
-	}
+// 	port, ok := postgresSecretData["port"]
+// 	if !ok {
+// 		err := errors.New("missing port in PostgreSQL Secret")
+// 		// log.Error(err, "Missing port in PostgreSQL Secret")
+// 		return err
+// 	}
 
-	// See https://github.com/opdev/synapse-operator/issues/12
-	// databaseName, ok := postgresSecretData["dbname"]
-	_, ok = postgresSecretData["dbname"]
-	if !ok {
-		err := errors.New("missing dbname in PostgreSQL Secret")
-		// log.Error(err, "Missing dbname in PostgreSQL Secret")
-		return err
-	}
+// 	// See https://github.com/opdev/synapse-operator/issues/12
+// 	// databaseName, ok := postgresSecretData["dbname"]
+// 	_, ok = postgresSecretData["dbname"]
+// 	if !ok {
+// 		err := errors.New("missing dbname in PostgreSQL Secret")
+// 		// log.Error(err, "Missing dbname in PostgreSQL Secret")
+// 		return err
+// 	}
 
-	user, ok := postgresSecretData["user"]
-	if !ok {
-		err := errors.New("missing user in PostgreSQL Secret")
-		// log.Error(err, "Missing user in PostgreSQL Secret")
-		return err
-	}
+// 	user, ok := postgresSecretData["user"]
+// 	if !ok {
+// 		err := errors.New("missing user in PostgreSQL Secret")
+// 		// log.Error(err, "Missing user in PostgreSQL Secret")
+// 		return err
+// 	}
 
-	password, ok := postgresSecretData["password"]
-	if !ok {
-		err := errors.New("missing password in PostgreSQL Secret")
-		// log.Error(err, "Missing password in PostgreSQL Secret")
-		return err
-	}
+// 	password, ok := postgresSecretData["password"]
+// 	if !ok {
+// 		err := errors.New("missing password in PostgreSQL Secret")
+// 		// log.Error(err, "Missing password in PostgreSQL Secret")
+// 		return err
+// 	}
 
-	s.Status.DatabaseConnectionInfo.ConnectionURL = string(host) + ":" + string(port)
-	// s.Status.DatabaseConnectionInfo.DatabaseName = string(databaseName) // See https://github.com/opdev/synapse-operator/issues/12
-	s.Status.DatabaseConnectionInfo.DatabaseName = "synapse"
-	s.Status.DatabaseConnectionInfo.User = string(user)
-	s.Status.DatabaseConnectionInfo.Password = string(base64encode(string(password)))
-	s.Status.DatabaseConnectionInfo.State = "READY"
+// 	s.Status.DatabaseConnectionInfo.ConnectionURL = string(host) + ":" + string(port)
+// 	// s.Status.DatabaseConnectionInfo.DatabaseName = string(databaseName) // See https://github.com/opdev/synapse-operator/issues/12
+// 	s.Status.DatabaseConnectionInfo.DatabaseName = "synapse"
+// 	s.Status.DatabaseConnectionInfo.User = string(user)
+// 	s.Status.DatabaseConnectionInfo.Password = string(base64encode(string(password)))
+// 	s.Status.DatabaseConnectionInfo.State = "READY"
 
-	return nil
-}
+// 	return nil
+// }
 
 // setSynapseStatusAsRunning is a function of type FnWithRequest, to be
 // called in the main reconciliation loop.
@@ -311,46 +310,46 @@ func (r *SynapseReconciler) setSynapseStatusAsRunning(ctx context.Context, req c
 	return subreconciler.ContinueReconciling()
 }
 
-func (r *SynapseReconciler) updateSynapseStatusBridges(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
+// func (r *SynapseReconciler) updateSynapseStatusBridges(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+// 	log := ctrllog.FromContext(ctx)
 
-	s := &synapsev1alpha1.Synapse{}
-	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return r, err
-	}
+// 	s := &synapsev1alpha1.Synapse{}
+// 	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
+// 		return r, err
+// 	}
 
-	// Set to default
-	s.Status.Bridges.Heisenbridge = synapsev1alpha1.SynapseStatusBridgesHeisenbridge{}
-	s.Status.Bridges.MautrixSignal = synapsev1alpha1.SynapseStatusBridgesMautrixSignal{}
+// 	// Set to default
+// 	s.Status.Bridges.Heisenbridge = synapsev1alpha1.SynapseStatusBridgesHeisenbridge{}
+// 	s.Status.Bridges.MautrixSignal = synapsev1alpha1.SynapseStatusBridgesMautrixSignal{}
 
-	hList := &synapsev1alpha1.HeisenbridgeList{}
-	r.Client.List(ctx, hList)
-	for _, h := range hList.Items {
-		if h.Spec.Synapse.Name == s.Name && h.GetDeletionTimestamp() == nil {
-			s.Status.Bridges.Heisenbridge.Enabled = true
-			s.Status.Bridges.Heisenbridge.Name = h.Name
-			break
-		}
-	}
+// 	hList := &synapsev1alpha1.HeisenbridgeList{}
+// 	r.Client.List(ctx, hList)
+// 	for _, h := range hList.Items {
+// 		if h.Spec.Synapse.Name == s.Name && h.GetDeletionTimestamp() == nil {
+// 			s.Status.Bridges.Heisenbridge.Enabled = true
+// 			s.Status.Bridges.Heisenbridge.Name = h.Name
+// 			break
+// 		}
+// 	}
 
-	msList := &synapsev1alpha1.MautrixSignalList{}
-	r.Client.List(ctx, msList)
-	for _, ms := range msList.Items {
-		if ms.Spec.Synapse.Name == s.Name && ms.GetDeletionTimestamp() == nil {
-			s.Status.Bridges.MautrixSignal.Enabled = true
-			s.Status.Bridges.MautrixSignal.Name = ms.Name
-			break
-		}
-	}
+// 	msList := &synapsev1alpha1.MautrixSignalList{}
+// 	r.Client.List(ctx, msList)
+// 	for _, ms := range msList.Items {
+// 		if ms.Spec.Synapse.Name == s.Name && ms.GetDeletionTimestamp() == nil {
+// 			s.Status.Bridges.MautrixSignal.Enabled = true
+// 			s.Status.Bridges.MautrixSignal.Name = ms.Name
+// 			break
+// 		}
+// 	}
 
-	err := utils.UpdateResourceStatus(ctx, r.Client, s, &synapsev1alpha1.Synapse{})
-	if err != nil {
-		log.Error(err, "Error updating Synapse Status")
-		return subreconciler.RequeueWithError(err)
-	}
+// 	err := utils.UpdateResourceStatus(ctx, r.Client, s, &synapsev1alpha1.Synapse{})
+// 	if err != nil {
+// 		log.Error(err, "Error updating Synapse Status")
+// 		return subreconciler.RequeueWithError(err)
+// 	}
 
-	return subreconciler.ContinueReconciling()
-}
+// 	return subreconciler.ContinueReconciling()
+// }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *SynapseReconciler) SetupWithManager(mgr ctrl.Manager) error {

@@ -2725,8 +2725,10 @@ redis:
 // It checks that the ConfigMap referenced by
 // synapse.Spec.Homeserver.ConfigMap.Name exists and extrats the server_name
 // and report_stats values.
-func (r *SynapseReconciler) parseInputSynapseConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *SynapseStatusReconciler) parseInputSynapseConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
+
+	log.Info("Start parsing Synapse ConfigMap")
 
 	s := &synapsev1alpha1.Synapse{}
 	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
@@ -2767,13 +2769,15 @@ func (r *SynapseReconciler) parseInputSynapseConfigMap(ctx context.Context, req 
 		return subreconciler.RequeueWithError(err)
 	}
 
+	log.Info("Finished parsing Synapse ConfigMap successfully")
+
 	return subreconciler.ContinueReconciling()
 }
 
 // ParseHomeserverConfigMap loads the ConfigMap, which name is determined by
 // Spec.Homeserver.ConfigMap.Name, run validation checks and fetch necesarry
 // value needed to configure the Synapse Deployment.
-func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synapse *synapsev1alpha1.Synapse, cm corev1.ConfigMap) error {
+func (r *SynapseStatusReconciler) ParseHomeserverConfigMap(ctx context.Context, synapse *synapsev1alpha1.Synapse, cm corev1.ConfigMap) error {
 	log := ctrllog.FromContext(ctx)
 
 	// TODO:
