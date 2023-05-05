@@ -6,6 +6,12 @@ offers a convenient way to deploy and manage a
 [Synapse](https://github.com/matrix-org/synapse/) server. It was built with
 [operator-sdk](https://sdk.operatorframework.io/).
 
+## Presentation
+
+Check out [this video](https://www.youtube.com/watch?v=Vsb18jr_VDc) to have
+an introduction to the concept of operators, CRDs, and how the Synapse
+Operator is built.
+
 ## Deploying the Synapse Operator
 
 Each of the following sections present one way to deploy the Synapse operator.
