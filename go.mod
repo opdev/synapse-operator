@@ -1,6 +1,6 @@
 module github.com/opdev/synapse-operator
 
-go 1.18
+go 1.22
 
 require (
 	github.com/crunchydata/postgres-operator v1.3.3-0.20220202164906-1c3cc3597c95
