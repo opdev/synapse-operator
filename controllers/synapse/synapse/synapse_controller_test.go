@@ -3,9 +3,11 @@ package synapse
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -22,9 +24,12 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	pgov1beta1 "github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
@@ -46,6 +51,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 	)
 
 	var k8sClient client.Client
+	var k8sManager manager.Manager
 	var testEnv *envtest.Environment
 	var ctx context.Context
 	var cancel context.CancelFunc
@@ -70,9 +76,14 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 		Expect(err).NotTo(HaveOccurred())
 		Expect(k8sClient).NotTo(BeNil())
 
-		k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-			Scheme:             scheme.Scheme,
-			MetricsBindAddress: "0",
+		k8sManager, err = ctrl.NewManager(cfg, ctrl.Options{
+			Scheme: scheme.Scheme,
+			Metrics: server.Options{
+				BindAddress: "0",
+			},
+			Controller: config.Controller{
+				SkipNameValidation: utils.BoolAddr(true),
+			},
 		})
 		Expect(err).ToNot(HaveOccurred())
 
@@ -141,6 +152,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				},
 				CRDs:                  []*v1.CustomResourceDefinition{&PostgresClusterCRD},
 				ErrorIfCRDPathMissing: true,
+				BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
+					fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+				AttachControlPlaneOutput: true,
 			}
 
 			startenvTest()
@@ -1053,6 +1067,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					filepath.Join("..", "..", "..", "bundle", "manifests", "synapse.opdev.io_synapses.yaml"),
 				},
 				ErrorIfCRDPathMissing: true,
+				BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
+					fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+				AttachControlPlaneOutput: true,
 			}
 
 			startenvTest()
