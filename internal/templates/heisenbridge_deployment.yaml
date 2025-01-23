@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: heisenbridge
-        image: hif1/heisenbridge:1.14
+        image: hif1/heisenbridge:1.15
         command:
         {{- range .Values.Command }}
         - {{ . }}
