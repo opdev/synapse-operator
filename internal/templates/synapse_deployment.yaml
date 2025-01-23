@@ -21,7 +21,7 @@ spec:
       serviceAccountName: {{ .Values.Name }}
       {{- end }}
       initContainers:
-        - image: "matrixdotorg/synapse:v1.82.0"
+        - image: "matrixdotorg/synapse:v1.122.0"
           name: "synapse-generate"
           args: [ "generate" ]
           env:
@@ -37,7 +37,7 @@ spec:
             - name: data-pv
               mountPath: /data
       containers:
-        - image: "matrixdotorg/synapse:v1.82.0"
+        - image: "matrixdotorg/synapse:v1.122.0"
           name: "synapse"
           env:
             - name: SYNAPSE_CONFIG_PATH
