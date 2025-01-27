@@ -18,7 +18,6 @@ package mautrixsignal
 
 import (
 	"context"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,10 +33,6 @@ import (
 type MautrixSignalReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-}
-
-func getSignaldResourceName(ms synapsev1alpha1.MautrixSignal) string {
-	return strings.Join([]string{ms.Name, "signald"}, "-")
 }
 
 //+kubebuilder:rbac:groups=synapse.opdev.io,resources=mautrixsignals,verbs=get;list;watch;create;update;patch;delete
@@ -102,12 +97,9 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		)
 	}
 
-	// Reconcile signald resources: PVC and Deployment
 	// Reconcile mautrix-signal resources: Service, PVC and Deployment
 	subreconcilersForMautrixSignal = append(
 		subreconcilersForMautrixSignal,
-		r.reconcileSignaldPVC,
-		r.reconcileSignaldDeployment,
 		r.reconcileMautrixSignalService,
 		r.reconcileMautrixSignalPVC,
 		r.reconcileMautrixSignalDeployment,

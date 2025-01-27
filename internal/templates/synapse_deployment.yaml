@@ -36,6 +36,18 @@ spec:
               mountPath: /data-homeserver
             - name: data-pv
               mountPath: /data
+        {{ if .Values.Status.Bridges.MautrixSignal.Enabled -}}
+        - image: registry.access.redhat.com/ubi8/ubi-minimal:8.10
+          name: "fix-mautrixsignal-permissions"
+          args:
+          - chmod 644 /data-mautrixsignal/registration.yaml
+          command:
+          - bin/sh
+          - -c
+          volumeMounts:
+          - name: data-mautrixsignal
+            mountPath: /data-mautrixsignal
+        {{- end }}
       containers:
         - image: "matrixdotorg/synapse:v1.122.0"
           name: "synapse"

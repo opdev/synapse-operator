@@ -234,11 +234,8 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 			var createdService *corev1.Service
 			var createdServiceAccount *corev1.ServiceAccount
 			var createdRoleBinding *rbacv1.RoleBinding
-			var createdSignaldPVC *corev1.PersistentVolumeClaim
-			var createdSignaldDeployment *appsv1.Deployment
 
 			var mautrixsignalLookupKey types.NamespacedName
-			var signaldLookupKey types.NamespacedName
 			var expectedOwnerReference metav1.OwnerReference
 			var mautrixsignalSpec synapsev1alpha1.MautrixSignalSpec
 
@@ -257,13 +254,6 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 				createdService = &corev1.Service{}
 				createdServiceAccount = &corev1.ServiceAccount{}
 				createdRoleBinding = &rbacv1.RoleBinding{}
-
-				signaldLookupKey = types.NamespacedName{
-					Name:      MautrixSignalName + "-signald",
-					Namespace: MautrixSignalNamespace,
-				}
-				createdSignaldPVC = &corev1.PersistentVolumeClaim{}
-				createdSignaldDeployment = &appsv1.Deployment{}
 
 				// The OwnerReference UID must be set after the MautrixSignal instance
 				// has been created.
@@ -361,12 +351,6 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 
 				By("Cleaning up MautrixSignal ServiceAccount")
 				deleteResource(createdServiceAccount, mautrixsignalLookupKey, false)
-
-				By("Cleaning up Signald PVC")
-				deleteResource(createdSignaldPVC, signaldLookupKey, true)
-
-				By("Cleaning up Signald Deployment")
-				deleteResource(createdSignaldDeployment, signaldLookupKey, false)
 			}
 
 			var cleanupMautrixSignalResources = func() {
@@ -436,14 +420,6 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 
 				It("Should create a MautrixSignal RoleBinding", func() {
 					checkResourcePresence(createdRoleBinding, mautrixsignalLookupKey, expectedOwnerReference)
-				})
-
-				It("Should create a Signald PVC", func() {
-					checkResourcePresence(createdSignaldPVC, signaldLookupKey, expectedOwnerReference)
-				})
-
-				It("Should create a Signald Deployment", func() {
-					checkResourcePresence(createdSignaldDeployment, signaldLookupKey, expectedOwnerReference)
 				})
 			})
 
@@ -562,14 +538,6 @@ logging:
 					checkResourcePresence(createdRoleBinding, mautrixsignalLookupKey, expectedOwnerReference)
 				})
 
-				It("Should create a Signald PVC", func() {
-					checkResourcePresence(createdSignaldPVC, signaldLookupKey, expectedOwnerReference)
-				})
-
-				It("Should create a Signald Deployment", func() {
-					checkResourcePresence(createdSignaldDeployment, signaldLookupKey, expectedOwnerReference)
-				})
-
 				It("Should overwrite necessary values in the created mautrix-signal ConfigMap", func() {
 					Eventually(func(g Gomega) {
 						By("Verifying that the mautrixsignal ConfigMap exists")
@@ -664,11 +632,6 @@ logging:
 						createdService,
 						createdServiceAccount,
 						createdRoleBinding,
-					)
-					checkSubresourceAbsence(
-						signaldLookupKey,
-						createdSignaldPVC,
-						createdSignaldDeployment,
 					)
 				})
 			})
