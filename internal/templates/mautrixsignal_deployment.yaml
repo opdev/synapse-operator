@@ -25,7 +25,7 @@ spec:
       # mautrixsignal-data volume. The mautrixsignal process
       # needs read & write access to the config.yaml file.
       initContainers:
-      - image: registry.access.redhat.com/ubi8/ubi-minimal:8.7
+      - image: registry.access.redhat.com/ubi8/ubi-minimal:8.10
         name: initconfig
         args:
         - if [ ! -f /data/config.yaml ]; then cp /input/config.yaml /data/config.yaml; fi
@@ -38,21 +38,15 @@ spec:
         - mountPath: /data
           name: mautrixsignal-data
       containers:
-      - image: dock.mau.dev/mautrix/signal:v0.4.2
+      - image: dock.mau.dev/mautrix/signal:v0.7.5
         name: mautrix-signal
         volumeMounts:
-        - mountPath: /signald
-          name: signald
         - mountPath: /data
           name: mautrixsignal-data
       volumes:
       - name: config
         configMap:
-          defaultMode: 420
           name: {{ .Values.Name }}
-      - name: signald
-        persistentVolumeClaim:
-          claimName: {{ .Values.Name }}-signald
       - name: mautrixsignal-data
         persistentVolumeClaim:
           claimName: {{ .Values.Name }}
