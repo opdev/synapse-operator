@@ -13,4 +13,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/opdev/synapse-operator
-  newTag: v0.5.1
+  newTag: v0.6.0
