@@ -9,8 +9,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.10.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.16.1
   name: heisenbridges.synapse.opdev.io
 spec:
   group: synapse.opdev.io
@@ -27,24 +26,44 @@ spec:
         description: Heisenbridge is the Schema for the heisenbridges API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
           spec:
-            description: 'HeisenbridgeSpec defines the desired state of Heisenbridge. The user can either: - enable the bridge, without specifying additional configuration options. The bridge will be deployed with a default configuration. - enable the bridge and specify an existing ConfigMap by its Name and Namespace containing a heisenbridge.yaml.'
+            description: |-
+              HeisenbridgeSpec defines the desired state of Heisenbridge. The user can
+              either:
+                - enable the bridge, without specifying additional configuration options.
+                  The bridge will be deployed with a default configuration.
+                - enable the bridge and specify an existing ConfigMap by its Name and
+                  Namespace containing a heisenbridge.yaml.
             properties:
               configMap:
-                description: Holds information about the ConfigMap containing the heisenbridge.yaml configuration file to be used as input for the configuration of the Heisenbridge IRC Bridge.
+                description: |-
+                  Holds information about the ConfigMap containing the heisenbridge.yaml
+                  configuration file to be used as input for the configuration of the
+                  Heisenbridge IRC Bridge.
                 properties:
                   name:
                     description: Name of the ConfigMap in the given Namespace.
                     type: string
                   namespace:
-                    description: Namespace in which the ConfigMap is living. If left empty, the Heisenbridge namespace is used.
+                    description: |-
+                      Namespace in which the ConfigMap is living. If left empty, the
+                      Heisenbridge namespace is used.
                     type: string
                 required:
                 - name
@@ -56,14 +75,19 @@ spec:
                     description: Name of the Synapse instance
                     type: string
                   namespace:
-                    description: 'Namespace of the Synapse instance TODO: Complete'
+                    description: Namespace of the Synapse instance
                     type: string
                 required:
                 - name
                 type: object
               verboseLevel:
                 default: 0
-                description: 'Controls the verbosity of the Heisenbrige: * 0 corresponds to normal level of logs * 1 corresponds to "-v" * 2 corresponds to "-vv" * 3 corresponds to "-vvv"'
+                description: |-
+                  Controls the verbosity of the Heisenbrige:
+                  * 0 corresponds to normal level of logs
+                  * 1 corresponds to "-v"
+                  * 2 corresponds to "-vv"
+                  * 3 corresponds to "-vvv"
                 type: integer
             required:
             - synapse
@@ -90,8 +114,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.10.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.16.1
   name: mautrixsignals.synapse.opdev.io
 spec:
   group: synapse.opdev.io
@@ -108,24 +131,44 @@ spec:
         description: MautrixSignal is the Schema for the mautrixsignals API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
           spec:
-            description: 'MautrixSignalSpec defines the desired state of MautrixSignal. The user can either: - enable the bridge, without specifying additional configuration options. The bridge will be deployed with a default configuration. - enable the bridge and specify an existing ConfigMap by its Name and Namespace containing a config.yaml file.'
+            description: |-
+              MautrixSignalSpec defines the desired state of MautrixSignal. The user can
+              either:
+                - enable the bridge, without specifying additional configuration options.
+                  The bridge will be deployed with a default configuration.
+                - enable the bridge and specify an existing ConfigMap by its Name and
+                  Namespace containing a config.yaml file.
             properties:
               configMap:
-                description: Holds information about the ConfigMap containing the config.yaml configuration file to be used as input for the configuration of the mautrix-signal bridge.
+                description: |-
+                  Holds information about the ConfigMap containing the config.yaml
+                  configuration file to be used as input for the configuration of the
+                  mautrix-signal bridge.
                 properties:
                   name:
                     description: Name of the ConfigMap in the given Namespace.
                     type: string
                   namespace:
-                    description: Namespace in which the ConfigMap is living. If left empty, the Synapse namespace is used.
+                    description: |-
+                      Namespace in which the ConfigMap is living. If left empty, the Synapse
+                      namespace is used.
                     type: string
                 required:
                 - name
@@ -137,7 +180,7 @@ spec:
                     description: Name of the Synapse instance
                     type: string
                   namespace:
-                    description: 'Namespace of the Synapse instance TODO: Complete'
+                    description: Namespace of the Synapse instance
                     type: string
                 required:
                 - name
@@ -159,7 +202,8 @@ spec:
                 description: State of the MautrixSignal instance
                 type: string
               synapse:
-                description: Information related to the Synapse instance associated with this bridge
+                description: Information related to the Synapse instance associated
+                  with this bridge
                 properties:
                   serverName:
                     type: string
@@ -177,8 +221,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.10.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.16.1
   name: synapses.synapse.opdev.io
 spec:
   group: synapse.opdev.io
@@ -195,10 +238,19 @@ spec:
         description: Synapse is the Schema for the synapses API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -207,10 +259,16 @@ spec:
             properties:
               createNewPostgreSQL:
                 default: false
-                description: Set to true to create a new PostreSQL instance. The homeserver.yaml 'database' section will be overwritten.
+                description: |-
+                  Set to true to create a new PostreSQL instance. The homeserver.yaml
+                  'database' section will be overwritten.
                 type: boolean
               homeserver:
-                description: Holds information related to the homeserver.yaml configuration file. The user can either specify an existing ConfigMap by its Name and Namespace containing a homeserver.yaml, or provide a set of values for the creation of a configuration file from scratch.
+                description: |-
+                  Holds information related to the homeserver.yaml configuration file.
+                  The user can either specify an existing ConfigMap by its Name and
+                  Namespace containing a homeserver.yaml, or provide a set of values for
+                  the creation of a configuration file from scratch.
                 oneOf:
                 - required:
                   - configMap
@@ -218,22 +276,30 @@ spec:
                   - values
                 properties:
                   configMap:
-                    description: Holds information about the ConfigMap containing the homeserver.yaml configuration file to be used as input for the configuration of the Synapse server.
+                    description: |-
+                      Holds information about the ConfigMap containing the homeserver.yaml
+                      configuration file to be used as input for the configuration of the
+                      Synapse server.
                     properties:
                       name:
                         description: Name of the ConfigMap in the given Namespace.
                         type: string
                       namespace:
-                        description: Namespace in which the ConfigMap is living. If left empty, the Synapse namespace is used.
+                        description: |-
+                          Namespace in which the ConfigMap is living. If left empty, the Synapse
+                          namespace is used.
                         type: string
                     required:
                     - name
                     type: object
                   values:
-                    description: Holds the required values for the creation of a homeserver.yaml configuration file by the Synapse Operator
+                    description: |-
+                      Holds the required values for the creation of a homeserver.yaml
+                      configuration file by the Synapse Operator
                     properties:
                       reportStats:
-                        description: Whether or not to report anonymized homeserver usage statistics
+                        description: Whether or not to report anonymized homeserver
+                          usage statistics
                         type: boolean
                       serverName:
                         description: The public-facing domain of the server
@@ -261,7 +327,8 @@ spec:
                     properties:
                       enabled:
                         default: false
-                        description: Whether a Heisenbridge has been deployed for this Synapse instance
+                        description: Whether a Heisenbridge has been deployed for
+                          this Synapse instance
                         type: boolean
                       name:
                         description: Name of the Heisenbridge object
@@ -271,7 +338,8 @@ spec:
                     description: Information on the mautrix-signal bridge.
                     properties:
                       enabled:
-                        description: Whether a mautrix-signal has been deployed for this Synapse instance
+                        description: Whether a mautrix-signal has been deployed for
+                          this Synapse instance
                         type: boolean
                       name:
                         description: Name of the mautrix-signal bridge object
@@ -301,7 +369,8 @@ spec:
                 description: Holds configuration information for Synapse
                 properties:
                   reportStats:
-                    description: Whether or not to report anonymized homeserver usage statistics
+                    description: Whether or not to report anonymized homeserver usage
+                      statistics
                     type: boolean
                   serverName:
                     description: The public-facing domain of the server
@@ -372,7 +441,6 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: synapse-operator-manager-role
 rules:
 - apiGroups:
@@ -430,57 +498,7 @@ rules:
   - synapse.opdev.io
   resources:
   - heisenbridges
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - synapse.opdev.io
-  resources:
-  - heisenbridges/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - synapse.opdev.io
-  resources:
-  - heisenbridges/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - synapse.opdev.io
-  resources:
   - mautrixsignals
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - synapse.opdev.io
-  resources:
-  - mautrixsignals/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - synapse.opdev.io
-  resources:
-  - mautrixsignals/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - synapse.opdev.io
-  resources:
   - synapses
   verbs:
   - create
@@ -493,12 +511,16 @@ rules:
 - apiGroups:
   - synapse.opdev.io
   resources:
+  - heisenbridges/finalizers
+  - mautrixsignals/finalizers
   - synapses/finalizers
   verbs:
   - update
 - apiGroups:
   - synapse.opdev.io
   resources:
+  - heisenbridges/status
+  - mautrixsignals/status
   - synapses/status
   verbs:
   - get
@@ -643,7 +665,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: quay.io/opdev/synapse-operator:v0.5.1
+        image: quay.io/opdev/synapse-operator:v0.6.0
         livenessProbe:
           httpGet:
             path: /healthz

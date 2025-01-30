@@ -62,13 +62,14 @@ metadata:
     capabilities: Basic Install
     categories: Developer Tools
     containerImage: quay.io/opdev/synapse-operator
+    createdAt: "2025-01-30T14:18:34Z"
     description: Deploys and manages the lifecycle of Synapse servers and their associated
       components (bridges, databases, ...). Synapse is the reference Matrix homeserver
       implementation.
-    operators.operatorframework.io/builder: operator-sdk-v1.25.0
+    operators.operatorframework.io/builder: operator-sdk-v1.29.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/opdev/synapse-operator
-  name: synapse-operator.v0.5.1
+  name: synapse-operator.v0.6.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -155,57 +156,7 @@ spec:
           - synapse.opdev.io
           resources:
           - heisenbridges
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - synapse.opdev.io
-          resources:
-          - heisenbridges/finalizers
-          verbs:
-          - update
-        - apiGroups:
-          - synapse.opdev.io
-          resources:
-          - heisenbridges/status
-          verbs:
-          - get
-          - patch
-          - update
-        - apiGroups:
-          - synapse.opdev.io
-          resources:
           - mautrixsignals
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - synapse.opdev.io
-          resources:
-          - mautrixsignals/finalizers
-          verbs:
-          - update
-        - apiGroups:
-          - synapse.opdev.io
-          resources:
-          - mautrixsignals/status
-          verbs:
-          - get
-          - patch
-          - update
-        - apiGroups:
-          - synapse.opdev.io
-          resources:
           - synapses
           verbs:
           - create
@@ -218,12 +169,16 @@ spec:
         - apiGroups:
           - synapse.opdev.io
           resources:
+          - heisenbridges/finalizers
+          - mautrixsignals/finalizers
           - synapses/finalizers
           verbs:
           - update
         - apiGroups:
           - synapse.opdev.io
           resources:
+          - heisenbridges/status
+          - mautrixsignals/status
           - synapses/status
           verbs:
           - get
@@ -276,7 +231,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/opdev/synapse-operator:v0.5.1
+                image: quay.io/opdev/synapse-operator:v0.6.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -368,4 +323,4 @@ spec:
   minKubeVersion: 1.24.0
   provider:
     name: Community
-  version: 0.5.1
+  version: 0.6.0
