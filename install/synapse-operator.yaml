@@ -665,7 +665,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: quay.io/opdev/synapse-operator:v0.6.0
+        image: quay.io/opdev/synapse-operator:v0.6.1
         livenessProbe:
           httpGet:
             path: /healthz
