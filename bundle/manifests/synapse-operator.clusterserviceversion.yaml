@@ -62,14 +62,14 @@ metadata:
     capabilities: Basic Install
     categories: Developer Tools
     containerImage: quay.io/opdev/synapse-operator
-    createdAt: "2025-01-30T14:18:34Z"
+    createdAt: "2025-05-16T15:21:27Z"
     description: Deploys and manages the lifecycle of Synapse servers and their associated
       components (bridges, databases, ...). Synapse is the reference Matrix homeserver
       implementation.
     operators.operatorframework.io/builder: operator-sdk-v1.29.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/opdev/synapse-operator
-  name: synapse-operator.v0.6.0
+  name: synapse-operator.v0.6.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -231,7 +231,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/opdev/synapse-operator:v0.6.0
+                image: quay.io/opdev/synapse-operator:v0.6.1
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -323,4 +323,4 @@ spec:
   minKubeVersion: 1.24.0
   provider:
     name: Community
-  version: 0.6.0
+  version: 0.6.1
