@@ -56,6 +56,14 @@ rules:
   - update
   - watch
 - apiGroups:
+  - security.openshift.io
+  resourceNames:
+  - anyuid
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+- apiGroups:
   - synapse.opdev.io
   resources:
   - heisenbridges
