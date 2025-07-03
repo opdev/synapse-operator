@@ -1,9 +1,0 @@
-apiVersion: synapse.opdev.io/v1alpha1
-kind: Synapse
-metadata:
-  name: synapse-with-heisenbridge
-spec:
-  homeserver:
-    values:
-      serverName: example.com
-      reportStats: true

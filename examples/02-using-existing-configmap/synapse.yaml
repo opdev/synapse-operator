@@ -1,8 +1,0 @@
-apiVersion: synapse.opdev.io/v1alpha1
-kind: Synapse
-metadata:
-  name: using-existing-configmap
-spec:
-  homeserver:
-    configMap:
-      name: my-custom-homeserver

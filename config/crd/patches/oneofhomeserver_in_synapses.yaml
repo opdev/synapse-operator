@@ -1,5 +1,0 @@
-- op: replace
-  path: /spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/homeserver/oneOf
-  value:
-  - required: [configMap]
-  - required: [values]

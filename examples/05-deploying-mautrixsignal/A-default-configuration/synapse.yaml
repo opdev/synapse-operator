@@ -1,9 +1,0 @@
-apiVersion: synapse.opdev.io/v1alpha1
-kind: Synapse
-metadata:
-  name: synapse-with-mautrixsignal
-spec:
-  homeserver:
-    values:
-      serverName: my.matrix.host
-      reportStats: true
