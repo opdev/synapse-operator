@@ -11,4 +11,32 @@ plugins:
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: synapse-operator
 repo: github.com/opdev/synapse-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: opdev.io
+  group: synapse
+  kind: Synapse
+  path: github.com/opdev/synapse-operator/api/synapse/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: opdev.io
+  group: synapse
+  kind: MautrixSignal
+  path: github.com/opdev/synapse-operator/api/synapse/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: opdev.io
+  group: synapse
+  kind: Heisenbridge
+  path: github.com/opdev/synapse-operator/api/synapse/v1alpha1
+  version: v1alpha1
 version: "3"

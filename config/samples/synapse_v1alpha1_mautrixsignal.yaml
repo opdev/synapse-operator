@@ -1,0 +1,9 @@
+apiVersion: synapse.opdev.io/v1alpha1
+kind: MautrixSignal
+metadata:
+  labels:
+    app.kubernetes.io/name: synapse-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: mautrixsignal-sample
+spec:
+  # TODO(user): Add fields here

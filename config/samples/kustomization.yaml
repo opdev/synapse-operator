@@ -1,0 +1,6 @@
+## Append samples of your project ##
+resources:
+- synapse_v1alpha1_synapse.yaml
+- synapse_v1alpha1_mautrixsignal.yaml
+- synapse_v1alpha1_heisenbridge.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples
