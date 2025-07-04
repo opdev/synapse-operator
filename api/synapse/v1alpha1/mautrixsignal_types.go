@@ -20,22 +20,65 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// MautrixSignalSpec defines the desired state of MautrixSignal.
+// MautrixSignalSpec defines the desired state of MautrixSignal. The user can
+// either:
+//   - enable the bridge, without specifying additional configuration options.
+//     The bridge will be deployed with a default configuration.
+//   - enable the bridge and specify an existing ConfigMap by its Name and
+//     Namespace containing a config.yaml file.
 type MautrixSignalSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Holds information about the ConfigMap containing the config.yaml
+	// configuration file to be used as input for the configuration of the
+	// mautrix-signal bridge.
+	ConfigMap MautrixSignalConfigMap `json:"configMap,omitempty"`
 
-	// Foo is an example field of MautrixSignal. Edit mautrixsignal_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// +kubebuilder:validation:Required
+
+	// Name of the Synapse instance, living in the same namespace.
+	Synapse MautrixSignalSynapseSpec `json:"synapse"`
+}
+
+type MautrixSignalSynapseSpec struct {
+	// +kubebuilder:validation:Required
+
+	// Name of the Synapse instance
+	Name string `json:"name"`
+
+	// Namespace of the Synapse instance
+	// TODO: Complete
+	Namespace string `json:"namespace,omitempty"`
+}
+
+type MautrixSignalConfigMap struct {
+	// +kubebuilder:validation:Required
+
+	// Name of the ConfigMap in the given Namespace.
+	Name string `json:"name"`
+
+	// Namespace in which the ConfigMap is living. If left empty, the Synapse
+	// namespace is used.
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // MautrixSignalStatus defines the observed state of MautrixSignal.
 type MautrixSignalStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// State of the MautrixSignal instance
+	State string `json:"state,omitempty"`
+
+	// Reason for the current MautrixSignal State
+	Reason string `json:"reason,omitempty"`
+
+	// Information related to the Synapse instance associated with this bridge
+	Synapse MautrixSignalStatusSynapse `json:"synapse,omitempty"`
+
+	// +kubebuilder:default:=false
+
+	// Values is set to true if deploying on OpenShift
+	IsOpenshift bool `json:"isOpenshift,omitempty"`
+}
+
+type MautrixSignalStatusSynapse struct {
+	ServerName string `json:"serverName,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -46,7 +89,8 @@ type MautrixSignal struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MautrixSignalSpec   `json:"spec,omitempty"`
+	// +kubebuilder:validation:Required
+	Spec   MautrixSignalSpec   `json:"spec"`
 	Status MautrixSignalStatus `json:"status,omitempty"`
 }
 
@@ -61,4 +105,12 @@ type MautrixSignalList struct {
 
 func init() {
 	SchemeBuilder.Register(&MautrixSignal{}, &MautrixSignalList{})
+}
+
+func (ms *MautrixSignal) GetSynapseName() string {
+	return ms.Spec.Synapse.Name
+}
+
+func (ms *MautrixSignal) GetSynapseNamespace() string {
+	return ms.Spec.Synapse.Namespace
 }

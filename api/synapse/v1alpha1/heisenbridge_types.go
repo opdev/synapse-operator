@@ -20,22 +20,62 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// HeisenbridgeSpec defines the desired state of Heisenbridge.
+// HeisenbridgeSpec defines the desired state of Heisenbridge. The user can
+// either:
+//   - enable the bridge, without specifying additional configuration options.
+//     The bridge will be deployed with a default configuration.
+//   - enable the bridge and specify an existing ConfigMap by its Name and
+//     Namespace containing a heisenbridge.yaml.
 type HeisenbridgeSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Holds information about the ConfigMap containing the heisenbridge.yaml
+	// configuration file to be used as input for the configuration of the
+	// Heisenbridge IRC Bridge.
+	ConfigMap HeisenbridgeConfigMap `json:"configMap,omitempty"`
 
-	// Foo is an example field of Heisenbridge. Edit heisenbridge_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// +kubebuilder:default:=0
+
+	// Controls the verbosity of the Heisenbrige:
+	// * 0 corresponds to normal level of logs
+	// * 1 corresponds to "-v"
+	// * 2 corresponds to "-vv"
+	// * 3 corresponds to "-vvv"
+	VerboseLevel int `json:"verboseLevel,omitempty"`
+
+	// +kubebuilder:validation:Required
+
+	// Name of the Synapse instance, living in the same namespace.
+	Synapse HeisenbridgeSynapseSpec `json:"synapse"`
+}
+
+type HeisenbridgeSynapseSpec struct {
+	// +kubebuilder:validation:Required
+
+	// Name of the Synapse instance
+	Name string `json:"name"`
+
+	// Namespace of the Synapse instance
+	// TODO: Complete
+	Namespace string `json:"namespace,omitempty"`
+}
+
+type HeisenbridgeConfigMap struct {
+	// +kubebuilder:validation:Required
+
+	// Name of the ConfigMap in the given Namespace.
+	Name string `json:"name"`
+
+	// Namespace in which the ConfigMap is living. If left empty, the
+	// Heisenbridge namespace is used.
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // HeisenbridgeStatus defines the observed state of Heisenbridge.
 type HeisenbridgeStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// State of the Heisenbridge instance
+	State string `json:"state,omitempty"`
+
+	// Reason for the current Heisenbridge State
+	Reason string `json:"reason,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -46,7 +86,8 @@ type Heisenbridge struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   HeisenbridgeSpec   `json:"spec,omitempty"`
+	// +kubebuilder:validation:Required
+	Spec   HeisenbridgeSpec   `json:"spec"`
 	Status HeisenbridgeStatus `json:"status,omitempty"`
 }
 
@@ -61,4 +102,12 @@ type HeisenbridgeList struct {
 
 func init() {
 	SchemeBuilder.Register(&Heisenbridge{}, &HeisenbridgeList{})
+}
+
+func (h *Heisenbridge) GetSynapseName() string {
+	return h.Spec.Synapse.Name
+}
+
+func (h *Heisenbridge) GetSynapseNamespace() string {
+	return h.Spec.Synapse.Namespace
 }
