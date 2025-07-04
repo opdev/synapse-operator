@@ -168,13 +168,13 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			By("bootstrapping test environment")
 			testEnv = &envtest.Environment{
 				CRDDirectoryPaths: []string{
-					filepath.Join("..", "..", "..", "bundle", "manifests", "synapse.opdev.io_synapses.yaml"),
-					filepath.Join("..", "..", "..", "bundle", "manifests", "synapse.opdev.io_heisenbridges.yaml"),
-					filepath.Join("..", "..", "..", "bundle", "manifests", "synapse.opdev.io_mautrixsignals.yaml"),
+					filepath.Join("..", "..", "..", "..", "bundle", "manifests", "synapse.opdev.io_synapses.yaml"),
+					filepath.Join("..", "..", "..", "..", "bundle", "manifests", "synapse.opdev.io_heisenbridges.yaml"),
+					filepath.Join("..", "..", "..", "..", "bundle", "manifests", "synapse.opdev.io_mautrixsignals.yaml"),
 				},
 				CRDs:                  []*v1.CustomResourceDefinition{&PostgresClusterCRD},
 				ErrorIfCRDPathMissing: true,
-				BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
+				BinaryAssetsDirectory: filepath.Join("..", "..", "..", "bin", "k8s",
 					fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 				AttachControlPlaneOutput: true,
 			}
@@ -1086,10 +1086,10 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			By("bootstrapping test environment")
 			testEnv = &envtest.Environment{
 				CRDDirectoryPaths: []string{
-					filepath.Join("..", "..", "..", "bundle", "manifests", "synapse.opdev.io_synapses.yaml"),
+					filepath.Join("..", "..", "..", "..", "bundle", "manifests", "synapse.opdev.io_synapses.yaml"),
 				},
 				ErrorIfCRDPathMissing: true,
-				BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
+				BinaryAssetsDirectory: filepath.Join("..", "..", "..", "bin", "k8s",
 					fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 				AttachControlPlaneOutput: true,
 			}
@@ -1205,7 +1205,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 // setting the 'KUBEBUILDER_ASSETS' environment variable. To ensure the binaries are
 // properly set up, run 'make setup-envtest' beforehand.
 func getFirstFoundEnvTestBinaryDir() string {
-	basePath := filepath.Join("..", "..", "..", "bin", "k8s")
+	basePath := filepath.Join("..", "..", "..", "..", "bin", "k8s")
 	entries, err := os.ReadDir(basePath)
 	if err != nil {
 		logf.Log.Error(err, "Failed to read directory", "path", basePath)

@@ -126,8 +126,8 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 			By("bootstrapping test environment")
 			testEnv = &envtest.Environment{
 				CRDDirectoryPaths: []string{
-					filepath.Join("..", "..", "..", "bundle", "manifests", "synapse.opdev.io_heisenbridges.yaml"),
-					filepath.Join("..", "..", "..", "bundle", "manifests", "synapse.opdev.io_synapses.yaml"),
+					filepath.Join("..", "..", "..", "..", "bundle", "manifests", "synapse.opdev.io_heisenbridges.yaml"),
+					filepath.Join("..", "..", "..", "..", "bundle", "manifests", "synapse.opdev.io_synapses.yaml"),
 				},
 				ErrorIfCRDPathMissing: true,
 			}
