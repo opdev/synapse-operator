@@ -8,6 +8,13 @@ resources:
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
+- path: patches/oneofhomeserver_in_synapses.yaml
+  target:
+    group: apiextensions.k8s.io
+    version: v1
+    kind: CustomResourceDefinition
+    name: synapses.synapse.opdev.io
+
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
 # patches here are for enabling the conversion webhook for each CRD
 # +kubebuilder:scaffold:crdkustomizewebhookpatch
