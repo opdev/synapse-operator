@@ -1,0 +1,7 @@
+apiVersion: synapse.opdev.io/v1alpha1
+kind: MautrixSignal
+metadata:
+  name: mautrixsignal-for-synapse
+spec:
+  synapse:
+    name: synapse-with-mautrixsignal

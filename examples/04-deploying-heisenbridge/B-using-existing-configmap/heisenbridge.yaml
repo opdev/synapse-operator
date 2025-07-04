@@ -1,0 +1,9 @@
+apiVersion: synapse.opdev.io/v1alpha1
+kind: Heisenbridge
+metadata:
+  name: heisenbridge-for-synapse
+spec:
+  configMap:
+    name: my-custom-heisenbridge
+  synapse:
+    name: synapse-with-heisenbridge

@@ -1,135 +1,153 @@
-# synapse-operator
-// TODO(user): Add simple overview of use/purpose
+# A Kubernetes Operator for Synapse
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+The Synapse
+[operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
+offers a convenient way to deploy and manage a
+[Synapse](https://github.com/matrix-org/synapse/) server. It was built with
+[operator-sdk](https://sdk.operatorframework.io/).
 
-## Getting Started
+## Presentation
 
-### Prerequisites
-- go version v1.23.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+Check out [this video](https://www.youtube.com/watch?v=Vsb18jr_VDc) to have
+an introduction to the concept of operators, CRDs, and how the Synapse
+Operator is built.
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+## Deploying the Synapse Operator
 
-```sh
-make docker-build docker-push IMG=<some-registry>/synapse-operator:tag
+Each of the following sections present one way to deploy the Synapse operator.
+
+### Deploy the controller using the existing manifest file
+
+The easiest way to deploy the Synapse operator is to use the manifest file
+present in the `install` directory:
+
+```shell
+$ kubectl apply -f install/synapse-operator.yaml
+namespace/synapse-operator-system created
+customresourcedefinition.apiextensions.k8s.io/synapses.synapse.opdev.io configured
+serviceaccount/synapse-operator-controller-manager created
+role.rbac.authorization.k8s.io/synapse-operator-leader-election-role created
+clusterrole.rbac.authorization.k8s.io/synapse-operator-manager-role created
+clusterrole.rbac.authorization.k8s.io/synapse-operator-metrics-reader created
+clusterrole.rbac.authorization.k8s.io/synapse-operator-proxy-role created
+rolebinding.rbac.authorization.k8s.io/synapse-operator-leader-election-rolebinding created
+clusterrolebinding.rbac.authorization.k8s.io/synapse-operator-manager-rolebinding created
+clusterrolebinding.rbac.authorization.k8s.io/synapse-operator-proxy-rolebinding created
+configmap/synapse-operator-manager-config created
+service/synapse-operator-controller-manager-metrics-service created
+deployment.apps/synapse-operator-controller-manager created
 ```
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+### Run the controller locally with `make run`
 
-**Install the CRDs into the cluster:**
+Install the `Synapse` CRD with:
 
-```sh
-make install
+```shell
+$ make install
+/home/mgoerens/dev/github.com/opdev/synapse-operator/bin/controller-gen "crd:trivialVersions=true,preserveUnknownFields=false" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+/home/mgoerens/dev/github.com/opdev/synapse-operator/bin/kustomize build config/crd | kubectl apply -f -
+customresourcedefinition.apiextensions.k8s.io/synapses.synapse.opdev.io configured
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+Run the controller locally with:
 
-```sh
-make deploy IMG=<some-registry>/synapse-operator:tag
+```shell
+$ make run
+/home/mgoerens/dev/github.com/opdev/synapse-operator/bin/controller-gen "crd:trivialVersions=true,preserveUnknownFields=false" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+/home/mgoerens/dev/github.com/opdev/synapse-operator/bin/controller-gen object:headerFile="hack/boilerplate.go.txt" paths="./..."
+go fmt ./...
+go vet ./...
+go run ./main.go
+I0329 13:14:32.483664   26252 request.go:665] Waited for 1.039947837s due to client-side throttling, not priority and fairness, request: GET:https://api.crc.testing:6443/apis/operators.coreos.com/v1?timeout=32s
+1.6485524737848275e+09	INFO	controller-runtime.metrics	Metrics server is starting to listen	{"addr": ":8080"}
+1.648552473785254e+09	INFO	setup	starting manager
+1.6485524737853944e+09	INFO	Starting server	{"kind": "health probe", "addr": "[::]:8081"}
+1.6485524737853956e+09	INFO	Starting server	{"path": "/metrics", "kind": "metrics", "addr": "[::]:8080"}
+1.6485524737854843e+09	INFO	controller.synapse	Starting EventSource	{"reconciler group": "synapse.opdev.io", "reconciler kind": "Synapse", "source": "kind source: *v1alpha1.Synapse"}
+1.648552473785519e+09	INFO	controller.synapse	Starting EventSource	{"reconciler group": "synapse.opdev.io", "reconciler kind": "Synapse", "source": "kind source: *v1.Service"}
+1.6485524737855291e+09	INFO	controller.synapse	Starting EventSource	{"reconciler group": "synapse.opdev.io", "reconciler kind": "Synapse", "source": "kind source: *v1.Deployment"}
+1.6485524737855399e+09	INFO	controller.synapse	Starting EventSource	{"reconciler group": "synapse.opdev.io", "reconciler kind": "Synapse", "source": "kind source: *v1.PersistentVolumeClaim"}
+1.6485524737855482e+09	INFO	controller.synapse	Starting Controller	{"reconciler group": "synapse.opdev.io", "reconciler kind": "Synapse"}
+1.6485524738865452e+09	INFO	controller.synapse	Starting workers	{"reconciler group": "synapse.opdev.io", "reconciler kind": "Synapse", "worker count": 1}
+
 ```
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
+This runs the controller until you hit `Ctrl` + `C`.
 
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+To uninstall the `Synapse `CRD:
 
-```sh
-kubectl apply -k config/samples/
+```shell
+$ make uninstall
+/home/mgoerens/dev/github.com/opdev/synapse-operator/bin/controller-gen "crd:trivialVersions=true,preserveUnknownFields=false" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+/home/mgoerens/dev/github.com/opdev/synapse-operator/bin/kustomize build config/crd | kubectl delete -f -
+customresourcedefinition.apiextensions.k8s.io "synapses.synapse.opdev.io" deleted
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
+### Deploy the controller in the Kubernetes cluster with `make deploy`
 
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+Deploy the controller with:
 
-```sh
-kubectl delete -k config/samples/
+```shell
+$ make deploy
+/home/mgoerens/dev/github.com/opdev/synapse-operator/bin/controller-gen "crd:trivialVersions=true,preserveUnknownFields=false" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+cd config/manager && /home/mgoerens/dev/github.com/opdev/synapse-operator/bin/kustomize edit set image controller=controller:latest
+/home/mgoerens/dev/github.com/opdev/synapse-operator/bin/kustomize build config/default | kubectl apply -f -
+namespace/synapse-operator-system created
+customresourcedefinition.apiextensions.k8s.io/synapses.synapse.opdev.io configured
+serviceaccount/synapse-operator-controller-manager created
+role.rbac.authorization.k8s.io/synapse-operator-leader-election-role created
+clusterrole.rbac.authorization.k8s.io/synapse-operator-manager-role created
+clusterrole.rbac.authorization.k8s.io/synapse-operator-metrics-reader created
+clusterrole.rbac.authorization.k8s.io/synapse-operator-proxy-role created
+rolebinding.rbac.authorization.k8s.io/synapse-operator-leader-election-rolebinding created
+clusterrolebinding.rbac.authorization.k8s.io/synapse-operator-manager-rolebinding created
+clusterrolebinding.rbac.authorization.k8s.io/synapse-operator-proxy-rolebinding created
+configmap/synapse-operator-manager-config created
+service/synapse-operator-controller-manager-metrics-service created
+deployment.apps/synapse-operator-controller-manager created
 ```
 
-**Delete the APIs(CRDs) from the cluster:**
+This creates a dedicated namespace `synapse-operator-system` and all required
+resources (including the CRD) for the controller to run.
 
-```sh
-make uninstall
+To cleanup all resources:
+
+```shell
+$ make undeploy
+/home/mgoerens/dev/github.com/opdev/synapse-operator/bin/kustomize build config/default | kubectl delete -f -
+namespace "synapse-operator-system" deleted
+customresourcedefinition.apiextensions.k8s.io "synapses.synapse.opdev.io" deleted
+serviceaccount "synapse-operator-controller-manager" deleted
+role.rbac.authorization.k8s.io "synapse-operator-leader-election-role" deleted
+clusterrole.rbac.authorization.k8s.io "synapse-operator-manager-role" deleted
+clusterrole.rbac.authorization.k8s.io "synapse-operator-metrics-reader" deleted
+clusterrole.rbac.authorization.k8s.io "synapse-operator-proxy-role" deleted
+rolebinding.rbac.authorization.k8s.io "synapse-operator-leader-election-rolebinding" deleted
+clusterrolebinding.rbac.authorization.k8s.io "synapse-operator-manager-rolebinding" deleted
+clusterrolebinding.rbac.authorization.k8s.io "synapse-operator-proxy-rolebinding" deleted
+configmap "synapse-operator-manager-config" deleted
+service "synapse-operator-controller-manager-metrics-service" deleted
+deployment.apps "synapse-operator-controller-manager" deleted
 ```
 
-**UnDeploy the controller from the cluster:**
+## Deploying a Synapse instance
 
-```sh
-make undeploy
-```
+A set of example how to use the Synapse operator to deploy a Synapse server is
+provided under the
+[examples](https://github.com/opdev/synapse-operator/tree/main/examples)
+directory.
 
-## Project Distribution
+## Notes and pre-requisites
 
-Following the options to release and provide this solution to the users.
+- The [postgres-operator](https://github.com/CrunchyData/postgres-operator)
+  needs to be installed. Specifically the `PostgresCluster` CRD is required.
+  This is only required if you intend to deploy a PostgreSQL instance alongside
+  Synapse.
+- Tested on OpenShift 4.9.0
 
-### By providing a bundle with all YAML files
+# Related links
 
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/synapse-operator:tag
-```
-
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
-
-2. Using the installer
-
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/synapse-operator/<tag or branch>/dist/install.yaml
-```
-
-### By providing a Helm Chart
-
-1. Build the chart using the optional helm plugin
-
-```sh
-operator-sdk edit --plugins=helm/v1-alpha
-```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
-
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
-## License
-
-Copyright 2025.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
+- [Matrix project homepage](https://matrix.org/)
+- [Synape Repository](https://github.com/matrix-org/synapse/)
+- [postgres-operator](https://github.com/CrunchyData/postgres-operator)
+- [Heisenbridge](https://github.com/hifi/heisenbridge)
