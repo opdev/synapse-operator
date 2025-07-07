@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func GetResource(
@@ -40,7 +40,7 @@ func GetResource(
 	req ctrl.Request,
 	resource client.Object,
 ) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
+	log := logf.FromContext(ctx)
 
 	if err := kubeClient.Get(ctx, req.NamespacedName, resource); err != nil {
 		if k8serrors.IsNotFound(err) {
@@ -99,7 +99,7 @@ func CopyInputConfigMap(
 	resource client.Object,
 ) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
 	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-		log := ctrllog.FromContext(ctx)
+		log := logf.FromContext(ctx)
 
 		if r, err := GetResource(ctx, kubeClient, req, resource); subreconciler.ShouldHaltOrRequeue(r, err) {
 			return r, err
@@ -182,7 +182,7 @@ func configMapForCopy(
 }
 
 func SetFailedState(ctx context.Context, kubeClient client.Client, resource client.Object, reason string) {
-	log := ctrllog.FromContext(ctx)
+	log := logf.FromContext(ctx)
 	var err error
 	const failed = "FAILED"
 

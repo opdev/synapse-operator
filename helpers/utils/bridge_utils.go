@@ -28,7 +28,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const synapseBridgeFinalizer = "synapse.opdev.io/finalizer"
@@ -94,7 +94,7 @@ func TriggerSynapseReconciliation(
 	resource Bridge,
 ) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
 	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-		log := ctrllog.FromContext(ctx)
+		log := logf.FromContext(ctx)
 
 		if r, err := GetResource(ctx, kubeClient, req, resource); subreconciler.ShouldHaltOrRequeue(r, err) {
 			return r, err
@@ -122,7 +122,7 @@ func TriggerSynapseReconciliation(
 // so that Synapse can remove the bridge from the list of application services in its configuration.
 func HandleDelete(kubeClient client.Client, resource Bridge) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
 	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-		log := ctrllog.FromContext(ctx)
+		log := logf.FromContext(ctx)
 
 		if r, err := GetResource(ctx, kubeClient, req, resource); subreconciler.ShouldHaltOrRequeue(r, err) {
 			return r, err
@@ -165,7 +165,7 @@ func HandleDelete(kubeClient client.Client, resource Bridge) func(context.Contex
 // AddFinalizer returns a function of type subreconciler.FnWithRequest
 func AddFinalizer(kubeClient client.Client, resource Bridge) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
 	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-		log := ctrllog.FromContext(ctx)
+		log := logf.FromContext(ctx)
 
 		if r, err := GetResource(ctx, kubeClient, req, resource); subreconciler.ShouldHaltOrRequeue(r, err) {
 			return r, err
