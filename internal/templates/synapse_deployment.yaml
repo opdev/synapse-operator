@@ -21,7 +21,7 @@ spec:
       serviceAccountName: {{ .Values.Name }}
       {{- end }}
       initContainers:
-        - image: "matrixdotorg/synapse:v1.129.0"
+        - image: "matrixdotorg/synapse:v1.133.0"
           name: "synapse-generate"
           args: [ "generate" ]
           env:
@@ -49,7 +49,7 @@ spec:
             mountPath: /data-mautrixsignal
         {{- end }}
       containers:
-        - image: "matrixdotorg/synapse:v1.129.0"
+        - image: "matrixdotorg/synapse:v1.133.0"
           name: "synapse"
           env:
             - name: SYNAPSE_CONFIG_PATH
