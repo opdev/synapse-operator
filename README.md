@@ -134,7 +134,7 @@ deployment.apps "synapse-operator-controller-manager" deleted
 
 A set of example how to use the Synapse operator to deploy a Synapse server is
 provided under the
-[examples](https://github.com/opdev/synapse-operator/tree/master/examples)
+[examples](https://github.com/opdev/synapse-operator/tree/main/examples)
 directory.
 
 ## Notes and pre-requisites
