@@ -3,10 +3,10 @@ package reconcile
 import (
 	"context"
 
-	"github.com/imdario/mergo"
+	"dario.cat/mergo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,7 +31,7 @@ func ReconcileResource(
 	desired client.Object,
 	current client.Object,
 ) error {
-	log := ctrllog.FromContext(ctx)
+	log := logf.FromContext(ctx)
 	log.Info(
 		"Reconciling child resource",
 		"Kind", desired.GetObjectKind().GroupVersionKind().Kind,

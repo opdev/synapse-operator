@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.1
+    controller-gen.kubebuilder.io/version: v0.17.2
   name: mautrixsignals.synapse.opdev.io
 spec:
   group: synapse.opdev.io
@@ -17,7 +17,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: MautrixSignal is the Schema for the mautrixsignals API
+        description: MautrixSignal is the Schema for the mautrixsignals API.
         properties:
           apiVersion:
             description: |-
@@ -78,7 +78,7 @@ spec:
             - synapse
             type: object
           status:
-            description: MautrixSignalStatus defines the observed state of MautrixSignal
+            description: MautrixSignalStatus defines the observed state of MautrixSignal.
             properties:
               isOpenshift:
                 default: false

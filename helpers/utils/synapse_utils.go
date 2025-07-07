@@ -1,5 +1,5 @@
 /*
-Copyright 2021.
+Copyright 2025.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/opdev/subreconciler"
-	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	synapsev1alpha1 "github.com/opdev/synapse-operator/api/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/reconcile"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func GetResource(
@@ -40,7 +40,7 @@ func GetResource(
 	req ctrl.Request,
 	resource client.Object,
 ) (*ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
+	log := logf.FromContext(ctx)
 
 	if err := kubeClient.Get(ctx, req.NamespacedName, resource); err != nil {
 		if k8serrors.IsNotFound(err) {
@@ -68,7 +68,12 @@ func GetResource(
 	return subreconciler.ContinueReconciling()
 }
 
-func UpdateResourceStatus(ctx context.Context, kubeClient client.Client, resource client.Object, current client.Object) error {
+func UpdateResourceStatus(
+	ctx context.Context,
+	kubeClient client.Client,
+	resource client.Object,
+	current client.Object,
+) error {
 	if err := kubeClient.Get(
 		ctx,
 		types.NamespacedName{Name: resource.GetName(), Namespace: resource.GetNamespace()},
@@ -88,9 +93,13 @@ func UpdateResourceStatus(ctx context.Context, kubeClient client.Client, resourc
 // be called in the main reconciliation loop.
 //
 // It creates a copy of the user-provided ConfigMap.
-func CopyInputConfigMap(kubeClient client.Client, runtimeScheme *runtime.Scheme, resource client.Object) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
+func CopyInputConfigMap(
+	kubeClient client.Client,
+	runtimeScheme *runtime.Scheme,
+	resource client.Object,
+) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
 	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-		log := ctrllog.FromContext(ctx)
+		log := logf.FromContext(ctx)
 
 		if r, err := GetResource(ctx, kubeClient, req, resource); subreconciler.ShouldHaltOrRequeue(r, err) {
 			return r, err
@@ -120,7 +129,7 @@ func CopyInputConfigMap(kubeClient client.Client, runtimeScheme *runtime.Scheme,
 
 		objectMeta := reconcile.SetObjectMeta(resource.GetName(), resource.GetNamespace(), map[string]string{})
 
-		desiredConfigMap, err := configMapForCopy(ctx, objectMeta, kubeClient, resource, runtimeScheme)
+		desiredConfigMap, err := configMapForCopy(objectMeta, kubeClient, resource, runtimeScheme)
 		if err != nil {
 			return subreconciler.RequeueWithError(err)
 		}
@@ -142,7 +151,6 @@ func CopyInputConfigMap(kubeClient client.Client, runtimeScheme *runtime.Scheme,
 // The ConfigMap returned by configMapForCopy is a copy of the user-defined
 // ConfigMap.
 func configMapForCopy(
-	ctx context.Context,
 	objectMeta metav1.ObjectMeta,
 	kubeClient client.Client,
 	resource client.Object,
@@ -174,22 +182,23 @@ func configMapForCopy(
 }
 
 func SetFailedState(ctx context.Context, kubeClient client.Client, resource client.Object, reason string) {
-	log := ctrllog.FromContext(ctx)
+	log := logf.FromContext(ctx)
 	var err error
+	const failed = "FAILED"
 
 	switch v := resource.(type) {
 	case *synapsev1alpha1.Synapse:
-		v.Status.State = "FAILED"
+		v.Status.State = failed
 		v.Status.Reason = reason
 
 		err = UpdateResourceStatus(ctx, kubeClient, v, &synapsev1alpha1.Synapse{})
 	case *synapsev1alpha1.Heisenbridge:
-		v.Status.State = "FAILED"
+		v.Status.State = failed
 		v.Status.Reason = reason
 
 		err = UpdateResourceStatus(ctx, kubeClient, v, &synapsev1alpha1.Heisenbridge{})
 	case *synapsev1alpha1.MautrixSignal:
-		v.Status.State = "FAILED"
+		v.Status.State = failed
 		v.Status.Reason = reason
 
 		err = UpdateResourceStatus(ctx, kubeClient, v, &synapsev1alpha1.MautrixSignal{})

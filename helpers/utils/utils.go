@@ -1,5 +1,5 @@
 /*
-Copyright 2021.
+Copyright 2025.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ limitations under the License.
 
 package utils
 
-import "gopkg.in/yaml.v2"
+import "gopkg.in/yaml.v3"
 
 func ConvertStructToMap(in interface{}) (map[string]interface{}, error) {
 	var intermediate []byte

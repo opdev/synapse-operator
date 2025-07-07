@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.1
+    controller-gen.kubebuilder.io/version: v0.17.2
   creationTimestamp: null
   name: synapses.synapse.opdev.io
 spec:
@@ -17,7 +17,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Synapse is the Schema for the synapses API
+        description: Synapse is the Schema for the synapses API.
         properties:
           apiVersion:
             description: |-
@@ -37,7 +37,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: SynapseSpec defines the desired state of Synapse
+            description: SynapseSpec defines the desired state of Synapse.
             properties:
               createNewPostgreSQL:
                 default: false
@@ -99,7 +99,7 @@ spec:
             - homeserver
             type: object
           status:
-            description: SynapseStatus defines the observed state of Synapse
+            description: SynapseStatus defines the observed state of Synapse.
             properties:
               bridges:
                 description: Information on the bridges deployed alongside Synapse

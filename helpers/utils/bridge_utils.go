@@ -1,5 +1,5 @@
 /*
-Copyright 2021.
+Copyright 2025.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,12 +23,12 @@ import (
 	"strings"
 
 	"github.com/opdev/subreconciler"
-	synapsev1alpha1 "github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	synapsev1alpha1 "github.com/opdev/synapse-operator/api/synapse/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const synapseBridgeFinalizer = "synapse.opdev.io/finalizer"
@@ -89,9 +89,12 @@ func FetchSynapseInstance(
 // TriggerSynapseReconciliation returns a function of type subreconciler.FnWithRequest
 // Bridges should trigger the reconciliation of their associated Synapse server
 // so that Synapse can add the bridge as an application service in its configuration.
-func TriggerSynapseReconciliation(kubeClient client.Client, resource Bridge) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
+func TriggerSynapseReconciliation(
+	kubeClient client.Client,
+	resource Bridge,
+) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
 	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-		log := ctrllog.FromContext(ctx)
+		log := logf.FromContext(ctx)
 
 		if r, err := GetResource(ctx, kubeClient, req, resource); subreconciler.ShouldHaltOrRequeue(r, err) {
 			return r, err
@@ -119,7 +122,7 @@ func TriggerSynapseReconciliation(kubeClient client.Client, resource Bridge) fun
 // so that Synapse can remove the bridge from the list of application services in its configuration.
 func HandleDelete(kubeClient client.Client, resource Bridge) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
 	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-		log := ctrllog.FromContext(ctx)
+		log := logf.FromContext(ctx)
 
 		if r, err := GetResource(ctx, kubeClient, req, resource); subreconciler.ShouldHaltOrRequeue(r, err) {
 			return r, err
@@ -162,7 +165,7 @@ func HandleDelete(kubeClient client.Client, resource Bridge) func(context.Contex
 // AddFinalizer returns a function of type subreconciler.FnWithRequest
 func AddFinalizer(kubeClient client.Client, resource Bridge) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
 	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
-		log := ctrllog.FromContext(ctx)
+		log := logf.FromContext(ctx)
 
 		if r, err := GetResource(ctx, kubeClient, req, resource); subreconciler.ShouldHaltOrRequeue(r, err) {
 			return r, err

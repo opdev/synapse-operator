@@ -1,6 +1,9 @@
 apiVersion: synapse.opdev.io/v1alpha1
 kind: Synapse
 metadata:
+  labels:
+    app.kubernetes.io/name: synapse-operator
+    app.kubernetes.io/managed-by: kustomize
   name: synapse-sample
 spec:
   createNewPostgreSQL: false

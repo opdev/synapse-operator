@@ -16,17 +16,17 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: Heisenbridge is the Schema for the heisenbridges API
+    - description: Heisenbridge is the Schema for the heisenbridges API.
       displayName: Heisenbridge
       kind: Heisenbridge
       name: heisenbridges.synapse.opdev.io
       version: v1alpha1
-    - description: MautrixSignal is the Schema for the mautrixsignals API
+    - description: MautrixSignal is the Schema for the mautrixsignals API.
       displayName: Mautrix Signal
       kind: MautrixSignal
       name: mautrixsignals.synapse.opdev.io
       version: v1alpha1
-    - description: Synapse is the Schema for the synapses API
+    - description: Synapse is the Schema for the synapses API.
       displayName: Synapse
       kind: Synapse
       name: synapses.synapse.opdev.io

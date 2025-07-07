@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/opdev/synapse-operator/apis/synapse/v1alpha1"
+	"github.com/opdev/synapse-operator/api/synapse/v1alpha1"
 )
 
 // Helper function for struct construction requiring a boolean pointer

@@ -9,11 +9,8 @@ metadata:
           "kind": "Heisenbridge",
           "metadata": {
             "labels": {
-              "app.kubernetes.io/created-by": "synapse-operator",
-              "app.kubernetes.io/instance": "heisenbridge-sample",
               "app.kubernetes.io/managed-by": "kustomize",
-              "app.kubernetes.io/name": "heisenbridge",
-              "app.kubernetes.io/part-of": "synapse-operator"
+              "app.kubernetes.io/name": "synapse-operator"
             },
             "name": "heisenbridge-sample"
           },
@@ -28,11 +25,8 @@ metadata:
           "kind": "MautrixSignal",
           "metadata": {
             "labels": {
-              "app.kubernetes.io/created-by": "synapse-operator",
-              "app.kubernetes.io/instance": "mautrixsignal-sample",
               "app.kubernetes.io/managed-by": "kustomize",
-              "app.kubernetes.io/name": "mautrixsignal",
-              "app.kubernetes.io/part-of": "synapse-operator"
+              "app.kubernetes.io/name": "synapse-operator"
             },
             "name": "mautrixsignal-sample"
           },
@@ -46,6 +40,10 @@ metadata:
           "apiVersion": "synapse.opdev.io/v1alpha1",
           "kind": "Synapse",
           "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "synapse-operator"
+            },
             "name": "synapse-sample"
           },
           "spec": {
@@ -62,12 +60,12 @@ metadata:
     capabilities: Basic Install
     categories: Developer Tools
     containerImage: quay.io/opdev/synapse-operator
-    createdAt: "2025-05-16T15:21:27Z"
+    createdAt: "2025-07-07T13:42:07Z"
     description: Deploys and manages the lifecycle of Synapse servers and their associated
       components (bridges, databases, ...). Synapse is the reference Matrix homeserver
       implementation.
-    operators.operatorframework.io/builder: operator-sdk-v1.29.0
-    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    operators.operatorframework.io/builder: operator-sdk-v1.40.0
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/opdev/synapse-operator
   name: synapse-operator.v0.6.1
   namespace: placeholder
@@ -75,17 +73,17 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: Heisenbridge is the Schema for the heisenbridges API
+    - description: Heisenbridge is the Schema for the heisenbridges API.
       displayName: Heisenbridge
       kind: Heisenbridge
       name: heisenbridges.synapse.opdev.io
       version: v1alpha1
-    - description: MautrixSignal is the Schema for the mautrixsignals API
+    - description: MautrixSignal is the Schema for the mautrixsignals API.
       displayName: Mautrix Signal
       kind: MautrixSignal
       name: mautrixsignals.synapse.opdev.io
       version: v1alpha1
-    - description: Synapse is the Schema for the synapses API
+    - description: Synapse is the Schema for the synapses API.
       displayName: Synapse
       kind: Synapse
       name: synapses.synapse.opdev.io
@@ -102,9 +100,12 @@ spec:
       clusterPermissions:
       - rules:
         - apiGroups:
-          - apps
+          - ""
           resources:
-          - deployments
+          - configmaps
+          - persistentvolumeclaims
+          - serviceaccounts
+          - services
           verbs:
           - create
           - delete
@@ -114,12 +115,9 @@ spec:
           - update
           - watch
         - apiGroups:
-          - ""
+          - apps
           resources:
-          - configmaps
-          - persistentvolumeclaims
-          - serviceaccounts
-          - services
+          - deployments
           verbs:
           - create
           - delete
@@ -152,6 +150,14 @@ spec:
           - patch
           - update
           - watch
+        - apiGroups:
+          - security.openshift.io
+          resourceNames:
+          - anyuid
+          resources:
+          - securitycontextconstraints
+          verbs:
+          - use
         - apiGroups:
           - synapse.opdev.io
           resources:
@@ -199,36 +205,30 @@ spec:
         serviceAccountName: synapse-operator-controller-manager
       deployments:
       - label:
+          app.kubernetes.io/managed-by: kustomize
+          app.kubernetes.io/name: synapse-operator
           control-plane: controller-manager
         name: synapse-operator-controller-manager
         spec:
           replicas: 1
           selector:
             matchLabels:
+              app.kubernetes.io/name: synapse-operator
               control-plane: controller-manager
           strategy: {}
           template:
             metadata:
+              annotations:
+                kubectl.kubernetes.io/default-container: manager
               labels:
+                app.kubernetes.io/name: synapse-operator
                 control-plane: controller-manager
             spec:
               containers:
               - args:
-                - --secure-listen-address=0.0.0.0:8443
-                - --upstream=http://127.0.0.1:8080/
-                - --logtostderr=true
-                - --v=10
-                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
-                name: kube-rbac-proxy
-                ports:
-                - containerPort: 8443
-                  name: https
-                  protocol: TCP
-                resources: {}
-              - args:
-                - --health-probe-bind-address=:8081
-                - --metrics-bind-address=127.0.0.1:8080
+                - --metrics-bind-address=:8443
                 - --leader-elect
+                - --health-probe-bind-address=:8081
                 command:
                 - /manager
                 image: quay.io/opdev/synapse-operator:v0.6.1
@@ -247,15 +247,20 @@ spec:
                   periodSeconds: 10
                 resources:
                   limits:
-                    cpu: 200m
-                    memory: 100Mi
+                    cpu: 500m
+                    memory: 128Mi
                   requests:
-                    cpu: 100m
-                    memory: 20Mi
+                    cpu: 10m
+                    memory: 64Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
               securityContext:
                 runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
               serviceAccountName: synapse-operator-controller-manager
               terminationGracePeriodSeconds: 10
       permissions:
