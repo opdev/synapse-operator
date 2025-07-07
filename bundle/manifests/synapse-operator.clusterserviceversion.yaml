@@ -14,7 +14,11 @@ metadata:
             },
             "name": "heisenbridge-sample"
           },
-          "spec": null
+          "spec": {
+            "synapse": {
+              "name": "synapse-sample"
+            }
+          }
         },
         {
           "apiVersion": "synapse.opdev.io/v1alpha1",
@@ -26,7 +30,11 @@ metadata:
             },
             "name": "mautrixsignal-sample"
           },
-          "spec": null
+          "spec": {
+            "synapse": {
+              "name": "synapse-sample"
+            }
+          }
         },
         {
           "apiVersion": "synapse.opdev.io/v1alpha1",
@@ -38,13 +46,21 @@ metadata:
             },
             "name": "synapse-sample"
           },
-          "spec": null
+          "spec": {
+            "createNewPostgreSQL": false,
+            "homeserver": {
+              "values": {
+                "reportStats": true,
+                "serverName": "my.matrix.host"
+              }
+            }
+          }
         }
       ]
     capabilities: Basic Install
     categories: Developer Tools
     containerImage: quay.io/opdev/synapse-operator
-    createdAt: "2025-07-04T15:32:46Z"
+    createdAt: "2025-07-07T13:42:07Z"
     description: Deploys and manages the lifecycle of Synapse servers and their associated
       components (bridges, databases, ...). Synapse is the reference Matrix homeserver
       implementation.

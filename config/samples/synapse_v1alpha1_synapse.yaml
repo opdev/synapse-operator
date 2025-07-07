@@ -6,4 +6,8 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: synapse-sample
 spec:
-  # TODO(user): Add fields here
+  createNewPostgreSQL: false
+  homeserver:
+    values:
+      serverName: my.matrix.host
+      reportStats: true

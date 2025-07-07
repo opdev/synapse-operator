@@ -6,4 +6,5 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: mautrixsignal-sample
 spec:
-  # TODO(user): Add fields here
+  synapse:
+    name: synapse-sample
