@@ -89,7 +89,10 @@ func FetchSynapseInstance(
 // TriggerSynapseReconciliation returns a function of type subreconciler.FnWithRequest
 // Bridges should trigger the reconciliation of their associated Synapse server
 // so that Synapse can add the bridge as an application service in its configuration.
-func TriggerSynapseReconciliation(kubeClient client.Client, resource Bridge) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
+func TriggerSynapseReconciliation(
+	kubeClient client.Client,
+	resource Bridge,
+) func(context.Context, ctrl.Request) (*ctrl.Result, error) {
 	return func(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
 		log := ctrllog.FromContext(ctx)
 

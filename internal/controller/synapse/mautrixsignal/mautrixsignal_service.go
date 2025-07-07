@@ -34,7 +34,10 @@ import (
 // be called in the main reconciliation loop.
 //
 // It reconciles the Service for mautrix-signal to its desired state.
-func (r *MautrixSignalReconciler) reconcileMautrixSignalService(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *MautrixSignalReconciler) reconcileMautrixSignalService(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	ms := &synapsev1alpha1.MautrixSignal{}
 	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err

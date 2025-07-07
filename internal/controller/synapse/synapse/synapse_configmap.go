@@ -164,7 +164,11 @@ func (r *SynapseReconciler) parseInputSynapseConfigMap(ctx context.Context, req 
 // ParseHomeserverConfigMap loads the ConfigMap, which name is determined by
 // Spec.Homeserver.ConfigMap.Name, run validation checks and fetch necesarry
 // value needed to configure the Synapse Deployment.
-func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synapse *synapsev1alpha1.Synapse, cm corev1.ConfigMap) error {
+func (r *SynapseReconciler) ParseHomeserverConfigMap(
+	ctx context.Context,
+	synapse *synapsev1alpha1.Synapse,
+	cm corev1.ConfigMap,
+) error {
 	log := logf.FromContext(ctx)
 
 	// TODO:
@@ -220,7 +224,10 @@ func (r *SynapseReconciler) ParseHomeserverConfigMap(ctx context.Context, synaps
 //
 // It configures the 'database' section of homeserver.yaml to allow Synapse to
 // connect to the newly created PostgresCluster instance.
-func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
 	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
@@ -319,7 +326,10 @@ func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1
 	return databaseDataMap, nil
 }
 
-func (r *SynapseReconciler) updateSynapseConfigMapForBridges(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *SynapseReconciler) updateSynapseConfigMapForBridges(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
 	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
@@ -345,7 +355,10 @@ func (r *SynapseReconciler) updateSynapseConfigMapForBridges(ctx context.Context
 //
 // It registers the heisenbridge as an application service in the
 // homeserver.yaml config file.
-func (r *SynapseReconciler) updateSynapseConfigMapForHeisenbridge(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *SynapseReconciler) updateSynapseConfigMapForHeisenbridge(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
 	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
@@ -389,7 +402,10 @@ func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
 //
 // It registers the mautrix-signal bridge as an application service in the
 // homeserver.yaml config file.
-func (r *SynapseReconciler) updateSynapseConfigMapForMautrixSignal(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *SynapseReconciler) updateSynapseConfigMapForMautrixSignal(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
 	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err

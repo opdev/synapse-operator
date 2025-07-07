@@ -53,7 +53,7 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 		HeisenbridgeNamespace = "default"
 		InputConfigMapName    = "test-configmap"
 
-		// Name and namespace of the Heisenbridge instance refered by the Heisenbridge Bridge
+		// Name and namespace of the Heisenbridge instance referred by the Heisenbridge Bridge
 		SynapseName       = "test-synapse"
 		SynapseNamespace  = "default"
 		SynapseServerName = "my.matrix.host"
@@ -86,7 +86,7 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 
 		Expect(synapsev1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
-		//+kubebuilder:scaffold:scheme
+		// +kubebuilder:scaffold:scheme
 
 		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 		Expect(err).NotTo(HaveOccurred())
@@ -303,7 +303,6 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 					},
 				}
 				Expect(k8sClient.Create(ctx, synapse)).Should(Succeed())
-				k8sClient.Get(ctx, synapseLookupKey, synapse)
 
 				By("Verifying that the Synapse object was created")
 				Eventually(func() bool {
@@ -408,7 +407,6 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 				var heisenbridgeYaml string = ""
 
 				const heisenbridgeFQDN = HeisenbridgeName + "." + HeisenbridgeNamespace + ".svc.cluster.local"
-				const synapseFQDN = SynapseName + "." + SynapseNamespace + ".svc.cluster.local"
 				const heisenbridgePort = 9898
 
 				var createHeisenbridgeConfigMap = func() {

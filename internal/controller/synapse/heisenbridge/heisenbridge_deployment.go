@@ -40,7 +40,10 @@ func labelsForHeisenbridge(name string) map[string]string {
 // be called in the main reconciliation loop.
 //
 // It reconciles the Deployment for Heisenbridge to its desired state.
-func (r *HeisenbridgeReconciler) reconcileHeisenbridgeDeployment(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *HeisenbridgeReconciler) reconcileHeisenbridgeDeployment(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	h := &synapsev1alpha1.Heisenbridge{}
 	if r, err := utils.GetResource(ctx, r.Client, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
@@ -64,7 +67,9 @@ func (r *HeisenbridgeReconciler) reconcileHeisenbridgeDeployment(ctx context.Con
 }
 
 // deploymentForHeisenbridge returns a Heisenbridge Deployment object
-func (r *HeisenbridgeReconciler) deploymentForHeisenbridge(h *synapsev1alpha1.Heisenbridge) (*appsv1.Deployment, error) {
+func (r *HeisenbridgeReconciler) deploymentForHeisenbridge(
+	h *synapsev1alpha1.Heisenbridge,
+) (*appsv1.Deployment, error) {
 	type deploymentExtraValues struct {
 		synapsev1alpha1.Heisenbridge
 		Labels  map[string]string
@@ -77,7 +82,10 @@ func (r *HeisenbridgeReconciler) deploymentForHeisenbridge(h *synapsev1alpha1.He
 		Command:      r.craftHeisenbridgeCommad(*h),
 	}
 
-	dep, err := templates.ResourceFromTemplate[deploymentExtraValues, appsv1.Deployment](&extraValues, "heisenbridge_deployment")
+	dep, err := templates.ResourceFromTemplate[deploymentExtraValues, appsv1.Deployment](
+		&extraValues,
+		"heisenbridge_deployment",
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not get template: %v", err)
 	}

@@ -92,7 +92,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 		Expect(synapsev1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 		Expect(pgov1beta1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
-		//+kubebuilder:scaffold:scheme
+		// +kubebuilder:scaffold:scheme
 
 		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 		Expect(err).NotTo(HaveOccurred())
@@ -134,8 +134,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 			By("Getting latest version of the PostgresCluster CRD")
 			postgresOperatorVersion := "5.2.0"
-			postgresClusterURL := "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-prod/main/operators/postgresql/" +
-				postgresOperatorVersion +
+			postgresClusterURL := "https://raw.githubusercontent.com/redhat-openshift-ecosystem/" +
+				"community-operators-prod/main/operators/postgresql/" + postgresOperatorVersion +
 				"/manifests/postgresclusters.postgres-operator.crunchydata.com.crd.yaml"
 
 			resp, err := http.Get(postgresClusterURL)
@@ -146,7 +146,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			// successfully Unmarshal the CRD Document into a
 			// CustomResourceDefinition object, it is necessary to first transform the
 			// YAML document into a intermediate JSON document.
-			defer resp.Body.Close()
+			defer resp.Body.Close() //nolint:errcheck
 			yamlBody, err := io.ReadAll(resp.Body)
 			Expect(err).ShouldNot(HaveOccurred())
 
@@ -678,7 +678,8 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							g.Expect(synapse.Status.DatabaseConnectionInfo.ConnectionURL).Should(Equal("hostname.postgresql.url:5432"))
 							g.Expect(synapse.Status.DatabaseConnectionInfo.DatabaseName).Should(Equal("synapse"))
 							g.Expect(synapse.Status.DatabaseConnectionInfo.User).Should(Equal("synapse"))
-							g.Expect(synapse.Status.DatabaseConnectionInfo.Password).Should(Equal(string(base64encode("VerySecureSyn@psePassword!"))))
+							encodedPassword := string(base64encode("VerySecureSyn@psePassword!"))
+							g.Expect(synapse.Status.DatabaseConnectionInfo.Password).Should(Equal(encodedPassword))
 							g.Expect(synapse.Status.DatabaseConnectionInfo.State).Should(Equal("READY"))
 						}, timeout, interval).Should(Succeed())
 					})

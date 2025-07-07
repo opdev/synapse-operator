@@ -34,7 +34,10 @@ import (
 // called in the main reconciliation loop.
 //
 // It reconciles the Service for Heisenbridge to its desired state.
-func (r *HeisenbridgeReconciler) reconcileHeisenbridgeService(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *HeisenbridgeReconciler) reconcileHeisenbridgeService(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	h := &synapsev1alpha1.Heisenbridge{}
 	if r, err := utils.GetResource(ctx, r.Client, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err

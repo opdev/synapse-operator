@@ -115,7 +115,10 @@ func (r *MautrixSignalReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return subreconciler.Evaluate(subreconciler.DoNotRequeue())
 }
 
-func (r *MautrixSignalReconciler) buildMautrixSignalStatus(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *MautrixSignalReconciler) buildMautrixSignalStatus(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
 	ms := &synapsev1alpha1.MautrixSignal{}

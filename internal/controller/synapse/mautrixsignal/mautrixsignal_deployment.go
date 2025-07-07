@@ -40,7 +40,10 @@ func labelsForMautrixSignal(name string) map[string]string {
 // to be called in the main reconciliation loop.
 //
 // It reconciles the Deployment for mautrix-signal to its desired state.
-func (r *MautrixSignalReconciler) reconcileMautrixSignalDeployment(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *MautrixSignalReconciler) reconcileMautrixSignalDeployment(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	ms := &synapsev1alpha1.MautrixSignal{}
 	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
@@ -64,7 +67,9 @@ func (r *MautrixSignalReconciler) reconcileMautrixSignalDeployment(ctx context.C
 }
 
 // deploymentForMautrixSignal returns a Deployment object for the mautrix-signal bridge
-func (r *MautrixSignalReconciler) deploymentForMautrixSignal(ms *synapsev1alpha1.MautrixSignal) (*appsv1.Deployment, error) {
+func (r *MautrixSignalReconciler) deploymentForMautrixSignal(
+	ms *synapsev1alpha1.MautrixSignal,
+) (*appsv1.Deployment, error) {
 	type deploymentExtraValues struct {
 		synapsev1alpha1.MautrixSignal
 		Labels map[string]string
@@ -75,7 +80,10 @@ func (r *MautrixSignalReconciler) deploymentForMautrixSignal(ms *synapsev1alpha1
 		Labels:        labelsForMautrixSignal(ms.Name),
 	}
 
-	dep, err := templates.ResourceFromTemplate[deploymentExtraValues, appsv1.Deployment](&extraValues, "mautrixsignal_deployment")
+	dep, err := templates.ResourceFromTemplate[deploymentExtraValues, appsv1.Deployment](
+		&extraValues,
+		"mautrixsignal_deployment",
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not get template: %v", err)
 	}

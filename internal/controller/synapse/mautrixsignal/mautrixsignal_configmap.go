@@ -39,7 +39,10 @@ import (
 // It reconciles the mautrix-signal ConfigMap to its desired state. It is
 // called only if the user hasn't provided its own ConfigMap for
 // mautrix-signal.
-func (r *MautrixSignalReconciler) reconcileMautrixSignalConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *MautrixSignalReconciler) reconcileMautrixSignalConfigMap(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	ms := &synapsev1alpha1.MautrixSignal{}
 	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
@@ -63,7 +66,9 @@ func (r *MautrixSignalReconciler) reconcileMautrixSignalConfigMap(ctx context.Co
 }
 
 // configMapForSynapse returns a synapse ConfigMap object
-func (r *MautrixSignalReconciler) configMapForMautrixSignal(ms *synapsev1alpha1.MautrixSignal) (*corev1.ConfigMap, error) {
+func (r *MautrixSignalReconciler) configMapForMautrixSignal(
+	ms *synapsev1alpha1.MautrixSignal,
+) (*corev1.ConfigMap, error) {
 	synapseName := ms.Spec.Synapse.Name
 	synapseNamespace := utils.ComputeNamespace(ms.Namespace, ms.Spec.Synapse.Namespace)
 
@@ -79,7 +84,10 @@ func (r *MautrixSignalReconciler) configMapForMautrixSignal(ms *synapsev1alpha1.
 		MautrixsignalFQDN: utils.ComputeFQDN(ms.Name, ms.Namespace),
 	}
 
-	cm, err := templates.ResourceFromTemplate[configmapExtraValues, corev1.ConfigMap](&extraValues, "mautrixsignal_configmap")
+	cm, err := templates.ResourceFromTemplate[configmapExtraValues, corev1.ConfigMap](
+		&extraValues,
+		"mautrixsignal_configmap",
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not get template: %v", err)
 	}
@@ -97,7 +105,9 @@ func (r *MautrixSignalReconciler) configMapForMautrixSignal(ms *synapsev1alpha1.
 //
 // Following the previous copy of the user-provided ConfigMap, it edits the
 // content of the copy to ensure that mautrix-signal is correctly configured.
-func (r *MautrixSignalReconciler) configureMautrixSignalConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *MautrixSignalReconciler) configureMautrixSignalConfigMap(
+	ctx context.Context, req ctrl.Request,
+) (*ctrl.Result, error) {
 	ms := &synapsev1alpha1.MautrixSignal{}
 	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err

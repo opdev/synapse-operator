@@ -54,7 +54,7 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 		MautrixSignalNamespace = "default"
 		InputConfigMapName     = "test-configmap"
 
-		// Name and namespace of the MautrixSignal instance refered by the MautrixSignal Bridge
+		// Name and namespace of the MautrixSignal instance referred by the MautrixSignal Bridge
 		SynapseName       = "test-synapse"
 		SynapseNamespace  = "default"
 		SynapseServerName = "my.matrix.host"
@@ -87,7 +87,7 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 
 		Expect(synapsev1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
-		//+kubebuilder:scaffold:scheme
+		// +kubebuilder:scaffold:scheme
 
 		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 		Expect(err).NotTo(HaveOccurred())
@@ -311,7 +311,6 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 					},
 				}
 				Expect(k8sClient.Create(ctx, synapse)).Should(Succeed())
-				k8sClient.Get(ctx, synapseLookupKey, synapse)
 				// Manually populating the status as the Synapse controller is not running
 				synapse.Status = synapsev1alpha1.SynapseStatus{
 					HomeserverConfiguration: synapsev1alpha1.SynapseStatusHomeserverConfiguration{
@@ -578,9 +577,10 @@ logging:
 						g.Expect(configHomeserver["domain"]).To(Equal(SynapseServerName))
 
 						By("Verifying that the appservice configuration has been updated")
+						expectedConfigAppServiceAddress := "http://" + mautrixsignalFQDN + ":" + strconv.Itoa(mautrixsignalPort)
 						configAppservice, ok := config["appservice"].(map[string]interface{})
 						g.Expect(ok).Should(BeTrue())
-						g.Expect(configAppservice["address"]).To(Equal("http://" + mautrixsignalFQDN + ":" + strconv.Itoa(mautrixsignalPort)))
+						g.Expect(configAppservice["address"]).To(Equal(expectedConfigAppServiceAddress))
 
 						By("Verifying that the signal configuration has been updated")
 						configSignal, ok := config["signal"].(map[string]interface{})

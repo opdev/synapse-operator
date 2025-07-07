@@ -36,7 +36,10 @@ import (
 // FnWithRequest, to be called in the main reconciliation loop.
 //
 // It reconciles the ServiceAccount for mautrix-signal to its desired state.
-func (r *MautrixSignalReconciler) reconcileMautrixSignalServiceAccount(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *MautrixSignalReconciler) reconcileMautrixSignalServiceAccount(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	ms := &synapsev1alpha1.MautrixSignal{}
 	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
@@ -60,7 +63,9 @@ func (r *MautrixSignalReconciler) reconcileMautrixSignalServiceAccount(ctx conte
 }
 
 // serviceAccountForMautrixSignal returns a ServiceAccount object for running the mautrix-signal bridge
-func (r *MautrixSignalReconciler) serviceAccountForMautrixSignal(ms *synapsev1alpha1.MautrixSignal) (client.Object, error) {
+func (r *MautrixSignalReconciler) serviceAccountForMautrixSignal(
+	ms *synapsev1alpha1.MautrixSignal,
+) (client.Object, error) {
 	// TODO: https://github.com/opdev/synapse-operator/issues/19
 	sa, err := templates.ResourceFromTemplate[synapsev1alpha1.MautrixSignal, corev1.ServiceAccount](ms, "serviceaccount")
 	if err != nil {
@@ -78,7 +83,10 @@ func (r *MautrixSignalReconciler) serviceAccountForMautrixSignal(ms *synapsev1al
 // to be called in the main reconciliation loop.
 //
 // It reconciles the RoleBinding for mautrix-signal to its desired state.
-func (r *MautrixSignalReconciler) reconcileMautrixSignalRoleBinding(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *MautrixSignalReconciler) reconcileMautrixSignalRoleBinding(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	ms := &synapsev1alpha1.MautrixSignal{}
 	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
@@ -102,7 +110,9 @@ func (r *MautrixSignalReconciler) reconcileMautrixSignalRoleBinding(ctx context.
 }
 
 // roleBindingForMautrixSignal returns a RoleBinding object for the mautrix-signal bridge
-func (r *MautrixSignalReconciler) roleBindingForMautrixSignal(ms *synapsev1alpha1.MautrixSignal) (*rbacv1.RoleBinding, error) {
+func (r *MautrixSignalReconciler) roleBindingForMautrixSignal(
+	ms *synapsev1alpha1.MautrixSignal,
+) (*rbacv1.RoleBinding, error) {
 	// TODO: https://github.com/opdev/synapse-operator/issues/19
 	rb, err := templates.ResourceFromTemplate[synapsev1alpha1.MautrixSignal, rbacv1.RoleBinding](ms, "rolebinding")
 	if err != nil {

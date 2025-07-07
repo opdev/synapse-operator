@@ -69,7 +69,10 @@ func (r *SynapseReconciler) deploymentForSynapse(s *synapsev1alpha1.Synapse) (*a
 		Labels:  labelsForSynapse(s.Name),
 	}
 
-	dep, err := templates.ResourceFromTemplate[deploymentExtraValues, appsv1.Deployment](&extraValues, "synapse_deployment")
+	dep, err := templates.ResourceFromTemplate[deploymentExtraValues, appsv1.Deployment](
+		&extraValues,
+		"synapse_deployment",
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not get template: %v", err)
 	}

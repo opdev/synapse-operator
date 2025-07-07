@@ -35,7 +35,10 @@ import (
 // be called in the main reconciliation loop.
 //
 // It reconciles the ServiceAccount for synapse to its desired state.
-func (r *SynapseReconciler) reconcileSynapseServiceAccount(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *SynapseReconciler) reconcileSynapseServiceAccount(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
 	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err

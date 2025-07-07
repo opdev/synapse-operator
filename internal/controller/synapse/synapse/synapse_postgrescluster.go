@@ -95,7 +95,10 @@ func (r *SynapseReconciler) reconcilePostgresClusterCR(ctx context.Context, req 
 }
 
 // postgresClusterForSynapse returns a PostgresCluster object
-func (r *SynapseReconciler) postgresClusterForSynapse(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (*pgov1beta1.PostgresCluster, error) {
+func (r *SynapseReconciler) postgresClusterForSynapse(
+	s *synapsev1alpha1.Synapse,
+	objectMeta metav1.ObjectMeta,
+) (*pgov1beta1.PostgresCluster, error) {
 	postgresCluster := &pgov1beta1.PostgresCluster{
 		ObjectMeta: objectMeta,
 		Spec: pgov1beta1.PostgresClusterSpec{
@@ -183,7 +186,10 @@ func (r *SynapseReconciler) isPostgresClusterReady(p pgov1beta1.PostgresCluster)
 // to be called in the main reconciliation loop.
 //
 // It reconciles the PostgresCluster ConfigMap to its desired state.
-func (r *SynapseReconciler) reconcilePostgresClusterConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *SynapseReconciler) reconcilePostgresClusterConfigMap(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	s := &synapsev1alpha1.Synapse{}
 	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
@@ -214,10 +220,14 @@ func (r *SynapseReconciler) reconcilePostgresClusterConfigMap(ctx context.Contex
 }
 
 // configMapForPostgresCluster returns a ConfigMap object
-func (r *SynapseReconciler) configMapForPostgresCluster(s *synapsev1alpha1.Synapse, objectMeta metav1.ObjectMeta) (*corev1.ConfigMap, error) {
+func (r *SynapseReconciler) configMapForPostgresCluster(
+	s *synapsev1alpha1.Synapse,
+	objectMeta metav1.ObjectMeta,
+) (*corev1.ConfigMap, error) {
+	createQuery := "CREATE DATABASE synapse LOCALE 'C' ENCODING 'UTF-8' TEMPLATE template0;"
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: objectMeta,
-		Data:       map[string]string{"createdb.sql": "CREATE DATABASE synapse LOCALE 'C' ENCODING 'UTF-8' TEMPLATE template0;"},
+		Data:       map[string]string{"createdb.sql": createQuery},
 	}
 
 	if err := ctrl.SetControllerReference(s, configMap, r.Scheme); err != nil {

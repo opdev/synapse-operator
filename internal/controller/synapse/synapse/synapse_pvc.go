@@ -58,7 +58,9 @@ func (r *SynapseReconciler) reconcileSynapsePVC(ctx context.Context, req ctrl.Re
 }
 
 // persistentVolumeClaimForSynapse returns a synapse PVC object
-func (r *SynapseReconciler) persistentVolumeClaimForSynapse(s *synapsev1alpha1.Synapse) (*corev1.PersistentVolumeClaim, error) {
+func (r *SynapseReconciler) persistentVolumeClaimForSynapse(
+	s *synapsev1alpha1.Synapse,
+) (*corev1.PersistentVolumeClaim, error) {
 	pvc, err := templates.ResourceFromTemplate[synapsev1alpha1.Synapse, corev1.PersistentVolumeClaim](s, "pvc")
 	if err != nil {
 		return nil, fmt.Errorf("could not get template: %v", err)

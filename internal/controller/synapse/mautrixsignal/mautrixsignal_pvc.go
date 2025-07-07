@@ -34,7 +34,10 @@ import (
 // called in the main reconciliation loop.
 //
 // It reconciles the PVC for mautrix-signal to its desired state.
-func (r *MautrixSignalReconciler) reconcileMautrixSignalPVC(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *MautrixSignalReconciler) reconcileMautrixSignalPVC(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	ms := &synapsev1alpha1.MautrixSignal{}
 	if r, err := utils.GetResource(ctx, r.Client, req, ms); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
@@ -58,7 +61,9 @@ func (r *MautrixSignalReconciler) reconcileMautrixSignalPVC(ctx context.Context,
 }
 
 // persistentVolumeClaimForMautrixSignal returns a mautrix-signal PVC object
-func (r *MautrixSignalReconciler) persistentVolumeClaimForMautrixSignal(ms *synapsev1alpha1.MautrixSignal) (*corev1.PersistentVolumeClaim, error) {
+func (r *MautrixSignalReconciler) persistentVolumeClaimForMautrixSignal(
+	ms *synapsev1alpha1.MautrixSignal,
+) (*corev1.PersistentVolumeClaim, error) {
 	pvc, err := templates.ResourceFromTemplate[synapsev1alpha1.MautrixSignal, corev1.PersistentVolumeClaim](ms, "pvc")
 	if err != nil {
 		return nil, fmt.Errorf("could not get template: %v", err)

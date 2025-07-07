@@ -169,7 +169,10 @@ func labelsForSynapse(name string) map[string]string {
 	return map[string]string{"app": "synapse", "synapse_cr": name}
 }
 
-func (r *SynapseReconciler) setStatusHomeserverConfiguration(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *SynapseReconciler) setStatusHomeserverConfiguration(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
 	s := &synapsev1alpha1.Synapse{}
@@ -199,7 +202,10 @@ func (r *SynapseReconciler) isPostgresOperatorInstalled(ctx context.Context) boo
 //
 // It parses the PostgresCluster Secret and updates the Synapse status with the
 // database connection information.
-func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *SynapseReconciler) updateSynapseStatusWithPostgreSQLInfos(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
 	s := &synapsev1alpha1.Synapse{}
@@ -278,7 +284,8 @@ func (r *SynapseReconciler) updateSynapseStatusDatabase(
 	}
 
 	s.Status.DatabaseConnectionInfo.ConnectionURL = string(host) + ":" + string(port)
-	// s.Status.DatabaseConnectionInfo.DatabaseName = string(databaseName) // See https://github.com/opdev/synapse-operator/issues/12
+	// See https://github.com/opdev/synapse-operator/issues/12
+	// s.Status.DatabaseConnectionInfo.DatabaseName = string(databaseName)
 	s.Status.DatabaseConnectionInfo.DatabaseName = "synapse"
 	s.Status.DatabaseConnectionInfo.User = string(user)
 	s.Status.DatabaseConnectionInfo.Password = string(base64encode(string(password)))
@@ -325,7 +332,9 @@ func (r *SynapseReconciler) updateSynapseStatusBridges(ctx context.Context, req 
 	s.Status.Bridges.MautrixSignal = synapsev1alpha1.SynapseStatusBridgesMautrixSignal{}
 
 	hList := &synapsev1alpha1.HeisenbridgeList{}
-	r.Client.List(ctx, hList)
+	if err := r.Client.List(ctx, hList); err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
 	for _, h := range hList.Items {
 		if h.Spec.Synapse.Name == s.Name && h.GetDeletionTimestamp() == nil {
 			s.Status.Bridges.Heisenbridge.Enabled = true
@@ -335,7 +344,9 @@ func (r *SynapseReconciler) updateSynapseStatusBridges(ctx context.Context, req 
 	}
 
 	msList := &synapsev1alpha1.MautrixSignalList{}
-	r.Client.List(ctx, msList)
+	if err := r.Client.List(ctx, msList); err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
 	for _, ms := range msList.Items {
 		if ms.Spec.Synapse.Name == s.Name && ms.GetDeletionTimestamp() == nil {
 			s.Status.Bridges.MautrixSignal.Enabled = true

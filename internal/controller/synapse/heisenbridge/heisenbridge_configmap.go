@@ -37,7 +37,10 @@ import (
 //
 // It reconciles the heisenbridge ConfigMap to its desired state. It is called
 // only if the user hasn't provided its own ConfigMap for heisenbridge
-func (r *HeisenbridgeReconciler) reconcileHeisenbridgeConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *HeisenbridgeReconciler) reconcileHeisenbridgeConfigMap(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	h := &synapsev1alpha1.Heisenbridge{}
 	if r, err := utils.GetResource(ctx, r.Client, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
@@ -72,7 +75,10 @@ func (r *HeisenbridgeReconciler) configMapForHeisenbridge(h *synapsev1alpha1.Hei
 		HeisenbridgeFQDN: utils.ComputeFQDN(h.Name, h.Namespace),
 	}
 
-	cm, err := templates.ResourceFromTemplate[configmapExtraValues, corev1.ConfigMap](&extraValues, "heisenbridge_configmap")
+	cm, err := templates.ResourceFromTemplate[configmapExtraValues, corev1.ConfigMap](
+		&extraValues,
+		"heisenbridge_configmap",
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not get template: %v", err)
 	}
@@ -90,7 +96,10 @@ func (r *HeisenbridgeReconciler) configMapForHeisenbridge(h *synapsev1alpha1.Hei
 //
 // Following the previous copy of the user-provided ConfigMap, it edits the
 // content of the copy to ensure that heisenbridge is correctly configured.
-func (r *HeisenbridgeReconciler) configureHeisenbridgeConfigMap(ctx context.Context, req ctrl.Request) (*ctrl.Result, error) {
+func (r *HeisenbridgeReconciler) configureHeisenbridgeConfigMap(
+	ctx context.Context,
+	req ctrl.Request,
+) (*ctrl.Result, error) {
 	h := &synapsev1alpha1.Heisenbridge{}
 	if r, err := utils.GetResource(ctx, r.Client, req, h); subreconciler.ShouldHaltOrRequeue(r, err) {
 		return r, err
