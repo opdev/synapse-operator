@@ -4,6 +4,6 @@ metadata:
   name: mautrixsignal-for-synapse
 spec:
   configMap:
-    name: my-custom-mautrixignal-config
+    name: my-custom-mautrixsignal-config
   synapse:
     name: synapse-with-mautrixsignal
