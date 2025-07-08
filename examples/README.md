@@ -126,8 +126,13 @@ $ kubectl delete configmap my-custom-homeserver
 configmap "my-custom-homeserver" deleted
 ```
 
-## Deploying a PostgreSQL instance for Synapse
+## [DEPRECATED] Deploying a PostgreSQL instance for Synapse
 
+> [!WARNING]
+> This feature is not tested on recent versions of the Synapse Operator and
+> will be removed in the future
+
+> [!NOTE]
 > *Pre-requisite:* The deployment of a PostgreSQL instance relies on the
 >  [postgres-operator](https://github.com/CrunchyData/postgres-operator). Make
 >  sure it is running on your cluster if you want to deploy a PostgreSQL
