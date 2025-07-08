@@ -879,7 +879,7 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: quay.io/opdev/synapse-operator:v0.6.1
+        image: quay.io/opdev/synapse-operator:v0.7.0
         livenessProbe:
           httpGet:
             path: /healthz
