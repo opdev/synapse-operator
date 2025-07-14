@@ -404,7 +404,7 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 
 			When("Specifying the Heisenbridge configuration via a ConfigMap", func() {
 				var inputConfigMap *corev1.ConfigMap
-				var heisenbridgeYaml string = ""
+				var heisenbridgeYaml = ""
 
 				const heisenbridgeFQDN = HeisenbridgeName + "." + HeisenbridgeNamespace + ".svc.cluster.local"
 				const heisenbridgePort = 9898

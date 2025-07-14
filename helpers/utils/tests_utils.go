@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2" //lint:ignore ST1001 Ginkgo and gomega are usually dot-imported
-	. "github.com/onsi/gomega"    //lint:ignore ST1001 Ginkgo and gomega are usually dot-imported
+	. "github.com/onsi/ginkgo/v2" //nolint:staticcheck // ST1001 Ginkgo and gomega are usually dot-imported
+	. "github.com/onsi/gomega"    //nolint:staticcheck // ST1001 Ginkgo and gomega are usually dot-imported
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"

@@ -40,7 +40,7 @@ type updateDataFunc func(obj client.Object, data map[string]interface{}) error
 // * The name of the file to update in the ConfigMap
 func UpdateConfigMap(
 	ctx context.Context,
-	client client.Client,
+	kubeClient client.Client,
 	key types.NamespacedName,
 	obj client.Object,
 	updateData updateDataFunc,
@@ -49,7 +49,7 @@ func UpdateConfigMap(
 	cm := &corev1.ConfigMap{}
 
 	// Get latest ConfigMap version
-	if err := client.Get(ctx, key, cm); err != nil {
+	if err := kubeClient.Get(ctx, key, cm); err != nil {
 		return err
 	}
 
@@ -58,7 +58,7 @@ func UpdateConfigMap(
 	}
 
 	// Update ConfigMap
-	if err := client.Update(ctx, cm); err != nil {
+	if err := kubeClient.Update(ctx, cm); err != nil {
 		return err
 	}
 
@@ -146,7 +146,7 @@ func writeYAMLFileToConfigMapData(
 // source ConfigMap. The resulting copy is a ConfigMap with similar data, and
 // with metadata set by the 'copyConfigMapObjectMeta' argument.
 func GetConfigMapCopy(
-	client client.Client,
+	kubeClient client.Client,
 	sourceConfigMapName string,
 	sourceConfigMapNamespace string,
 	copyConfigMapObjectMeta metav1.ObjectMeta,
@@ -156,7 +156,7 @@ func GetConfigMapCopy(
 	ctx := context.TODO()
 
 	// Get sourceConfigMap
-	if err := client.Get(
+	if err := kubeClient.Get(
 		ctx,
 		types.NamespacedName{Name: sourceConfigMapName, Namespace: sourceConfigMapNamespace},
 		sourceConfigMap,
