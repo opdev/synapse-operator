@@ -326,6 +326,11 @@ func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1
 	return databaseDataMap, nil
 }
 
+// updateSynapseConfigMapForBridges is a function of type
+// FnWithRequest, to be called in the main reconciliation loop.
+//
+// It registers the bridges as a application services in the
+// homeserver.yaml config file.
 func (r *SynapseReconciler) updateSynapseConfigMapForBridges(
 	ctx context.Context,
 	req ctrl.Request,
@@ -335,127 +340,61 @@ func (r *SynapseReconciler) updateSynapseConfigMapForBridges(
 		return r, err
 	}
 
+	keyForSynapse := types.NamespacedName{
+		Name:      s.Name,
+		Namespace: s.Namespace,
+	}
+
+	// Update the Synapse ConfigMap to enable bridges
+	if err := utils.UpdateConfigMap(
+		ctx,
+		r.Client,
+		keyForSynapse,
+		s,
+		r.updateHomeserverWithBridgesInfo,
+		"homeserver.yaml",
+	); err != nil {
+		return subreconciler.RequeueWithError(err)
+	}
+
+	return subreconciler.ContinueReconciling()
+}
+
+func (r *SynapseReconciler) updateHomeserverWithBridgesInfo(
+	obj client.Object,
+	homeserver map[string]interface{},
+) error {
+	s := obj.(*synapsev1alpha1.Synapse)
+
+	var appServiceConfigPaths []string
+
 	if s.Status.Bridges.Heisenbridge.Enabled {
-		if r, err := r.updateSynapseConfigMapForHeisenbridge(ctx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
-			return r, err
-		}
+		appServiceConfigPaths = append(appServiceConfigPaths, "/data-heisenbridge/heisenbridge.yaml")
 	}
 
 	if s.Status.Bridges.MautrixSignal.Enabled {
-		if r, err := r.updateSynapseConfigMapForMautrixSignal(ctx, req); subreconciler.ShouldHaltOrRequeue(r, err) {
-			return r, err
-		}
+		appServiceConfigPaths = append(appServiceConfigPaths, "/data-mautrixsignal/registration.yaml")
 	}
 
-	return subreconciler.ContinueReconciling()
-}
-
-// updateSynapseConfigMapForHeisenbridge is a function of type
-// FnWithRequest, to be called in the main reconciliation loop.
-//
-// It registers the heisenbridge as an application service in the
-// homeserver.yaml config file.
-func (r *SynapseReconciler) updateSynapseConfigMapForHeisenbridge(
-	ctx context.Context,
-	req ctrl.Request,
-) (*ctrl.Result, error) {
-	s := &synapsev1alpha1.Synapse{}
-	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return r, err
+	if len(appServiceConfigPaths) > 0 {
+		r.addAppServicesToHomeserver(homeserver, appServiceConfigPaths)
 	}
 
-	keyForSynapse := types.NamespacedName{
-		Name:      s.Name,
-		Namespace: s.Namespace,
-	}
-
-	// Update the Synapse ConfigMap to enable heisenbridge
-	if err := utils.UpdateConfigMap(
-		ctx,
-		r.Client,
-		keyForSynapse,
-		s,
-		r.updateHomeserverWithHeisenbridgeInfos,
-		"homeserver.yaml",
-	); err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-
-	return subreconciler.ContinueReconciling()
-}
-
-// updateHomeserverWithHeisenbridgeInfos is a function of type updateDataFunc
-// function to be passed as an argument in a call to utils.UpdateConfigMap.
-//
-// It enables the Heisenbridge as an AppService in Synapse.
-func (r *SynapseReconciler) updateHomeserverWithHeisenbridgeInfos(
-	_ client.Object,
-	homeserver map[string]interface{},
-) error {
-	// Add heisenbridge configuration file to the list of application services
-	r.addAppServiceToHomeserver(homeserver, "/data-heisenbridge/heisenbridge.yaml")
 	return nil
 }
 
-// updateSynapseConfigMapForMautrixSignal is a function of type
-// FnWithRequest, to be called in the main reconciliation loop.
-//
-// It registers the mautrix-signal bridge as an application service in the
-// homeserver.yaml config file.
-func (r *SynapseReconciler) updateSynapseConfigMapForMautrixSignal(
-	ctx context.Context,
-	req ctrl.Request,
-) (*ctrl.Result, error) {
-	s := &synapsev1alpha1.Synapse{}
-	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return r, err
-	}
-
-	keyForSynapse := types.NamespacedName{
-		Name:      s.Name,
-		Namespace: s.Namespace,
-	}
-
-	// Update the Synapse ConfigMap to enable mautrix-signal
-	if err := utils.UpdateConfigMap(
-		ctx,
-		r.Client,
-		keyForSynapse,
-		s,
-		r.updateHomeserverWithMautrixSignalInfos,
-		"homeserver.yaml",
-	); err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-
-	return subreconciler.ContinueReconciling()
-}
-
-// updateHomeserverWithMautrixSignalInfos is a function of type updateDataFunc
-// function to be passed as an argument in a call to utils.UpdateConfigMap.
-//
-// It enables the mautrix-signal bridge as an AppService in Synapse.
-func (r *SynapseReconciler) updateHomeserverWithMautrixSignalInfos(
-	_ client.Object,
+func (r *SynapseReconciler) addAppServicesToHomeserver(
 	homeserver map[string]interface{},
-) error {
-	// Add mautrix-signal configuration file to the list of application services
-	r.addAppServiceToHomeserver(homeserver, "/data-mautrixsignal/registration.yaml")
-	return nil
-}
-
-func (r *SynapseReconciler) addAppServiceToHomeserver(
-	homeserver map[string]interface{},
-	configFilePath string,
+	configFilePaths []string,
 ) {
 	homeserverAppService, ok := homeserver["app_service_config_files"].([]string)
 	if !ok {
 		// "app_service_config_files" key not present, or malformed. Overwrite with
 		// the given app_service config file.
-		homeserver["app_service_config_files"] = []string{configFilePath}
+		homeserver["app_service_config_files"] = configFilePaths
 	} else {
 		// There are already app services registered. Adding to the list.
-		homeserver["app_service_config_files"] = append(homeserverAppService, configFilePath)
+		homeserver["app_service_config_files"] = append(homeserverAppService, configFilePaths...)
 	}
 }
 
