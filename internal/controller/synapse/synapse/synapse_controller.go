@@ -193,7 +193,7 @@ func (r *SynapseReconciler) setStatusHomeserverConfiguration(
 }
 
 func (r *SynapseReconciler) isPostgresOperatorInstalled(ctx context.Context) bool {
-	err := r.Client.List(ctx, &pgov1beta1.PostgresClusterList{})
+	err := r.List(ctx, &pgov1beta1.PostgresClusterList{})
 	return err == nil
 }
 
@@ -244,7 +244,7 @@ func (r *SynapseReconciler) updateSynapseStatusDatabase(
 	s *synapsev1alpha1.Synapse,
 	postgresSecret corev1.Secret,
 ) error {
-	var postgresSecretData map[string][]byte = postgresSecret.Data
+	var postgresSecretData = postgresSecret.Data
 
 	host, ok := postgresSecretData["host"]
 	if !ok {
@@ -332,7 +332,7 @@ func (r *SynapseReconciler) updateSynapseStatusBridges(ctx context.Context, req 
 	s.Status.Bridges.MautrixSignal = synapsev1alpha1.SynapseStatusBridgesMautrixSignal{}
 
 	hList := &synapsev1alpha1.HeisenbridgeList{}
-	if err := r.Client.List(ctx, hList); err != nil {
+	if err := r.List(ctx, hList); err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
 	for _, h := range hList.Items {
@@ -344,7 +344,7 @@ func (r *SynapseReconciler) updateSynapseStatusBridges(ctx context.Context, req 
 	}
 
 	msList := &synapsev1alpha1.MautrixSignalList{}
-	if err := r.Client.List(ctx, msList); err != nil {
+	if err := r.List(ctx, msList); err != nil {
 		return subreconciler.RequeueWithError(err)
 	}
 	for _, ms := range msList.Items {

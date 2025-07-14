@@ -446,7 +446,7 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 
 			When("Specifying the MautrixSignal configuration via a ConfigMap", func() {
 				var inputConfigMap *corev1.ConfigMap
-				var configYaml string = ""
+				var configYaml = ""
 
 				const mautrixsignalFQDN = MautrixSignalName + "." + MautrixSignalNamespace + ".svc.cluster.local"
 				const synapseFQDN = SynapseName + "." + SynapseNamespace + ".svc.cluster.local"
