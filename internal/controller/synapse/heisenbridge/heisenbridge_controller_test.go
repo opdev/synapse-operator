@@ -142,13 +142,13 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 		})
 
 		Context("Validating Heisenbridge CRD Schema", func() {
-			var obj map[string]interface{}
+			var obj map[string]any
 
 			BeforeEach(func() {
-				obj = map[string]interface{}{
+				obj = map[string]any{
 					"apiVersion": "synapse.opdev.io/v1alpha1",
 					"kind":       "Heisenbridge",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name":      HeisenbridgeName,
 						"namespace": HeisenbridgeNamespace,
 					},
@@ -156,7 +156,7 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 			})
 
 			DescribeTable("Creating a misconfigured Heisenbridge instance",
-				func(heisenbridge map[string]interface{}) {
+				func(heisenbridge map[string]any) {
 					// Augment base heisenbridge obj with additional fields
 					for key, value := range heisenbridge {
 						obj[key] = value
@@ -165,38 +165,38 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 					u := unstructured.Unstructured{Object: obj}
 					Expect(k8sClient.Create(ctx, &u)).ShouldNot(Succeed())
 				},
-				Entry("when Heisenbridge spec is missing", map[string]interface{}{}),
-				Entry("when Heisenbridge spec is empty", map[string]interface{}{
-					"spec": map[string]interface{}{},
+				Entry("when Heisenbridge spec is missing", map[string]any{}),
+				Entry("when Heisenbridge spec is empty", map[string]any{
+					"spec": map[string]any{},
 				}),
-				Entry("when Heisenbridge spec is missing Synapse reference", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"configMap": map[string]interface{}{
+				Entry("when Heisenbridge spec is missing Synapse reference", map[string]any{
+					"spec": map[string]any{
+						"configMap": map[string]any{
 							"name": "dummy",
 						},
 					},
 				}),
-				Entry("when Heisenbridge spec Synapse doesn't has a name", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"synapse": map[string]interface{}{
+				Entry("when Heisenbridge spec Synapse doesn't has a name", map[string]any{
+					"spec": map[string]any{
+						"synapse": map[string]any{
 							"namespase": "dummy",
 						},
 					},
 				}),
-				Entry("when Heisenbridge spec ConfigMap doesn't specify a Name", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"configMap": map[string]interface{}{
+				Entry("when Heisenbridge spec ConfigMap doesn't specify a Name", map[string]any{
+					"spec": map[string]any{
+						"configMap": map[string]any{
 							"namespace": "dummy",
 						},
-						"synapse": map[string]interface{}{
+						"synapse": map[string]any{
 							"name": "dummy",
 						},
 					},
 				}),
 				// This should not work but passes
-				PEntry("when Heisenbridge spec possesses an invalid field", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"synapse": map[string]interface{}{
+				PEntry("when Heisenbridge spec possesses an invalid field", map[string]any{
+					"spec": map[string]any{
+						"synapse": map[string]any{
 							"name": "dummy",
 						},
 						"invalidSpecFiels": "random",
@@ -205,7 +205,7 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 			)
 
 			DescribeTable("Creating a correct Heisenbridge instance",
-				func(heisenbridge map[string]interface{}) {
+				func(heisenbridge map[string]any) {
 					// Augment base heisenbridge obj with additional fields
 					for key, value := range heisenbridge {
 						obj[key] = value
@@ -218,13 +218,13 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 				},
 				Entry(
 					"when the Configuration file is provided via a ConfigMap",
-					map[string]interface{}{
-						"spec": map[string]interface{}{
-							"configMap": map[string]interface{}{
+					map[string]any{
+						"spec": map[string]any{
+							"configMap": map[string]any{
 								"name":      "dummy",
 								"namespace": "dummy",
 							},
-							"synapse": map[string]interface{}{
+							"synapse": map[string]any{
 								"name":      "dummy",
 								"namespace": "dummy",
 							},
@@ -233,12 +233,12 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 				),
 				Entry(
 					"when optional Synapse Namespace and ConfigMap Namespace are missing",
-					map[string]interface{}{
-						"spec": map[string]interface{}{
-							"configMap": map[string]interface{}{
+					map[string]any{
+						"spec": map[string]any{
+							"configMap": map[string]any{
 								"name": "dummy",
 							},
-							"synapse": map[string]interface{}{
+							"synapse": map[string]any{
 								"name": "dummy",
 							},
 						},
@@ -492,7 +492,7 @@ var _ = Describe("Integration tests for the Heisenbridge controller", Ordered, L
 						configMapdata, ok := createdConfigMap.Data["heisenbridge.yaml"]
 						g.Expect(ok).Should(BeTrue())
 
-						heisenbridge := make(map[string]interface{})
+						heisenbridge := make(map[string]any)
 						g.Expect(yaml.Unmarshal([]byte(configMapdata), heisenbridge)).Should(Succeed())
 
 						_, ok = heisenbridge["url"]

@@ -30,7 +30,7 @@ import (
 
 // Defines a function type. Functions of the updateDataFunc type implements the
 // logic to update the data of a configmap, defined by the 'data' argument.
-type updateDataFunc func(obj client.Object, data map[string]interface{}) error
+type updateDataFunc func(obj client.Object, data map[string]any) error
 
 // A generic function to update an existing ConfigMap. It takes as arguments:
 // * The context
@@ -106,8 +106,8 @@ func loadFileFromConfigMapData(
 func LoadYAMLFileFromConfigMapData(
 	configMap corev1.ConfigMap,
 	filename string,
-) (map[string]interface{}, error) {
-	yamlContent := map[string]interface{}{}
+) (map[string]any, error) {
+	yamlContent := map[string]any{}
 
 	content, err := loadFileFromConfigMapData(configMap, filename)
 	if err != nil {
@@ -131,7 +131,7 @@ func writeFileToConfigMapData(
 func writeYAMLFileToConfigMapData(
 	configMap *corev1.ConfigMap,
 	filename string,
-	yamlContent map[string]interface{},
+	yamlContent map[string]any,
 ) error {
 	bytesContent, err := yaml.Marshal(yamlContent)
 	if err != nil {

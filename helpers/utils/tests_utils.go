@@ -19,15 +19,15 @@ func BoolAddr(b bool) *bool {
 	return &boolVar
 }
 
-func Convert(i interface{}) interface{} {
+func Convert(i any) any {
 	switch x := i.(type) {
-	case map[interface{}]interface{}:
-		m2 := map[string]interface{}{}
+	case map[any]any:
+		m2 := map[string]any{}
 		for k, v := range x {
 			m2[k.(string)] = Convert(v)
 		}
 		return m2
-	case []interface{}:
+	case []any:
 		for i, v := range x {
 			x[i] = Convert(v)
 		}

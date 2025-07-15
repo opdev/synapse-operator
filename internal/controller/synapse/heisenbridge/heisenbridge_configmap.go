@@ -132,7 +132,7 @@ func (r *HeisenbridgeReconciler) configureHeisenbridgeConfigMap(
 // bridge.
 func (r *HeisenbridgeReconciler) updateHeisenbridgeWithURL(
 	obj client.Object,
-	heisenbridge map[string]interface{},
+	heisenbridge map[string]any,
 ) error {
 	h := obj.(*synapsev1alpha1.Heisenbridge)
 

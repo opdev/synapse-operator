@@ -151,7 +151,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			Expect(err).ShouldNot(HaveOccurred())
 
 			// Unmarshal the YAML document into an intermediate map
-			var mapBody interface{}
+			var mapBody any
 			Expect(yaml.Unmarshal(yamlBody, &mapBody)).ShouldNot(HaveOccurred())
 
 			// The map has to be converted. See https://stackoverflow.com/a/40737676/6133648
@@ -189,13 +189,13 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 		})
 
 		Context("Validating Synapse CRD Schema", func() {
-			var obj map[string]interface{}
+			var obj map[string]any
 
 			BeforeEach(func() {
-				obj = map[string]interface{}{
+				obj = map[string]any{
 					"apiVersion": "synapse.opdev.io/v1alpha1",
 					"kind":       "Synapse",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name":      SynapseName,
 						"namespace": SynapseNamespace,
 					},
@@ -203,7 +203,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			})
 
 			DescribeTable("Creating a misconfigured Synapse instance",
-				func(synapse_data map[string]interface{}) {
+				func(synapse_data map[string]any) {
 					// Augment base synapse obj with additional fields
 					for key, value := range synapse_data {
 						obj[key] = value
@@ -212,60 +212,60 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					u := unstructured.Unstructured{Object: obj}
 					Expect(k8sClient.Create(ctx, &u)).ShouldNot(Succeed())
 				},
-				Entry("when Synapse spec is missing", map[string]interface{}{}),
-				Entry("when Synapse spec is empty", map[string]interface{}{
-					"spec": map[string]interface{}{},
+				Entry("when Synapse spec is missing", map[string]any{}),
+				Entry("when Synapse spec is empty", map[string]any{
+					"spec": map[string]any{},
 				}),
-				Entry("when Synapse spec is missing Homeserver", map[string]interface{}{
-					"spec": map[string]interface{}{"createNewPostgreSQL": true},
+				Entry("when Synapse spec is missing Homeserver", map[string]any{
+					"spec": map[string]any{"createNewPostgreSQL": true},
 				}),
-				Entry("when Synapse spec Homeserver is empty", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"homeserver": map[string]interface{}{},
+				Entry("when Synapse spec Homeserver is empty", map[string]any{
+					"spec": map[string]any{
+						"homeserver": map[string]any{},
 					},
 				}),
-				Entry("when Synapse spec Homeserver possess both Values and ConfigMap", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"homeserver": map[string]interface{}{
-							"configMap": map[string]interface{}{
+				Entry("when Synapse spec Homeserver possess both Values and ConfigMap", map[string]any{
+					"spec": map[string]any{
+						"homeserver": map[string]any{
+							"configMap": map[string]any{
 								"name":      InputConfigMapName,
 								"namespace": SynapseNamespace,
 							},
-							"values": map[string]interface{}{
+							"values": map[string]any{
 								"serverName":  ServerName,
 								"reportStats": ReportStats,
 							},
 						}},
 				}),
-				Entry("when Synapse spec Homeserver ConfigMap doesn't specify a Name", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"homeserver": map[string]interface{}{
-							"configMap": map[string]interface{}{
+				Entry("when Synapse spec Homeserver ConfigMap doesn't specify a Name", map[string]any{
+					"spec": map[string]any{
+						"homeserver": map[string]any{
+							"configMap": map[string]any{
 								"namespace": SynapseNamespace,
 							},
 						}},
 				}),
-				Entry("when Synapse spec Homeserver Values is missing ServerName", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"homeserver": map[string]interface{}{
-							"values": map[string]interface{}{
+				Entry("when Synapse spec Homeserver Values is missing ServerName", map[string]any{
+					"spec": map[string]any{
+						"homeserver": map[string]any{
+							"values": map[string]any{
 								"reportStats": ReportStats,
 							},
 						}},
 				}),
-				Entry("when Synapse spec Homeserver Values is missing ReportStats", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"homeserver": map[string]interface{}{
-							"values": map[string]interface{}{
+				Entry("when Synapse spec Homeserver Values is missing ReportStats", map[string]any{
+					"spec": map[string]any{
+						"homeserver": map[string]any{
+							"values": map[string]any{
 								"serverName": ServerName,
 							},
 						}},
 				}),
 				// This should not work but passes
-				PEntry("when Synapse spec possesses an invalid field", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"homeserver": map[string]interface{}{
-							"configMap": map[string]interface{}{
+				PEntry("when Synapse spec possesses an invalid field", map[string]any{
+					"spec": map[string]any{
+						"homeserver": map[string]any{
+							"configMap": map[string]any{
 								"name":      InputConfigMapName,
 								"namespace": SynapseNamespace,
 							},
@@ -276,7 +276,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			)
 
 			DescribeTable("Creating a correct Synapse instance",
-				func(synapse_data map[string]interface{}) {
+				func(synapse_data map[string]any) {
 					// Augment base synapse obj with additional fields
 					for key, value := range synapse_data {
 						obj[key] = value
@@ -289,10 +289,10 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				},
 				Entry(
 					"when the Homeserver Configuration file is provided via a ConfigMap",
-					map[string]interface{}{
-						"spec": map[string]interface{}{
-							"homeserver": map[string]interface{}{
-								"configMap": map[string]interface{}{
+					map[string]any{
+						"spec": map[string]any{
+							"homeserver": map[string]any{
+								"configMap": map[string]any{
 									"name":      InputConfigMapName,
 									"namespace": SynapseNamespace,
 								},
@@ -303,10 +303,10 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				),
 				Entry(
 					"when the Homeserver Configuration values are provided",
-					map[string]interface{}{
-						"spec": map[string]interface{}{
-							"homeserver": map[string]interface{}{
-								"values": map[string]interface{}{
+					map[string]any{
+						"spec": map[string]any{
+							"homeserver": map[string]any{
+								"values": map[string]any{
 									"serverName":  ServerName,
 									"reportStats": ReportStats,
 								},
@@ -317,10 +317,10 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 				),
 				Entry(
 					"when optional CreateNewPostgreSQL and ConfigMap Namespace are missing",
-					map[string]interface{}{
-						"spec": map[string]interface{}{
-							"homeserver": map[string]interface{}{
-								"configMap": map[string]interface{}{
+					map[string]any{
+						"spec": map[string]any{
+							"homeserver": map[string]any{
+								"configMap": map[string]any{
 									"name": InputConfigMapName,
 								},
 							},
@@ -695,7 +695,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							ConfigMapData, ok := createdConfigMap.Data["homeserver.yaml"]
 							g.Expect(ok).Should(BeTrue())
 
-							homeserver := make(map[string]interface{})
+							homeserver := make(map[string]any)
 							g.Expect(yaml.Unmarshal([]byte(ConfigMapData), homeserver)).Should(Succeed())
 
 							_, ok = homeserver["database"]
@@ -815,7 +815,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							ConfigMapData, ok := createdConfigMap.Data["homeserver.yaml"]
 							g.Expect(ok).Should(BeTrue())
 
-							homeserver := make(map[string]interface{})
+							homeserver := make(map[string]any)
 							g.Expect(yaml.Unmarshal([]byte(ConfigMapData), homeserver)).Should(Succeed())
 
 							_, ok = homeserver["app_service_config_files"]
@@ -963,7 +963,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							ConfigMapData, ok := createdConfigMap.Data["homeserver.yaml"]
 							g.Expect(ok).Should(BeTrue())
 
-							homeserver := make(map[string]interface{})
+							homeserver := make(map[string]any)
 							g.Expect(yaml.Unmarshal([]byte(ConfigMapData), homeserver)).Should(Succeed())
 
 							_, ok = homeserver["app_service_config_files"]

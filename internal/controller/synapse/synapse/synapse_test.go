@@ -337,8 +337,8 @@ var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 	Context("When updating the Synapse ConfigMap Data with PostgreSQL database information", func() {
 		var r SynapseReconciler
 		var cm corev1.ConfigMap
-		var homeserver_in map[interface{}]interface{}
-		var homeserver_out map[interface{}]interface{}
+		var homeserver_in map[any]any
+		var homeserver_out map[any]any
 		var s synapsev1alpha1.Synapse
 		var synapseDatabaseInfo synapsev1alpha1.SynapseStatusDatabaseConnectionInfo
 
@@ -408,17 +408,17 @@ var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 			r = SynapseReconciler{}
 			cm = corev1.ConfigMap{}
 			s = synapsev1alpha1.Synapse{}
-			homeserver_out = make(map[interface{}]interface{})
+			homeserver_out = make(map[any]any)
 
 			// Init default value for pre-existing homeserver.yaml, and for Synapse
 			// Status given as input. These are intended to be overwritten in the
 			// different tests depending on the behavior that is currently being tested.
-			homeserver_in = map[interface{}]interface{}{
+			homeserver_in = map[any]any{
 				"server_name":  "example.com",
 				"report_stats": true,
-				"database": map[interface{}]interface{}{
+				"database": map[any]any{
 					"name": "sqlite3",
-					"args": map[interface{}]interface{}{
+					"args": map[any]any{
 						"database": "/path/to/homeserver.db",
 					},
 				},
@@ -462,12 +462,12 @@ var _ = Describe("Unit tests for Synapse package", Label("unit"), func() {
 
 		When("when homeserver.yaml contain prior database information for a PostgreSQL Instance", func() {
 			BeforeEach(func() {
-				homeserver_in = map[interface{}]interface{}{
+				homeserver_in = map[any]any{
 					"server_name":  "example.com",
 					"report_stats": true,
-					"database": map[interface{}]interface{}{
+					"database": map[any]any{
 						"name": "psycopg2",
-						"args": map[interface{}]interface{}{
+						"args": map[any]any{
 							"user":     "not-synapse",
 							"password": "PmRJTlF1cn1yPHZKUkUrWmJaRCxkPGE+",
 							"database": "anotherdb",

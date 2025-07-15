@@ -143,13 +143,13 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 		})
 
 		Context("Validating MautrixSignal CRD Schema", func() {
-			var obj map[string]interface{}
+			var obj map[string]any
 
 			BeforeEach(func() {
-				obj = map[string]interface{}{
+				obj = map[string]any{
 					"apiVersion": "synapse.opdev.io/v1alpha1",
 					"kind":       "MautrixSignal",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name":      MautrixSignalName,
 						"namespace": MautrixSignalNamespace,
 					},
@@ -157,7 +157,7 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 			})
 
 			DescribeTable("Creating a misconfigured MautrixSignal instance",
-				func(mautrixsignal map[string]interface{}) {
+				func(mautrixsignal map[string]any) {
 					// Augment base mautrixsignal obj with additional fields
 					for key, value := range mautrixsignal {
 						obj[key] = value
@@ -166,38 +166,38 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 					u := unstructured.Unstructured{Object: obj}
 					Expect(k8sClient.Create(ctx, &u)).ShouldNot(Succeed())
 				},
-				Entry("when MautrixSignal spec is missing", map[string]interface{}{}),
-				Entry("when MautrixSignal spec is empty", map[string]interface{}{
-					"spec": map[string]interface{}{},
+				Entry("when MautrixSignal spec is missing", map[string]any{}),
+				Entry("when MautrixSignal spec is empty", map[string]any{
+					"spec": map[string]any{},
 				}),
-				Entry("when MautrixSignal spec is missing Synapse reference", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"configMap": map[string]interface{}{
+				Entry("when MautrixSignal spec is missing Synapse reference", map[string]any{
+					"spec": map[string]any{
+						"configMap": map[string]any{
 							"name": "dummy",
 						},
 					},
 				}),
-				Entry("when MautrixSignal spec Synapse doesn't has a name", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"synapse": map[string]interface{}{
+				Entry("when MautrixSignal spec Synapse doesn't has a name", map[string]any{
+					"spec": map[string]any{
+						"synapse": map[string]any{
 							"namespase": "dummy",
 						},
 					},
 				}),
-				Entry("when MautrixSignal spec ConfigMap doesn't specify a Name", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"configMap": map[string]interface{}{
+				Entry("when MautrixSignal spec ConfigMap doesn't specify a Name", map[string]any{
+					"spec": map[string]any{
+						"configMap": map[string]any{
 							"namespace": "dummy",
 						},
-						"synapse": map[string]interface{}{
+						"synapse": map[string]any{
 							"name": "dummy",
 						},
 					},
 				}),
 				// This should not work but passes
-				PEntry("when MautrixSignal spec possesses an invalid field", map[string]interface{}{
-					"spec": map[string]interface{}{
-						"synapse": map[string]interface{}{
+				PEntry("when MautrixSignal spec possesses an invalid field", map[string]any{
+					"spec": map[string]any{
+						"synapse": map[string]any{
 							"name": "dummy",
 						},
 						"invalidSpecFiels": "random",
@@ -206,7 +206,7 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 			)
 
 			DescribeTable("Creating a correct MautrixSignal instance",
-				func(mautrixsignal map[string]interface{}) {
+				func(mautrixsignal map[string]any) {
 					// Augment base mautrixsignal obj with additional fields
 					for key, value := range mautrixsignal {
 						obj[key] = value
@@ -219,13 +219,13 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 				},
 				Entry(
 					"when the Configuration file is provided via a ConfigMap",
-					map[string]interface{}{
-						"spec": map[string]interface{}{
-							"configMap": map[string]interface{}{
+					map[string]any{
+						"spec": map[string]any{
+							"configMap": map[string]any{
 								"name":      "dummy",
 								"namespace": "dummy",
 							},
-							"synapse": map[string]interface{}{
+							"synapse": map[string]any{
 								"name":      "dummy",
 								"namespace": "dummy",
 							},
@@ -234,12 +234,12 @@ var _ = Describe("Integration tests for the MautrixSignal controller", Ordered, 
 				),
 				Entry(
 					"when optional Synapse Namespace and ConfigMap Namespace are missing",
-					map[string]interface{}{
-						"spec": map[string]interface{}{
-							"configMap": map[string]interface{}{
+					map[string]any{
+						"spec": map[string]any{
+							"configMap": map[string]any{
 								"name": "dummy",
 							},
-							"synapse": map[string]interface{}{
+							"synapse": map[string]any{
 								"name": "dummy",
 							},
 						},
@@ -567,41 +567,41 @@ logging:
 						ConfigMapdata, ok := createdConfigMap.Data["config.yaml"]
 						g.Expect(ok).Should(BeTrue())
 
-						config := make(map[string]interface{})
+						config := make(map[string]any)
 						g.Expect(yaml.Unmarshal([]byte(ConfigMapdata), config)).Should(Succeed())
 
 						By("Verifying that the homeserver configuration has been updated")
-						configHomeserver, ok := config["homeserver"].(map[string]interface{})
+						configHomeserver, ok := config["homeserver"].(map[string]any)
 						g.Expect(ok).Should(BeTrue())
 						g.Expect(configHomeserver["address"]).To(Equal("http://" + synapseFQDN + ":8008"))
 						g.Expect(configHomeserver["domain"]).To(Equal(SynapseServerName))
 
 						By("Verifying that the appservice configuration has been updated")
 						expectedConfigAppServiceAddress := "http://" + mautrixsignalFQDN + ":" + strconv.Itoa(mautrixsignalPort)
-						configAppservice, ok := config["appservice"].(map[string]interface{})
+						configAppservice, ok := config["appservice"].(map[string]any)
 						g.Expect(ok).Should(BeTrue())
 						g.Expect(configAppservice["address"]).To(Equal(expectedConfigAppServiceAddress))
 
 						By("Verifying that the signal configuration has been updated")
-						configSignal, ok := config["signal"].(map[string]interface{})
+						configSignal, ok := config["signal"].(map[string]any)
 						g.Expect(ok).Should(BeTrue())
 						g.Expect(configSignal["socket_path"]).To(Equal("/signald/signald.sock"))
 
 						By("Verifying that the permissions have been updated")
-						configBridge, ok := config["bridge"].(map[string]interface{})
+						configBridge, ok := config["bridge"].(map[string]any)
 						g.Expect(ok).Should(BeTrue())
-						configBridgePermissions, ok := configBridge["permissions"].(map[string]interface{})
+						configBridgePermissions, ok := configBridge["permissions"].(map[string]any)
 						g.Expect(ok).Should(BeTrue())
 						g.Expect(configBridgePermissions).Should(HaveKeyWithValue("*", "relay"))
 						g.Expect(configBridgePermissions).Should(HaveKeyWithValue(SynapseServerName, "user"))
 						g.Expect(configBridgePermissions).Should(HaveKeyWithValue("@admin:"+SynapseServerName, "admin"))
 
 						By("Verifying that the log configuration file path have been updated")
-						configLogging, ok := config["logging"].(map[string]interface{})
+						configLogging, ok := config["logging"].(map[string]any)
 						g.Expect(ok).Should(BeTrue())
-						configLoggingHandlers, ok := configLogging["handlers"].(map[string]interface{})
+						configLoggingHandlers, ok := configLogging["handlers"].(map[string]any)
 						g.Expect(ok).Should(BeTrue())
-						configLoggingHandlersFile, ok := configLoggingHandlers["file"].(map[string]interface{})
+						configLoggingHandlersFile, ok := configLoggingHandlers["file"].(map[string]any)
 						g.Expect(ok).Should(BeTrue())
 						g.Expect(configLoggingHandlersFile["filename"]).To(Equal("/data/mautrix-signal.log"))
 					}, timeout, interval).Should(Succeed())
