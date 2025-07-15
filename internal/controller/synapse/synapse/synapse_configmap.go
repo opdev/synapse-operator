@@ -254,7 +254,7 @@ func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(
 
 func (r *SynapseReconciler) updateHomeserverWithPostgreSQLInfos(
 	obj client.Object,
-	homeserver map[string]interface{},
+	homeserver map[string]any,
 ) error {
 	s := obj.(*synapsev1alpha1.Synapse)
 
@@ -268,43 +268,43 @@ func (r *SynapseReconciler) updateHomeserverWithPostgreSQLInfos(
 	return nil
 }
 
-func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1.Synapse) (map[string]interface{}, error) {
+func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1.Synapse) (map[string]any, error) {
 	databaseData := HomeserverPgsqlDatabase{}
 
 	// Check if s.Status.DatabaseConnectionInfo contains necessary information
 	if s.Status.DatabaseConnectionInfo == (synapsev1alpha1.SynapseStatusDatabaseConnectionInfo{}) {
 		err := errors.New("missing DatabaseConnectionInfo in Synapse status")
-		return map[string]interface{}{}, err
+		return map[string]any{}, err
 	}
 
 	if s.Status.DatabaseConnectionInfo.User == "" {
 		err := errors.New("missing User in DatabaseConnectionInfo")
-		return map[string]interface{}{}, err
+		return map[string]any{}, err
 	}
 
 	if s.Status.DatabaseConnectionInfo.Password == "" {
 		err := errors.New("missing Password in DatabaseConnectionInfo")
-		return map[string]interface{}{}, err
+		return map[string]any{}, err
 	}
 	decodedPassword := base64decode([]byte(s.Status.DatabaseConnectionInfo.Password))
 
 	if s.Status.DatabaseConnectionInfo.DatabaseName == "" {
 		err := errors.New("missing DatabaseName in DatabaseConnectionInfo")
-		return map[string]interface{}{}, err
+		return map[string]any{}, err
 	}
 
 	if s.Status.DatabaseConnectionInfo.ConnectionURL == "" {
 		err := errors.New("missing ConnectionURL in DatabaseConnectionInfo")
-		return map[string]interface{}{}, err
+		return map[string]any{}, err
 	}
 	connectionURL := strings.Split(s.Status.DatabaseConnectionInfo.ConnectionURL, ":")
 	if len(connectionURL) < 2 {
 		err := errors.New("error parsing the Connection URL with value: " + s.Status.DatabaseConnectionInfo.ConnectionURL)
-		return map[string]interface{}{}, err
+		return map[string]any{}, err
 	}
 	port, err := strconv.ParseInt(connectionURL[1], 10, 64)
 	if err != nil {
-		return map[string]interface{}{}, err
+		return map[string]any{}, err
 	}
 
 	// Populate databaseData
@@ -317,10 +317,10 @@ func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1
 	databaseData.Args.CpMin = 5
 	databaseData.Args.CpMax = 10
 
-	// Convert databaseData into a map[string]interface{}
+	// Convert databaseData into a map[string]any
 	databaseDataMap, err := utils.ConvertStructToMap(databaseData)
 	if err != nil {
-		return map[string]interface{}{}, err
+		return map[string]any{}, err
 	}
 
 	return databaseDataMap, nil
@@ -362,7 +362,7 @@ func (r *SynapseReconciler) updateSynapseConfigMapForBridges(
 
 func (r *SynapseReconciler) updateHomeserverWithBridgesInfo(
 	obj client.Object,
-	homeserver map[string]interface{},
+	homeserver map[string]any,
 ) error {
 	s := obj.(*synapsev1alpha1.Synapse)
 
@@ -384,7 +384,7 @@ func (r *SynapseReconciler) updateHomeserverWithBridgesInfo(
 }
 
 func (r *SynapseReconciler) addAppServicesToHomeserver(
-	homeserver map[string]interface{},
+	homeserver map[string]any,
 	configFilePaths []string,
 ) {
 	homeserverAppService, ok := homeserver["app_service_config_files"].([]string)

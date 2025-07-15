@@ -141,7 +141,7 @@ func (r *MautrixSignalReconciler) configureMautrixSignalConfigMap(
 // and knows the correct path to the signald socket.
 func (r *MautrixSignalReconciler) updateMautrixSignalData(
 	obj client.Object,
-	config map[string]interface{},
+	config map[string]any,
 ) error {
 	ms := obj.(*synapsev1alpha1.MautrixSignal)
 
@@ -150,7 +150,7 @@ func (r *MautrixSignalReconciler) updateMautrixSignalData(
 	synapseServerName := ms.Status.Synapse.ServerName
 
 	// Update the homeserver section so that the bridge can reach Synapse
-	configHomeserver, ok := config["homeserver"].(map[string]interface{})
+	configHomeserver, ok := config["homeserver"].(map[string]any)
 	if !ok {
 		err := errors.New("cannot parse mautrix-signal config.yaml: error parsing 'homeserver' section")
 		return err
@@ -160,7 +160,7 @@ func (r *MautrixSignalReconciler) updateMautrixSignalData(
 	config["homeserver"] = configHomeserver
 
 	// Update the appservice section so that Synapse can reach the bridge
-	configAppservice, ok := config["appservice"].(map[string]interface{})
+	configAppservice, ok := config["appservice"].(map[string]any)
 	if !ok {
 		err := errors.New("cannot parse mautrix-signal config.yaml: error parsing 'appservice' section")
 		return err
@@ -169,7 +169,7 @@ func (r *MautrixSignalReconciler) updateMautrixSignalData(
 	config["appservice"] = configAppservice
 
 	// Update the path to the signal socket path
-	configSignal, ok := config["signal"].(map[string]interface{})
+	configSignal, ok := config["signal"].(map[string]any)
 	if !ok {
 		err := errors.New("cannot parse mautrix-signal config.yaml: error parsing 'signal' section")
 		return err
@@ -178,7 +178,7 @@ func (r *MautrixSignalReconciler) updateMautrixSignalData(
 	config["signal"] = configSignal
 
 	// Update persmissions to use the correct domain name
-	configBridge, ok := config["bridge"].(map[string]interface{})
+	configBridge, ok := config["bridge"].(map[string]any)
 	if !ok {
 		err := errors.New("cannot parse mautrix-signal config.yaml: error parsing 'bridge' section")
 		return err
@@ -191,17 +191,17 @@ func (r *MautrixSignalReconciler) updateMautrixSignalData(
 	config["bridge"] = configBridge
 
 	// Update the path to the log file
-	configLogging, ok := config["logging"].(map[string]interface{})
+	configLogging, ok := config["logging"].(map[string]any)
 	if !ok {
 		err := errors.New("cannot parse mautrix-signal config.yaml: error parsing 'logging' section")
 		return err
 	}
-	configLoggingHandlers, ok := configLogging["handlers"].(map[string]interface{})
+	configLoggingHandlers, ok := configLogging["handlers"].(map[string]any)
 	if !ok {
 		err := errors.New("cannot parse mautrix-signal config.yaml: error parsing 'logging/handlers' section")
 		return err
 	}
-	configLoggingHandlersFile, ok := configLoggingHandlers["file"].(map[string]interface{})
+	configLoggingHandlersFile, ok := configLoggingHandlers["file"].(map[string]any)
 	if !ok {
 		err := errors.New("cannot parse mautrix-signal config.yaml: error parsing 'logging/handlers/file' section")
 		return err

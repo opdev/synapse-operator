@@ -18,9 +18,9 @@ package utils
 
 import "gopkg.in/yaml.v3"
 
-func ConvertStructToMap(in interface{}) (map[string]interface{}, error) {
+func ConvertStructToMap(in any) (map[string]any, error) {
 	var intermediate []byte
-	var out map[string]interface{}
+	var out map[string]any
 	intermediate, err := yaml.Marshal(in)
 	if err != nil {
 		return nil, err
