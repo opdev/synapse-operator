@@ -7,7 +7,7 @@ require (
 	github.com/crunchydata/postgres-operator v1.3.3-0.20220202164906-1c3cc3597c95
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.1
-	github.com/opdev/subreconciler v0.0.0-20230302151718-c4c8b5ec17c5
+	github.com/opdev/subreconciler v0.0.3
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.33.0
 	k8s.io/apiextensions-apiserver v0.33.0
