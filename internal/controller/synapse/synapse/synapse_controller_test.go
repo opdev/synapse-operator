@@ -456,7 +456,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					By("Checking that a Synapse Deployment exists and is correctly configured")
 					checkResourcePresence(createdDeployment, synapseLookupKey, expectedOwnerReference)
 
-					By("Checking that initContainers contains the required environment variables")
+					By("Checking that initContainer for generating config file contains the required environment variables")
 					envVars := []corev1.EnvVar{{
 						Name:  "SYNAPSE_SERVER_NAME",
 						Value: ServerName,
@@ -464,7 +464,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						Name:  "SYNAPSE_REPORT_STATS",
 						Value: utils.BoolToYesNo(ReportStats),
 					}}
-					Expect(createdDeployment.Spec.Template.Spec.InitContainers[0].Env).Should(ContainElements(envVars))
+					Expect(createdDeployment.Spec.Template.Spec.InitContainers[1].Env).Should(ContainElements(envVars))
 				})
 
 				It("Should create a Synapse Service", func() {
@@ -557,7 +557,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 						By("Checking that a Synapse Deployment exists and is correctly configured")
 						checkResourcePresence(createdDeployment, synapseLookupKey, expectedOwnerReference)
 
-						By("Checking that initContainers contains the required environment variables")
+						By("Checking that initContainer for generating config file contains the required environment variables")
 						envVars := []corev1.EnvVar{{
 							Name:  "SYNAPSE_SERVER_NAME",
 							Value: ServerName,
@@ -565,7 +565,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							Name:  "SYNAPSE_REPORT_STATS",
 							Value: utils.BoolToYesNo(ReportStats),
 						}}
-						Expect(createdDeployment.Spec.Template.Spec.InitContainers[0].Env).Should(ContainElements(envVars))
+						Expect(createdDeployment.Spec.Template.Spec.InitContainers[1].Env).Should(ContainElements(envVars))
 					})
 
 					It("Should create a Synapse Service", func() {
