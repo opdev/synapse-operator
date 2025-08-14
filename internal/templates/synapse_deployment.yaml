@@ -21,19 +21,31 @@ spec:
       serviceAccountName: {{ .Values.Name }}
       {{- end }}
       initContainers:
+        # Copy homeserver.yaml from read-only ConfigMap to writable PV
+        # This allows manual editing of the configuration
+        - image: registry.access.redhat.com/ubi8/ubi-minimal:8.10
+          name: "copy-homeserver-config"
+          args:
+          - if [ ! -f /data/homeserver.yaml ]; then cp /data-homeserver/homeserver.yaml /data/homeserver.yaml; fi
+          command:
+          - bin/sh
+          - -c
+          volumeMounts:
+            - name: homeserver
+              mountPath: /data-homeserver
+            - name: data-pv
+              mountPath: /data
         - image: "matrixdotorg/synapse:v1.133.0"
           name: "synapse-generate"
           args: [ "generate" ]
           env:
             - name: SYNAPSE_CONFIG_PATH
-              value: /data-homeserver/homeserver.yaml
+              value: /data/homeserver.yaml
             - name: SYNAPSE_SERVER_NAME
               value: {{ .Values.Status.HomeserverConfiguration.ServerName }}
             - name: SYNAPSE_REPORT_STATS
               value: {{ if .Values.Status.HomeserverConfiguration.ReportStats }}"yes"{{ else }}"no"{{ end }}
           volumeMounts:
-            - name: homeserver
-              mountPath: /data-homeserver
             - name: data-pv
               mountPath: /data
         {{ if .Values.Status.Bridges.MautrixSignal.Enabled -}}
@@ -53,7 +65,7 @@ spec:
           name: "synapse"
           env:
             - name: SYNAPSE_CONFIG_PATH
-              value: /data-homeserver/homeserver.yaml
+              value: /data/homeserver.yaml
           volumeMounts:
             - name: homeserver
               mountPath: /data-homeserver
