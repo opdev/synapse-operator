@@ -34,6 +34,8 @@ data:
     media_store_path: "/data/media_store"
     registration_shared_secret: "{{ .Values.RegistrationSharedSecret }}"
     report_stats: {{ if .Values.Spec.Homeserver.Values.ReportStats }}yes{{ else }}no{{ end }}
+    enable_registration: {{ if eq (Deref .Values.Spec.Homeserver.Values.EnableRegistration) true }}true{{ else }}false{{ end }}
+    {{ if eq (Deref .Values.Spec.Homeserver.Values.EnableRegistration) true }}enable_registration_without_verification: true{{ end }}
     macaroon_secret_key: "{{ .Values.MacaroonSecretKey }}"
     form_secret: "{{ .Values.FormSecret }}"
     signing_key_path: "data/{{ .Values.Spec.Homeserver.Values.ServerName }}.signing.key"
