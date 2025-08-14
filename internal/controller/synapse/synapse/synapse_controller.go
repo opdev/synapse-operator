@@ -183,6 +183,13 @@ func (r *SynapseReconciler) setStatusHomeserverConfiguration(
 	s.Status.HomeserverConfiguration.ServerName = s.Spec.Homeserver.Values.ServerName
 	s.Status.HomeserverConfiguration.ReportStats = s.Spec.Homeserver.Values.ReportStats
 
+	// Set registration enabled status - default to false if not specified
+	registrationEnabled := false
+	if s.Spec.Homeserver.Values.EnableRegistration != nil {
+		registrationEnabled = *s.Spec.Homeserver.Values.EnableRegistration
+	}
+	s.Status.HomeserverConfiguration.RegistrationEnabled = registrationEnabled
+
 	err := utils.UpdateResourceStatus(ctx, r.Client, s, &synapsev1alpha1.Synapse{})
 	if err != nil {
 		log.Error(err, "Error updating Synapse Status")

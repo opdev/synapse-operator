@@ -74,6 +74,11 @@ spec:
                       Holds the required values for the creation of a homeserver.yaml
                       configuration file by the Synapse Operator
                     properties:
+                      enableRegistration:
+                        default: false
+                        description: Whether new user registration is allowed. Defaults
+                          to false.
+                        type: boolean
                       reportStats:
                         description: Whether or not to report anonymized homeserver
                           usage statistics
@@ -145,6 +150,9 @@ spec:
               homeserverConfiguration:
                 description: Holds configuration information for Synapse
                 properties:
+                  registrationEnabled:
+                    description: Whether new user registration is enabled
+                    type: boolean
                   reportStats:
                     description: Whether or not to report anonymized homeserver usage
                       statistics

@@ -17,7 +17,9 @@ func ResourceFromTemplate[T any, R any](t *T, name string) (*R, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not read %s template: %v", name, err)
 	}
-	tmpl, err := template.New(name).Parse(string(resYaml))
+	tmpl, err := template.New(name).Funcs(template.FuncMap{
+		"Deref": func(i *bool) bool { return *i },
+	}).Parse(string(resYaml))
 	if err != nil {
 		return nil, fmt.Errorf("could not parse %s template: %v", name, err)
 	}

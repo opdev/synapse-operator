@@ -80,6 +80,11 @@ type SynapseHomeserverValues struct {
 
 	// Whether or not to report anonymized homeserver usage statistics
 	ReportStats bool `json:"reportStats"`
+
+	// +kubebuilder:default:=false
+
+	// Whether new user registration is allowed. Defaults to false.
+	EnableRegistration *bool `json:"enableRegistration,omitempty"`
 }
 
 // SynapseStatus defines the observed state of Synapse.
@@ -155,6 +160,9 @@ type SynapseStatusHomeserverConfiguration struct {
 
 	// Whether or not to report anonymized homeserver usage statistics
 	ReportStats bool `json:"reportStats,omitempty"`
+
+	// Whether new user registration is enabled
+	RegistrationEnabled bool `json:"registrationEnabled,omitempty"`
 }
 
 // +kubebuilder:object:root=true

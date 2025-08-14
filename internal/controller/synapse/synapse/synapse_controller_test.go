@@ -316,6 +316,20 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					},
 				),
 				Entry(
+					"when registration option is provided",
+					map[string]any{
+						"spec": map[string]any{
+							"homeserver": map[string]any{
+								"values": map[string]any{
+									"serverName":         ServerName,
+									"reportStats":        ReportStats,
+									"enableRegistration": true,
+								},
+							},
+						},
+					},
+				),
+				Entry(
 					"when optional CreateNewPostgreSQL and ConfigMap Namespace are missing",
 					map[string]any{
 						"spec": map[string]any{
@@ -408,75 +422,157 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 			}
 
 			When("Specifying the Synapse configuration via Values", func() {
-				BeforeAll(func() {
-					initSynapseVariables()
+				When("Creating a simple Synapse instance", func() {
+					BeforeAll(func() {
+						initSynapseVariables()
 
-					synapseSpec = synapsev1alpha1.SynapseSpec{
-						Homeserver: synapsev1alpha1.SynapseHomeserver{
-							Values: &synapsev1alpha1.SynapseHomeserverValues{
-								ServerName:  ServerName,
-								ReportStats: ReportStats,
+						synapseSpec = synapsev1alpha1.SynapseSpec{
+							Homeserver: synapsev1alpha1.SynapseHomeserver{
+								Values: &synapsev1alpha1.SynapseHomeserverValues{
+									ServerName:  ServerName,
+									ReportStats: ReportStats,
+								},
 							},
+							IsOpenshift: true,
+						}
+
+						createSynapseInstance()
+					})
+
+					AfterAll(func() {
+						cleanupSynapseResources()
+					})
+
+					It("Should should update the Synapse Status", func() {
+						expectedStatus := synapsev1alpha1.SynapseStatus{
+							State:  "RUNNING",
+							Reason: "",
+							HomeserverConfiguration: synapsev1alpha1.SynapseStatusHomeserverConfiguration{
+								ServerName:          ServerName,
+								ReportStats:         ReportStats,
+								RegistrationEnabled: false, // Default value
+							},
+						}
+						// Status may need some time to be updated
+						Eventually(func() synapsev1alpha1.SynapseStatus {
+							_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
+							return synapse.Status
+						}, timeout, interval).Should(Equal(expectedStatus))
+					})
+
+					It("Should create a Synapse ConfigMap", func() {
+						checkResourcePresence(createdConfigMap, synapseLookupKey, expectedOwnerReference)
+					})
+
+					It("Should create a Synapse PVC", func() {
+						checkResourcePresence(createdPVC, synapseLookupKey, expectedOwnerReference)
+					})
+
+					It("Should create a Synapse Deployment", func() {
+						By("Checking that a Synapse Deployment exists and is correctly configured")
+						checkResourcePresence(createdDeployment, synapseLookupKey, expectedOwnerReference)
+
+						By("Checking that initContainer for generating config file contains the required environment variables")
+						envVars := []corev1.EnvVar{{
+							Name:  "SYNAPSE_SERVER_NAME",
+							Value: ServerName,
+						}, {
+							Name:  "SYNAPSE_REPORT_STATS",
+							Value: utils.BoolToYesNo(ReportStats),
+						}}
+						Expect(createdDeployment.Spec.Template.Spec.InitContainers[1].Env).Should(ContainElements(envVars))
+					})
+
+					It("Should create a Synapse Service", func() {
+						checkResourcePresence(createdService, synapseLookupKey, expectedOwnerReference)
+					})
+
+					It("Should create a Synapse ServiceAccount", func() {
+						checkResourcePresence(createdServiceAccount, synapseLookupKey, expectedOwnerReference)
+					})
+
+					It("Should create a Synapse RoleBinding", func() {
+						checkResourcePresence(createdRoleBinding, synapseLookupKey, expectedOwnerReference)
+					})
+				})
+
+				When("Specifying a registration option", func() {
+					DescribeTable("Should create a ConfigMap with the correct enable_registration setting",
+						func(enableRegistration *bool, expectedValue bool) {
+							initSynapseVariables()
+
+							synapseSpec = synapsev1alpha1.SynapseSpec{
+								Homeserver: synapsev1alpha1.SynapseHomeserver{
+									Values: &synapsev1alpha1.SynapseHomeserverValues{
+										ServerName:  ServerName,
+										ReportStats: ReportStats,
+									},
+								},
+								IsOpenshift: true,
+							}
+
+							// Only set enableRegistration if provided
+							if enableRegistration != nil {
+								synapseSpec.Homeserver.Values.EnableRegistration = enableRegistration
+							}
+
+							createSynapseInstance()
+
+							By("Checking that the Synapse Status is correctly updated")
+							expectedStatus := synapsev1alpha1.SynapseStatus{
+								State:  "RUNNING",
+								Reason: "",
+								HomeserverConfiguration: synapsev1alpha1.SynapseStatusHomeserverConfiguration{
+									ServerName:          ServerName,
+									ReportStats:         ReportStats,
+									RegistrationEnabled: expectedValue,
+								},
+							}
+							// Status may need some time to be updated
+							Eventually(func() synapsev1alpha1.SynapseStatus {
+								_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
+								return synapse.Status
+							}, timeout, interval).Should(Equal(expectedStatus))
+
+							// Verify ConfigMap content
+							Eventually(func(g Gomega) {
+								By("Checking that the Synapse ConfigMap exists")
+								checkResourcePresence(createdConfigMap, synapseLookupKey, expectedOwnerReference)
+
+								By("Checking that the ConfigMap contains the enable_registration setting")
+								ConfigMapData, ok := createdConfigMap.Data["homeserver.yaml"]
+								g.Expect(ok).Should(BeTrue())
+
+								homeserver := make(map[string]any)
+								g.Expect(yaml.Unmarshal([]byte(ConfigMapData), homeserver)).Should(Succeed())
+
+								// Check enable_registration setting
+								enableRegistrationValue, exists := homeserver["enable_registration"]
+								if exists {
+									g.Expect(enableRegistrationValue).Should(Equal(expectedValue))
+								} else {
+									// If not present, Synapse defaults to false
+									g.Expect(expectedValue).Should(BeFalse())
+								}
+
+								// Check enable_registration_without_verification setting
+								enableRegistrationWithoutVerificationValue, withoutVerificationExists := homeserver["enable_registration_without_verification"]
+								if expectedValue {
+									// When registration is enabled, enable_registration_without_verification should also be true
+									g.Expect(withoutVerificationExists).Should(BeTrue())
+									g.Expect(enableRegistrationWithoutVerificationValue).Should(BeTrue())
+								} else {
+									// When registration is disabled, enable_registration_without_verification should not be present
+									g.Expect(withoutVerificationExists).Should(BeFalse())
+								}
+							}, timeout, interval).Should(Succeed())
+
+							cleanupSynapseResources()
 						},
-						IsOpenshift: true,
-					}
-
-					createSynapseInstance()
-				})
-
-				AfterAll(func() {
-					cleanupSynapseResources()
-				})
-
-				It("Should should update the Synapse Status", func() {
-					expectedStatus := synapsev1alpha1.SynapseStatus{
-						State:  "RUNNING",
-						Reason: "",
-						HomeserverConfiguration: synapsev1alpha1.SynapseStatusHomeserverConfiguration{
-							ServerName:  ServerName,
-							ReportStats: ReportStats,
-						},
-					}
-					// Status may need some time to be updated
-					Eventually(func() synapsev1alpha1.SynapseStatus {
-						_ = k8sClient.Get(ctx, synapseLookupKey, synapse)
-						return synapse.Status
-					}, timeout, interval).Should(Equal(expectedStatus))
-				})
-
-				It("Should create a Synapse ConfigMap", func() {
-					checkResourcePresence(createdConfigMap, synapseLookupKey, expectedOwnerReference)
-				})
-
-				It("Should create a Synapse PVC", func() {
-					checkResourcePresence(createdPVC, synapseLookupKey, expectedOwnerReference)
-				})
-
-				It("Should create a Synapse Deployment", func() {
-					By("Checking that a Synapse Deployment exists and is correctly configured")
-					checkResourcePresence(createdDeployment, synapseLookupKey, expectedOwnerReference)
-
-					By("Checking that initContainer for generating config file contains the required environment variables")
-					envVars := []corev1.EnvVar{{
-						Name:  "SYNAPSE_SERVER_NAME",
-						Value: ServerName,
-					}, {
-						Name:  "SYNAPSE_REPORT_STATS",
-						Value: utils.BoolToYesNo(ReportStats),
-					}}
-					Expect(createdDeployment.Spec.Template.Spec.InitContainers[1].Env).Should(ContainElements(envVars))
-				})
-
-				It("Should create a Synapse Service", func() {
-					checkResourcePresence(createdService, synapseLookupKey, expectedOwnerReference)
-				})
-
-				It("Should create a Synapse ServiceAccount", func() {
-					checkResourcePresence(createdServiceAccount, synapseLookupKey, expectedOwnerReference)
-				})
-
-				It("Should create a Synapse RoleBinding", func() {
-					checkResourcePresence(createdRoleBinding, synapseLookupKey, expectedOwnerReference)
+						Entry("when enableRegistration is nil (default)", nil, false),
+						Entry("when enableRegistration is false", utils.BoolAddr(false), false),
+						Entry("when enableRegistration is true", utils.BoolAddr(true), true),
+					)
 				})
 			})
 
@@ -534,8 +630,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							State:  "RUNNING",
 							Reason: "",
 							HomeserverConfiguration: synapsev1alpha1.SynapseStatusHomeserverConfiguration{
-								ServerName:  ServerName,
-								ReportStats: ReportStats,
+								ServerName:          ServerName,
+								ReportStats:         ReportStats,
+								RegistrationEnabled: false, // Default value
 							},
 						}
 						// Status may need some time to be updated
@@ -764,8 +861,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							State:  "RUNNING",
 							Reason: "",
 							HomeserverConfiguration: synapsev1alpha1.SynapseStatusHomeserverConfiguration{
-								ServerName:  ServerName,
-								ReportStats: ReportStats,
+								ServerName:          ServerName,
+								ReportStats:         ReportStats,
+								RegistrationEnabled: false, // Default value
 							},
 						}
 						// Status may need some time to be updated
@@ -912,8 +1010,9 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 							State:  "RUNNING",
 							Reason: "",
 							HomeserverConfiguration: synapsev1alpha1.SynapseStatusHomeserverConfiguration{
-								ServerName:  ServerName,
-								ReportStats: ReportStats,
+								ServerName:          ServerName,
+								ReportStats:         ReportStats,
+								RegistrationEnabled: false, // Default value
 							},
 						}
 						// Status may need some time to be updated
