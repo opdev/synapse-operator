@@ -11,7 +11,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: heisenbridges.synapse.opdev.io
 spec:
   group: synapse.opdev.io
@@ -116,7 +116,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: mautrixsignals.synapse.opdev.io
 spec:
   group: synapse.opdev.io
@@ -223,7 +223,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: synapses.synapse.opdev.io
 spec:
   group: synapse.opdev.io
@@ -299,6 +299,11 @@ spec:
                       Holds the required values for the creation of a homeserver.yaml
                       configuration file by the Synapse Operator
                     properties:
+                      enableRegistration:
+                        default: false
+                        description: Whether new user registration is allowed. Defaults
+                          to false.
+                        type: boolean
                       reportStats:
                         description: Whether or not to report anonymized homeserver
                           usage statistics
@@ -370,6 +375,9 @@ spec:
               homeserverConfiguration:
                 description: Holds configuration information for Synapse
                 properties:
+                  registrationEnabled:
+                    description: Whether new user registration is enabled
+                    type: boolean
                   reportStats:
                     description: Whether or not to report anonymized homeserver usage
                       statistics
@@ -879,7 +887,7 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: quay.io/opdev/synapse-operator:v0.7.0
+        image: quay.io/opdev/synapse-operator:v0.8.0
         livenessProbe:
           httpGet:
             path: /healthz
