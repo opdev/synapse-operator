@@ -4,7 +4,6 @@ go 1.24.0
 
 require (
 	dario.cat/mergo v1.0.2
-	github.com/crunchydata/postgres-operator v1.3.3-0.20220202164906-1c3cc3597c95
 	github.com/onsi/ginkgo/v2 v2.25.3
 	github.com/onsi/gomega v1.38.2
 	github.com/opdev/subreconciler v0.0.3
