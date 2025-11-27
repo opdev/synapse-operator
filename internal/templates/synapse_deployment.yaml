@@ -35,7 +35,7 @@ spec:
               mountPath: /data-homeserver
             - name: data-pv
               mountPath: /data
-        - image: "matrixdotorg/synapse:v1.136.0"
+        - image: "matrixdotorg/synapse:v1.143.0"
           name: "synapse-generate"
           args: [ "generate" ]
           env:
@@ -61,7 +61,7 @@ spec:
             mountPath: /data-mautrixsignal
         {{- end }}
       containers:
-        - image: "matrixdotorg/synapse:v1.136.0"
+        - image: "matrixdotorg/synapse:v1.143.0"
           name: "synapse"
           env:
             - name: SYNAPSE_CONFIG_PATH
