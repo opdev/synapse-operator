@@ -37,8 +37,6 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	pgov1beta1 "github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
-
 	synapsev1alpha1 "github.com/opdev/synapse-operator/api/synapse/v1alpha1"
 	heisenbridgecontroller "github.com/opdev/synapse-operator/internal/controller/synapse/heisenbridge"
 	mautrixsignalcontroller "github.com/opdev/synapse-operator/internal/controller/synapse/mautrixsignal"
@@ -55,7 +53,6 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(synapsev1alpha1.AddToScheme(scheme))
-	utilruntime.Must(pgov1beta1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

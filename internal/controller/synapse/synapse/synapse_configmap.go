@@ -23,8 +23,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"strconv"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -217,113 +215,6 @@ func (r *SynapseReconciler) ParseHomeserverConfigMap(
 	)
 
 	return nil
-}
-
-// updateSynapseConfigMapForPostgresCluster is a function of type
-// FnWithRequest, to be called in the main reconciliation loop.
-//
-// It configures the 'database' section of homeserver.yaml to allow Synapse to
-// connect to the newly created PostgresCluster instance.
-func (r *SynapseReconciler) updateSynapseConfigMapForPostgresCluster(
-	ctx context.Context,
-	req ctrl.Request,
-) (*ctrl.Result, error) {
-	s := &synapsev1alpha1.Synapse{}
-	if r, err := utils.GetResource(ctx, r.Client, req, s); subreconciler.ShouldHaltOrRequeue(r, err) {
-		return r, err
-	}
-
-	keyForSynapse := types.NamespacedName{
-		Name:      s.Name,
-		Namespace: s.Namespace,
-	}
-
-	if err := utils.UpdateConfigMap(
-		ctx,
-		r.Client,
-		keyForSynapse,
-		s,
-		r.updateHomeserverWithPostgreSQLInfos,
-		"homeserver.yaml",
-	); err != nil {
-		return subreconciler.RequeueWithError(err)
-	}
-
-	return subreconciler.ContinueReconciling()
-}
-
-func (r *SynapseReconciler) updateHomeserverWithPostgreSQLInfos(
-	obj client.Object,
-	homeserver map[string]any,
-) error {
-	s := obj.(*synapsev1alpha1.Synapse)
-
-	databaseData, err := r.fetchDatabaseDataFromSynapseStatus(*s)
-	if err != nil {
-		return err
-	}
-
-	// Save new database section of homeserver.yaml
-	homeserver["database"] = databaseData
-	return nil
-}
-
-func (r *SynapseReconciler) fetchDatabaseDataFromSynapseStatus(s synapsev1alpha1.Synapse) (map[string]any, error) {
-	databaseData := HomeserverPgsqlDatabase{}
-
-	// Check if s.Status.DatabaseConnectionInfo contains necessary information
-	if s.Status.DatabaseConnectionInfo == (synapsev1alpha1.SynapseStatusDatabaseConnectionInfo{}) {
-		err := errors.New("missing DatabaseConnectionInfo in Synapse status")
-		return map[string]any{}, err
-	}
-
-	if s.Status.DatabaseConnectionInfo.User == "" {
-		err := errors.New("missing User in DatabaseConnectionInfo")
-		return map[string]any{}, err
-	}
-
-	if s.Status.DatabaseConnectionInfo.Password == "" {
-		err := errors.New("missing Password in DatabaseConnectionInfo")
-		return map[string]any{}, err
-	}
-	decodedPassword := base64decode([]byte(s.Status.DatabaseConnectionInfo.Password))
-
-	if s.Status.DatabaseConnectionInfo.DatabaseName == "" {
-		err := errors.New("missing DatabaseName in DatabaseConnectionInfo")
-		return map[string]any{}, err
-	}
-
-	if s.Status.DatabaseConnectionInfo.ConnectionURL == "" {
-		err := errors.New("missing ConnectionURL in DatabaseConnectionInfo")
-		return map[string]any{}, err
-	}
-	connectionURL := strings.Split(s.Status.DatabaseConnectionInfo.ConnectionURL, ":")
-	if len(connectionURL) < 2 {
-		err := errors.New("error parsing the Connection URL with value: " + s.Status.DatabaseConnectionInfo.ConnectionURL)
-		return map[string]any{}, err
-	}
-	port, err := strconv.ParseInt(connectionURL[1], 10, 64)
-	if err != nil {
-		return map[string]any{}, err
-	}
-
-	// Populate databaseData
-	databaseData.Name = "psycopg2"
-	databaseData.Args.User = s.Status.DatabaseConnectionInfo.User
-	databaseData.Args.Password = decodedPassword
-	databaseData.Args.Database = s.Status.DatabaseConnectionInfo.DatabaseName
-	databaseData.Args.Host = connectionURL[0]
-	databaseData.Args.Port = port
-	databaseData.Args.CpMin = 5
-	databaseData.Args.CpMax = 10
-
-	// Convert databaseData into a map[string]any
-	databaseDataMap, err := utils.ConvertStructToMap(databaseData)
-	if err != nil {
-		return map[string]any{}, err
-	}
-
-	return databaseDataMap, nil
 }
 
 // updateSynapseConfigMapForBridges is a function of type
