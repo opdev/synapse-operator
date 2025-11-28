@@ -78,7 +78,6 @@ metadata:
   resourceVersion: "98298"
   uid: 086652b1-9ba9-40ed-9223-1336db12681d
 spec:
-  createNewPostgreSQL: false
   homeserver:
     values:
       reportStats: true
@@ -124,63 +123,6 @@ $ kubectl delete synapse using-existing-configmap
 synapse.synapse..opdevio "using-existing-configmap" deleted
 $ kubectl delete configmap my-custom-homeserver
 configmap "my-custom-homeserver" deleted
-```
-
-## [DEPRECATED] Deploying a PostgreSQL instance for Synapse
-
-> [!WARNING]
-> This feature is not tested on recent versions of the Synapse Operator and
-> will be removed in the future
-
-> [!NOTE]
-> *Pre-requisite:* The deployment of a PostgreSQL instance relies on the
->  [postgres-operator](https://github.com/CrunchyData/postgres-operator). Make
->  sure it is running on your cluster if you want to deploy a PostgreSQL
->  instance for Synapse.
-
-The `03-deploying-postgresql` directory provides an example of a `Synapse`
-resource requesting for a new PostgreSQL instance to be deployed:
-
-```shell
-$ kubectl apply -f examples/03-deploying-postgresql/synapse.yaml
-synapse.synapse.opdev.io/synapse-with-postgresql created
-
-$ kubectl get pods,replicaset,deployment,statefulset,jobs,pods,service,configmap
-NAME                                               READY   STATUS             RESTARTS   AGE
-pod/synapse-with-postgresql-5d859d7b57-wrdl9       1/1     Running            0          77s
-pod/synapse-with-postgresql-backup-n29s--1-7c7zh   0/1     Completed          0          87s
-pod/synapse-with-postgresql-instance1-b7tj-0       3/3     Running            0          98s
-pod/synapse-with-postgresql-repo-host-0            1/1     Running            0          98s
-
-NAME                                                 DESIRED   CURRENT   READY   AGE
-replicaset.apps/synapse-with-postgresql-5d859d7b57   1         1         1       78s
-
-NAME                                      READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/synapse-with-postgresql   1/1     1            1           78s
-
-NAME                                                      READY   AGE
-statefulset.apps/synapse-with-postgresql-instance1-b7tj   1/1     98s
-statefulset.apps/synapse-with-postgresql-repo-host        1/1     98s
-
-NAME                                            COMPLETIONS   DURATION   AGE
-job.batch/synapse-with-postgresql-backup-n29s   1/1           27s        87s
-
-NAME                                        TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
-service/synapse-with-postgresql             ClusterIP   10.217.4.222   <none>        8008/TCP   78s
-service/synapse-with-postgresql-ha          ClusterIP   10.217.5.159   <none>        5432/TCP   99s
-service/synapse-with-postgresql-ha-config   ClusterIP   None           <none>        <none>     98s
-service/synapse-with-postgresql-pods        ClusterIP   None           <none>        <none>     99s
-service/synapse-with-postgresql-primary     ClusterIP   None           <none>        5432/TCP   99s
-service/synapse-with-postgresql-replicas    ClusterIP   10.217.5.24    <none>        5432/TCP   99s
-
-NAME                                                      DATA   AGE
-configmap/kube-root-ca.crt                                1      6d19h
-configmap/openshift-service-ca.crt                        1      6d19h
-configmap/synapse-with-postgresql                         1      99s
-configmap/synapse-with-postgresql-config                  1      99s
-configmap/synapse-with-postgresql-instance1-b7tj-config   1      98s
-configmap/synapse-with-postgresql-pgbackrest-config       3      98s
-configmap/synapse-with-postgresql-ssh-config              2      98s
 ```
 
 ## Deploying a bridge

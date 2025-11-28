@@ -47,7 +47,6 @@ metadata:
             "name": "synapse-sample"
           },
           "spec": {
-            "createNewPostgreSQL": false,
             "homeserver": {
               "values": {
                 "reportStats": true,
@@ -60,7 +59,7 @@ metadata:
     capabilities: Basic Install
     categories: Developer Tools
     containerImage: quay.io/opdev/synapse-operator
-    createdAt: "2025-08-15T10:29:51Z"
+    createdAt: "2025-11-28T12:00:17Z"
     description: Deploys and manages the lifecycle of Synapse servers and their associated
       components (bridges, databases, ...). Synapse is the reference Matrix homeserver
       implementation.
@@ -118,18 +117,6 @@ spec:
           - apps
           resources:
           - deployments
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - postgres-operator.crunchydata.com
-          resources:
-          - postgresclusters
           verbs:
           - create
           - delete

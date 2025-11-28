@@ -139,15 +139,10 @@ directory.
 
 ## Notes and pre-requisites
 
-- The [postgres-operator](https://github.com/CrunchyData/postgres-operator)
-  needs to be installed. Specifically the `PostgresCluster` CRD is required.
-  This is only required if you intend to deploy a PostgreSQL instance alongside
-  Synapse.
 - Tested on OpenShift 4.9.0
 
 # Related links
 
 - [Matrix project homepage](https://matrix.org/)
 - [Synape Repository](https://github.com/matrix-org/synapse/)
-- [postgres-operator](https://github.com/CrunchyData/postgres-operator)
 - [Heisenbridge](https://github.com/hifi/heisenbridge)

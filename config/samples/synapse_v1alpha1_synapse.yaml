@@ -6,7 +6,6 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: synapse-sample
 spec:
-  createNewPostgreSQL: false
   homeserver:
     values:
       serverName: my.matrix.host

@@ -38,12 +38,6 @@ type SynapseSpec struct {
 
 	// +kubebuilder:default:=false
 
-	// Set to true to create a new PostreSQL instance. The homeserver.yaml
-	// 'database' section will be overwritten.
-	CreateNewPostgreSQL bool `json:"createNewPostgreSQL,omitempty"`
-
-	// +kubebuilder:default:=false
-
 	// Set to true if deploying on OpenShift
 	IsOpenshift bool `json:"isOpenshift,omitempty"`
 }
@@ -89,12 +83,6 @@ type SynapseHomeserverValues struct {
 
 // SynapseStatus defines the observed state of Synapse.
 type SynapseStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Connection information to the external PostgreSQL Database
-	DatabaseConnectionInfo SynapseStatusDatabaseConnectionInfo `json:"databaseConnectionInfo,omitempty"`
-
 	// Holds configuration information for Synapse
 	HomeserverConfiguration SynapseStatusHomeserverConfiguration `json:"homeserverConfiguration,omitempty"`
 
@@ -135,23 +123,6 @@ type SynapseStatusBridgesMautrixSignal struct {
 
 	// Name of the mautrix-signal bridge object
 	Name string `json:"name,omitempty"`
-}
-
-type SynapseStatusDatabaseConnectionInfo struct {
-	// Endpoint to connect to the PostgreSQL database
-	ConnectionURL string `json:"connectionURL,omitempty"`
-
-	// Name of the database to connect to
-	DatabaseName string `json:"databaseName,omitempty"`
-
-	// User allowed to query the given database
-	User string `json:"user,omitempty"`
-
-	// Base64 encoded password
-	Password string `json:"password,omitempty"`
-
-	// State of the PostgreSQL database
-	State string `json:"State,omitempty"`
 }
 
 type SynapseStatusHomeserverConfiguration struct {

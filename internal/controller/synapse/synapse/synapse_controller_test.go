@@ -18,10 +18,7 @@ package synapse
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -34,7 +31,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -48,7 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	pgov1beta1 "github.com/crunchydata/postgres-operator/pkg/apis/postgres-operator.crunchydata.com/v1beta1"
 	synapsev1alpha1 "github.com/opdev/synapse-operator/api/synapse/v1alpha1"
 	"github.com/opdev/synapse-operator/helpers/utils"
 )
@@ -90,8 +85,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 		Expect(cfg).NotTo(BeNil())
 
 		Expect(synapsev1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
-		Expect(pgov1beta1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
-
 		// +kubebuilder:scaffold:scheme
 
 		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
@@ -132,39 +125,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 			ctx, cancel = context.WithCancel(context.TODO())
 
-			By("Getting latest version of the PostgresCluster CRD")
-			postgresOperatorVersion := "5.2.0"
-			postgresClusterURL := "https://raw.githubusercontent.com/redhat-openshift-ecosystem/" +
-				"community-operators-prod/main/operators/postgresql/" + postgresOperatorVersion +
-				"/manifests/postgresclusters.postgres-operator.crunchydata.com.crd.yaml"
-
-			resp, err := http.Get(postgresClusterURL)
-			Expect(err).ShouldNot(HaveOccurred())
-
-			// The CRD is downloaded as a YAML document. The CustomResourceDefinition
-			// struct defined in the v1 package only possess json tags. In order to
-			// successfully Unmarshal the CRD Document into a
-			// CustomResourceDefinition object, it is necessary to first transform the
-			// YAML document into a intermediate JSON document.
-			defer resp.Body.Close() //nolint:errcheck
-			yamlBody, err := io.ReadAll(resp.Body)
-			Expect(err).ShouldNot(HaveOccurred())
-
-			// Unmarshal the YAML document into an intermediate map
-			var mapBody any
-			Expect(yaml.Unmarshal(yamlBody, &mapBody)).ShouldNot(HaveOccurred())
-
-			// The map has to be converted. See https://stackoverflow.com/a/40737676/6133648
-			mapBody = utils.Convert(mapBody)
-
-			// Marshal the map into an intermediate JSON document
-			jsonBody, err := json.Marshal(mapBody)
-			Expect(err).ShouldNot(HaveOccurred())
-
-			// Unmarshall the JSON document into the final CustomResourceDefinition object.
-			var PostgresClusterCRD v1.CustomResourceDefinition
-			Expect(json.Unmarshal(jsonBody, &PostgresClusterCRD)).ShouldNot(HaveOccurred())
-
 			By("bootstrapping test environment")
 			testEnv = &envtest.Environment{
 				CRDDirectoryPaths: []string{
@@ -172,7 +132,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					filepath.Join("..", "..", "..", "..", "bundle", "manifests", "synapse.opdev.io_heisenbridges.yaml"),
 					filepath.Join("..", "..", "..", "..", "bundle", "manifests", "synapse.opdev.io_mautrixsignals.yaml"),
 				},
-				CRDs:                  []*v1.CustomResourceDefinition{&PostgresClusterCRD},
 				ErrorIfCRDPathMissing: true,
 				BinaryAssetsDirectory: filepath.Join("..", "..", "..", "bin", "k8s",
 					fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
@@ -217,7 +176,7 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					"spec": map[string]any{},
 				}),
 				Entry("when Synapse spec is missing Homeserver", map[string]any{
-					"spec": map[string]any{"createNewPostgreSQL": true},
+					"spec": map[string]any{"IsOpenshift": true},
 				}),
 				Entry("when Synapse spec Homeserver is empty", map[string]any{
 					"spec": map[string]any{
@@ -324,18 +283,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 									"serverName":         ServerName,
 									"reportStats":        ReportStats,
 									"enableRegistration": true,
-								},
-							},
-						},
-					},
-				),
-				Entry(
-					"when optional CreateNewPostgreSQL and ConfigMap Namespace are missing",
-					map[string]any{
-						"spec": map[string]any{
-							"homeserver": map[string]any{
-								"configMap": map[string]any{
-									"name": InputConfigMapName,
 								},
 							},
 						},
@@ -675,151 +622,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 
 					It("Should create a Synapse RoleBinding", func() {
 						checkResourcePresence(createdRoleBinding, synapseLookupKey, expectedOwnerReference)
-					})
-				})
-
-				When("Requesting a new PostgreSQL instance to be created for Synapse", func() {
-					var createdPostgresCluster *pgov1beta1.PostgresCluster
-					var postgresSecret corev1.Secret
-					var postgresLookupKeys types.NamespacedName
-
-					BeforeAll(func() {
-						initSynapseVariables()
-
-						postgresLookupKeys = types.NamespacedName{
-							Name:      synapseLookupKey.Name + "-pgsql",
-							Namespace: synapseLookupKey.Namespace,
-						}
-
-						// Init variable
-						createdPostgresCluster = &pgov1beta1.PostgresCluster{}
-
-						inputConfigmapData = map[string]string{
-							"homeserver.yaml": "server_name: " + ServerName + "\n" +
-								"report_stats: " + strconv.FormatBool(ReportStats),
-						}
-
-						synapseSpec = synapsev1alpha1.SynapseSpec{
-							Homeserver: synapsev1alpha1.SynapseHomeserver{
-								ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
-									Name: InputConfigMapName,
-								},
-							},
-							CreateNewPostgreSQL: true,
-							IsOpenshift:         true,
-						}
-
-						createSynapseConfigMap()
-						createSynapseInstance()
-					})
-
-					doPostgresControllerJob := func() {
-						// The postgres-operator is responsible for creating a Secret holding
-						// information on how to connect to the synapse Database with the synapse
-						// user. As this controller is not running during our integration tests,
-						// we have to manually create this secret here.
-						postgresSecret = corev1.Secret{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      SynapseName + "-pgsql-pguser-synapse",
-								Namespace: SynapseNamespace,
-							},
-							Data: map[string][]byte{
-								"host":     []byte("hostname.postgresql.url"),
-								"port":     []byte("5432"),
-								"dbname":   []byte("synapse"),
-								"user":     []byte("synapse"),
-								"password": []byte("VerySecureSyn@psePassword!"),
-							},
-						}
-						Expect(k8sClient.Create(ctx, &postgresSecret)).Should(Succeed())
-
-						// The portgres-operator is responsible for updating the PostgresCluster
-						// status, with the number of Pods being ready. This is used a part of
-						// the 'isPostgresClusterReady' method in the Synapse controller.
-						createdPostgresCluster.Status.InstanceSets = []pgov1beta1.PostgresInstanceSetStatus{{
-							Name:            "instance1",
-							Replicas:        1,
-							ReadyReplicas:   1,
-							UpdatedReplicas: 1,
-						}}
-						Expect(k8sClient.Status().Update(ctx, createdPostgresCluster)).Should(Succeed())
-					}
-
-					AfterAll(func() {
-						By("Cleaning up the Synapse PostgresCluster")
-						deleteResource(createdPostgresCluster, postgresLookupKeys, false)
-
-						cleanupSynapseResources()
-						cleanupSynapseConfigMap()
-					})
-
-					It("Should create a PostgresCluster for Synapse", func() {
-						By("Checking that a Synapse PostgresCluster exists")
-						checkResourcePresence(createdPostgresCluster, postgresLookupKeys, expectedOwnerReference)
-					})
-
-					It("Should update the Synapse status", func() {
-						By("Checking that the controller detects the Database as not ready")
-						Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).Should(Succeed())
-						Expect(synapse.Status.DatabaseConnectionInfo.State).Should(Equal("NOT READY"))
-
-						// Once the PostgresCluster has been created, we simulate the
-						// postgres-operator reconciliation.
-						By("Simulating the postgres-operator controller job")
-						doPostgresControllerJob()
-
-						By("Checking that the Synapse Status is correctly updated")
-						Eventually(func(g Gomega) {
-							g.Expect(k8sClient.Get(ctx, synapseLookupKey, synapse)).Should(Succeed())
-
-							g.Expect(synapse.Status.DatabaseConnectionInfo.ConnectionURL).Should(Equal("hostname.postgresql.url:5432"))
-							g.Expect(synapse.Status.DatabaseConnectionInfo.DatabaseName).Should(Equal("synapse"))
-							g.Expect(synapse.Status.DatabaseConnectionInfo.User).Should(Equal("synapse"))
-							encodedPassword := string(base64encode("VerySecureSyn@psePassword!"))
-							g.Expect(synapse.Status.DatabaseConnectionInfo.Password).Should(Equal(encodedPassword))
-							g.Expect(synapse.Status.DatabaseConnectionInfo.State).Should(Equal("READY"))
-						}, timeout, interval).Should(Succeed())
-					})
-
-					It("Should update the ConfigMap Data", func() {
-						Eventually(func(g Gomega) {
-							// Fetching database section of the homeserver.yaml configuration file
-							g.Expect(k8sClient.Get(ctx,
-								types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace},
-								createdConfigMap,
-							)).Should(Succeed())
-
-							ConfigMapData, ok := createdConfigMap.Data["homeserver.yaml"]
-							g.Expect(ok).Should(BeTrue())
-
-							homeserver := make(map[string]any)
-							g.Expect(yaml.Unmarshal([]byte(ConfigMapData), homeserver)).Should(Succeed())
-
-							_, ok = homeserver["database"]
-							g.Expect(ok).Should(BeTrue())
-
-							marshalled_homeserver_database, err := yaml.Marshal(homeserver["database"])
-							g.Expect(err).ShouldNot(HaveOccurred())
-
-							var hs_database HomeserverPgsqlDatabase
-							g.Expect(yaml.Unmarshal(marshalled_homeserver_database, &hs_database)).Should(Succeed())
-
-							// hs_database, ok := homeserver["database"].(HomeserverPgsqlDatabase)
-							// g.Expect(ok).Should(BeTrue())
-
-							// Testing that the database section is correctly configured for using
-							// the PostgreSQL DB
-							g.Expect(hs_database.Name).Should(Equal("psycopg2"))
-							g.Expect(hs_database.Args.Host).Should(Equal("hostname.postgresql.url"))
-
-							g.Expect(hs_database.Args.Port).Should(Equal(int64(5432)))
-							g.Expect(hs_database.Args.Database).Should(Equal("synapse"))
-							g.Expect(hs_database.Args.User).Should(Equal("synapse"))
-							g.Expect(hs_database.Args.Password).Should(Equal("VerySecureSyn@psePassword!"))
-
-							g.Expect(hs_database.Args.CpMin).Should(Equal(int64(5)))
-							g.Expect(hs_database.Args.CpMax).Should(Equal(int64(10)))
-						}, timeout, interval).Should(Succeed())
 					})
 				})
 
@@ -1172,124 +974,6 @@ var _ = Describe("Integration tests for the Synapse controller", Ordered, Label(
 					createdService,
 					createdServiceAccount,
 					createdRoleBinding,
-				)
-			})
-		})
-	})
-
-	Context("When the Kubernetes cluster is missing the postgres-operator", func() {
-		BeforeAll(func() {
-			logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
-
-			ctx, cancel = context.WithCancel(context.TODO())
-
-			By("bootstrapping test environment")
-			testEnv = &envtest.Environment{
-				CRDDirectoryPaths: []string{
-					filepath.Join("..", "..", "..", "..", "bundle", "manifests", "synapse.opdev.io_synapses.yaml"),
-				},
-				ErrorIfCRDPathMissing: true,
-				BinaryAssetsDirectory: filepath.Join("..", "..", "..", "bin", "k8s",
-					fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
-				AttachControlPlaneOutput: true,
-			}
-
-			startenvTest()
-		})
-
-		AfterAll(func() {
-			cancel()
-			By("tearing down the test environment")
-			err := testEnv.Stop()
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		When("Requesting a new PostgreSQL instance to be created for Synapse", func() {
-			var synapse *synapsev1alpha1.Synapse
-			var configMap *corev1.ConfigMap
-
-			var createdPVC *corev1.PersistentVolumeClaim
-			var createdDeployment *appsv1.Deployment
-			var createdService *corev1.Service
-			var createdServiceAccount *corev1.ServiceAccount
-			var createdRoleBinding *rbacv1.RoleBinding
-			var synapseLookupKey types.NamespacedName
-
-			var createdPostgresCluster *pgov1beta1.PostgresCluster
-			var postgresLookupKeys types.NamespacedName
-
-			var initSynapseVariables = func() {
-				// Init variables
-				synapseLookupKey = types.NamespacedName{Name: SynapseName, Namespace: SynapseNamespace}
-				createdPVC = &corev1.PersistentVolumeClaim{}
-				createdDeployment = &appsv1.Deployment{}
-				createdService = &corev1.Service{}
-				createdServiceAccount = &corev1.ServiceAccount{}
-				createdRoleBinding = &rbacv1.RoleBinding{}
-			}
-
-			BeforeAll(func() {
-				initSynapseVariables()
-
-				postgresLookupKeys = types.NamespacedName{
-					Name:      synapseLookupKey.Name + "-pgsql",
-					Namespace: synapseLookupKey.Namespace,
-				}
-
-				createdPostgresCluster = &pgov1beta1.PostgresCluster{}
-
-				configMap = &corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      InputConfigMapName,
-						Namespace: SynapseNamespace,
-					},
-					Data: map[string]string{
-						"homeserver.yaml": "server_name: " + ServerName + "\n" +
-							"report_stats: " + strconv.FormatBool(ReportStats),
-					},
-				}
-				Expect(k8sClient.Create(ctx, configMap)).Should(Succeed())
-
-				By("Creating the Synapse instance")
-				synapse = &synapsev1alpha1.Synapse{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      SynapseName,
-						Namespace: SynapseNamespace,
-					},
-					Spec: synapsev1alpha1.SynapseSpec{
-						Homeserver: synapsev1alpha1.SynapseHomeserver{
-							ConfigMap: &synapsev1alpha1.SynapseHomeserverConfigMap{
-								Name: InputConfigMapName,
-							},
-						},
-						CreateNewPostgreSQL: true,
-					},
-				}
-				Expect(k8sClient.Create(ctx, synapse)).Should(Succeed())
-			})
-
-			AfterAll(func() {
-				By("Cleaning up ConfigMap")
-				Expect(k8sClient.Delete(ctx, configMap)).Should(Succeed())
-
-				By("Cleaning up Synapse CR")
-				Expect(k8sClient.Delete(ctx, synapse)).Should(Succeed())
-			})
-
-			It("Should not create Synapse sub-resources", func() {
-				reason := "Cannot create PostgreSQL instance for synapse. Postgres-operator is not installed."
-				checkStatus("FAILED", reason, synapseLookupKey, synapse)
-				checkSubresourceAbsence(
-					synapseLookupKey,
-					createdPVC,
-					createdDeployment,
-					createdService,
-					createdServiceAccount,
-					createdRoleBinding,
-				)
-				checkSubresourceAbsence(
-					postgresLookupKeys,
-					createdPostgresCluster,
 				)
 			})
 		})
