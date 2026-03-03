@@ -38,7 +38,7 @@ spec:
         - mountPath: /data
           name: mautrixsignal-data
       containers:
-      - image: dock.mau.dev/mautrix/signal:v25.11
+      - image: dock.mau.dev/mautrix/signal:v26.02.2
         name: mautrix-signal
         volumeMounts:
         - mountPath: /data
